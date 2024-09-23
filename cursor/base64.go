@@ -1,0 +1,50 @@
+package cursor
+
+import (
+	"context"
+	"encoding/base64"
+
+	"github.com/pkg/errors"
+	"github.com/samber/lo"
+	relay "github.com/theplant/gorelay"
+)
+
+func WrapBase64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
+	return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
+		if req.After != nil {
+			cursor, err := base64.StdEncoding.DecodeString(*req.After)
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid after cursor")
+			}
+			req.After = lo.ToPtr(string(cursor))
+		}
+
+		if req.Before != nil {
+			cursor, err := base64.StdEncoding.DecodeString(*req.Before)
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid before cursor")
+			}
+			req.Before = lo.ToPtr(string(cursor))
+		}
+
+		resp, err := next(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+
+		// Encrypt the cursor
+		for i := range resp.Edges {
+			edge := &resp.Edges[i]
+			originalCursor := edge.Cursor
+			edge.Cursor = func(ctx context.Context, node T) (string, error) {
+				cursor, err := originalCursor(ctx, node)
+				if err != nil {
+					return "", err
+				}
+				return base64.StdEncoding.EncodeToString([]byte(cursor)), nil
+			}
+		}
+
+		return resp, nil
+	}
+}
