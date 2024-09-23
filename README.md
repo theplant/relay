@@ -2,6 +2,8 @@
 
 `gorelay` is a library designed to simplify Relay-style pagination in Go applications, supporting both cursor-based and offset-based pagination. It helps developers efficiently implement GraphQL pagination queries while offering optimization options, such as skipping `TotalCount` queries and encrypting cursors.
 
+**Currently, only the `GORM` adapter is provided by default. For other adapters, refer to `gormrelay` to implement them yourself.**
+
 ## Features
 
 - **Supports cursor-based and offset-based pagination**: You can freely choose high-performance cursor pagination based on multiple indexed columns, or use offset pagination.
