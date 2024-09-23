@@ -1,58 +1,83 @@
 # gorelay
 
+`gorelay` is a library designed to simplify Relay-style pagination in Go applications, supporting both cursor-based and offset-based pagination. It helps developers efficiently implement GraphQL pagination queries while offering optimization options, such as skipping `TotalCount` queries and encrypting cursors.
+
+## Features
+
+- **Supports cursor-based and offset-based pagination**: You can freely choose high-performance cursor pagination based on multiple indexed columns, or use offset pagination.
+- **Optional cursor encryption**: Supports encrypting cursors using AES or Base64 to ensure the security of pagination information.
+- **Flexible query strategies**: Optionally skip the `TotalCount` query to improve performance, especially in large datasets.
+- **Non-generic support**: Even without using Go generics, you can paginate using the `any` type for flexible use cases.
+
 ## Usage
+
+### Basic Usage
 
 ```go
 p := relay.New(
-    true, // nodesOnly
+    true, // nodesOnly, default returns nodes and pageInfo
     10, 10, // maxLimit / limitIfNotSet
     []relay.OrderBy{
-        {Field: "ID", Desc: false},
-    }, // orderBysIfNotSet
+        {Field: "ID", Desc: false}, // default order if not provided
+    },
     func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-        // return gormrelay.NewOffsetAdapter[*User](db)(ctx, req) // offset-based
-        return gormrelay.NewKeysetAdapter[*User](db)(ctx, req) // cursor-based
-    }, // applyCursorsFunc
+        // Offset-based pagination
+        // return gormrelay.NewOffsetAdapter[*User](db)(ctx, req)
+        // Cursor-based pagination
+        return gormrelay.NewKeysetAdapter[*User](db)(ctx, req)
+    },
 )
 resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-    First: lo.ToPtr(10),
+    First: lo.ToPtr(10), // query first 10 records
 })
 ```
 
-If you need to encrypt the cursor
+### Encrypting Cursors
+
+If you need to encrypt cursors, you can use WrapBase64 or WrapAES wrappers:
 
 ```go
+// Encrypt cursors with Base64
 cursor.WrapBase64(gormrelay.NewOffsetAdapter[*User](db))
+
+// Encrypt cursors with AES
 cursor.WrapAES(gormrelay.NewKeysetAdapter[*User](db), encryptionKey)
 ```
 
-If you do not want to query `TotalCount` to improve query performance
+### Skipping `TotalCount` Query for Optimization
+
+To improve performance, you can skip querying TotalCount, especially useful for large datasets:
 
 ```go
+// Cursor-based pagination without querying TotalCount
 cursor.NewKeysetAdapter(gormrelay.NewKeysetFinder[any](db))
 
-// !!! Note: For offset-based pagination, it is not possible to use `Last != nil && Before == nil` if cant query `TotalCount`
+// Note: For offset-based pagination, if you can't query TotalCount, 
+// using `Last != nil && Before == nil` is not possible.
 cursor.NewOffsetAdapter(gormrelay.NewOffsetFinder[any](db))
 ```
 
-If you do not want to use generics, you can create Pagination with the `any` type and use it with the `db.Model` method.
+### Non-Generic Usage
+
+If you do not use generics, you can create a paginator with the `any` type and combine it with the `db.Model` method:
 
 ```go
 p := relay.New(
-    false,
+    false, // nodesOnly
     10, 10,
     []relay.OrderBy{
         {Field: "ID", Desc: false},
-    }, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
-        // This is a generic(T: any) function, so we must to call db.Model(x)
+    },
+    func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+        // Since this is a generic function (T: any), we must call db.Model(x)
         return gormrelay.NewKeysetAdapter[*User](db.Model(&User{}))(ctx, req)
     },
 )
 resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
-    First: lo.ToPtr(10),
+    First: lo.ToPtr(10), // query first 10 records
 })
 ```
 
 ## Reference
 
-[GraphQL Connections](https://relay.dev/graphql/connections.htm)
+For more information about Relay-style pagination, refer to [GraphQL Connections](https://relay.dev/graphql/connections.htm).
