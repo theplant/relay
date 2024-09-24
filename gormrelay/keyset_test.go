@@ -178,12 +178,13 @@ func TestScopeKeyset(t *testing.T) {
 func TestKeysetCursor(t *testing.T) {
 	resetDB(t)
 
-	defaultOrderBys := []relay.OrderBy{
-		{Field: "ID", Desc: false},
-		{Field: "Age", Desc: true},
-	}
-	defaultOrderByKeys := []string{"ID", "Age"}
-	applyCursorsFunc := NewKeysetAdapter[*User](db)
+	primaryOrderByKeys := []string{"ID", "Age"}
+	applyCursorsFunc := relay.PrimaryOrderBys[*User](
+		relay.OrderBy{Field: "ID", Desc: false},
+		relay.OrderBy{Field: "Age", Desc: true},
+	)(
+		NewKeysetAdapter[*User](db),
+	)
 
 	testCases := []struct {
 		name             string
@@ -278,10 +279,10 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 9 + 1, Name: "name9", Age: 91}, defaultOrderByKeys,
+					&User{ID: 9 + 1, Name: "name9", Age: 91}, primaryOrderByKeys,
 				)),
 				Before: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 9 + 1, Name: "name9", Age: 91}, defaultOrderByKeys,
+					&User{ID: 9 + 1, Name: "name9", Age: 91}, primaryOrderByKeys,
 				)),
 			},
 			expectedError: "after == before",
@@ -298,10 +299,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 9 + 1, Name: "name9", Age: 91}, defaultOrderByKeys,
+					&User{ID: 9 + 1, Name: "name9", Age: 91}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -312,7 +313,7 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				First: lo.ToPtr(2),
 			},
@@ -322,10 +323,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 1 + 1, Name: "name1", Age: 99}, defaultOrderByKeys,
+					&User{ID: 1 + 1, Name: "name1", Age: 99}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 2 + 1, Name: "name2", Age: 98}, defaultOrderByKeys,
+					&User{ID: 2 + 1, Name: "name2", Age: 98}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -343,10 +344,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 1 + 1, Name: "name1", Age: 99}, defaultOrderByKeys,
+					&User{ID: 1 + 1, Name: "name1", Age: 99}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -357,7 +358,7 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Before: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 18 + 1, Name: "name18", Age: 82}, defaultOrderByKeys,
+					&User{ID: 18 + 1, Name: "name18", Age: 82}, primaryOrderByKeys,
 				)),
 				Last: lo.ToPtr(2),
 			},
@@ -367,10 +368,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 16 + 1, Name: "name16", Age: 84}, defaultOrderByKeys,
+					&User{ID: 16 + 1, Name: "name16", Age: 84}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 17 + 1, Name: "name17", Age: 83}, defaultOrderByKeys,
+					&User{ID: 17 + 1, Name: "name17", Age: 83}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -388,10 +389,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 90 + 1, Name: "name90", Age: 10}, defaultOrderByKeys,
+					&User{ID: 90 + 1, Name: "name90", Age: 10}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 99 + 1, Name: "name99", Age: 1}, defaultOrderByKeys,
+					&User{ID: 99 + 1, Name: "name99", Age: 1}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -402,10 +403,10 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				Before: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 8 + 1, Name: "name8", Age: 92}, defaultOrderByKeys,
+					&User{ID: 8 + 1, Name: "name8", Age: 92}, primaryOrderByKeys,
 				)),
 				First: lo.ToPtr(5),
 			},
@@ -415,10 +416,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 1 + 1, Name: "name1", Age: 99}, defaultOrderByKeys,
+					&User{ID: 1 + 1, Name: "name1", Age: 99}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 5 + 1, Name: "name5", Age: 95}, defaultOrderByKeys,
+					&User{ID: 5 + 1, Name: "name5", Age: 95}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -429,10 +430,10 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				Before: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 4 + 1, Name: "name4", Age: 96}, defaultOrderByKeys,
+					&User{ID: 4 + 1, Name: "name4", Age: 96}, primaryOrderByKeys,
 				)),
 				First: lo.ToPtr(8),
 			},
@@ -442,10 +443,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 1 + 1, Name: "name1", Age: 99}, defaultOrderByKeys,
+					&User{ID: 1 + 1, Name: "name1", Age: 99}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 3 + 1, Name: "name3", Age: 97}, defaultOrderByKeys,
+					&User{ID: 3 + 1, Name: "name3", Age: 97}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -456,10 +457,10 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				Before: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 8 + 1, Name: "name8", Age: 92}, defaultOrderByKeys,
+					&User{ID: 8 + 1, Name: "name8", Age: 92}, primaryOrderByKeys,
 				)),
 				Last: lo.ToPtr(5),
 			},
@@ -469,10 +470,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 3 + 1, Name: "name3", Age: 97}, defaultOrderByKeys,
+					&User{ID: 3 + 1, Name: "name3", Age: 97}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 7 + 1, Name: "name7", Age: 93}, defaultOrderByKeys,
+					&User{ID: 7 + 1, Name: "name7", Age: 93}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -483,10 +484,10 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				Before: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 4 + 1, Name: "name4", Age: 96}, defaultOrderByKeys,
+					&User{ID: 4 + 1, Name: "name4", Age: 96}, primaryOrderByKeys,
 				)),
 				Last: lo.ToPtr(8),
 			},
@@ -496,10 +497,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 1 + 1, Name: "name1", Age: 99}, defaultOrderByKeys,
+					&User{ID: 1 + 1, Name: "name1", Age: 99}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 3 + 1, Name: "name3", Age: 97}, defaultOrderByKeys,
+					&User{ID: 3 + 1, Name: "name3", Age: 97}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -510,7 +511,7 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 99 + 1, Name: "name99", Age: 1}, defaultOrderByKeys,
+					&User{ID: 99 + 1, Name: "name99", Age: 1}, primaryOrderByKeys,
 				)),
 			},
 			expectedEdgesLen: 0,
@@ -529,7 +530,7 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Before: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 			},
 			expectedEdgesLen: 0,
@@ -555,10 +556,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     false,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 99 + 1, Name: "name99", Age: 1}, defaultOrderByKeys,
+					&User{ID: 99 + 1, Name: "name99", Age: 1}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -576,10 +577,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     false,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 99 + 1, Name: "name99", Age: 1}, defaultOrderByKeys,
+					&User{ID: 99 + 1, Name: "name99", Age: 1}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -624,7 +625,7 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 95 + 1, Name: "name95", Age: 5}, defaultOrderByKeys,
+					&User{ID: 95 + 1, Name: "name95", Age: 5}, primaryOrderByKeys,
 				)),
 				First: lo.ToPtr(10),
 			},
@@ -634,10 +635,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 96 + 1, Name: "name96", Age: 4}, defaultOrderByKeys,
+					&User{ID: 96 + 1, Name: "name96", Age: 4}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 99 + 1, Name: "name99", Age: 1}, defaultOrderByKeys,
+					&User{ID: 99 + 1, Name: "name99", Age: 1}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -648,7 +649,7 @@ func TestKeysetCursor(t *testing.T) {
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Before: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 4 + 1, Name: "name4", Age: 96}, defaultOrderByKeys,
+					&User{ID: 4 + 1, Name: "name4", Age: 96}, primaryOrderByKeys,
 				)),
 				Last: lo.ToPtr(10),
 			},
@@ -658,10 +659,10 @@ func TestKeysetCursor(t *testing.T) {
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 0 + 1, Name: "name0", Age: 100}, defaultOrderByKeys,
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
-					&User{ID: 3 + 1, Name: "name3", Age: 97}, defaultOrderByKeys,
+					&User{ID: 3 + 1, Name: "name3", Age: 97}, primaryOrderByKeys,
 				)),
 			},
 		},
@@ -672,12 +673,12 @@ func TestKeysetCursor(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					relay.New(false, tc.maxLimit, tc.limitIfNotSet, defaultOrderBys, tc.applyCursorsFunc)
+					relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
 				})
 				return
 			}
 
-			p := relay.New(false, tc.maxLimit, tc.limitIfNotSet, defaultOrderBys, tc.applyCursorsFunc)
+			p := relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
 			resp, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {
@@ -700,10 +701,9 @@ func TestKeysetWithoutCounter(t *testing.T) {
 		p := relay.New(
 			false,
 			10, 10,
-			[]relay.OrderBy{
-				{Field: "ID", Desc: false},
-			},
-			applyCursorFunc,
+			relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+				applyCursorFunc,
+			),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
@@ -720,24 +720,18 @@ func TestKeysetWithoutCounter(t *testing.T) {
 }
 
 func TestUnexpectOrderBys(t *testing.T) {
-	require.PanicsWithValue(t, "primaryOrderBys must be set", func() {
-		relay.New(false, 10, 10, nil, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-			return nil, nil
-		})
-	})
-	require.PanicsWithValue(t, "primaryOrderBys must be set", func() {
-		relay.New(false, 10, 10, []relay.OrderBy{}, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-			return nil, nil
-		})
-	})
+	{
+		resp, err := relay.New(false, 10, 10, NewKeysetAdapter[*User](db)).
+			Paginate(context.Background(), &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+			})
+		require.ErrorContains(t, err, "no keys to encode cursor, orderBys must be set for keyset")
+		require.Nil(t, resp)
+	}
 
-	p := relay.New(false, 10, 10,
-		[]relay.OrderBy{
-			{Field: "ID", Desc: false},
-		}, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-			return nil, nil
-		},
-	)
+	p := relay.New(false, 10, 10, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+		return nil, nil
+	})
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		First: lo.ToPtr(10),
 		OrderBys: []relay.OrderBy{
@@ -757,10 +751,9 @@ func TestContext(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				[]relay.OrderBy{
-					{Field: "ID", Desc: false},
-				},
-				f(db),
+				relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+					f(db),
+				),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -775,12 +768,12 @@ func TestContext(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				[]relay.OrderBy{
-					{Field: "ID", Desc: false},
-				}, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-					// Set WithContext here
-					return f(db.WithContext(ctx))(ctx, req)
-				},
+				relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+						// Set WithContext here
+						return f(db.WithContext(ctx))(ctx, req)
+					},
+				),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -806,14 +799,13 @@ func generateAESKey(length int) ([]byte, error) {
 func TestMiddleware(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, w relay.ApplyCursorsFuncWrapper[*User], isEncrypt bool) {
+	testCase := func(t *testing.T, w relay.ApplyCursorsMiddleware[*User], isEncrypt bool) {
 		p := relay.New(
 			false,
 			10, 10,
-			[]relay.OrderBy{
-				{Field: "ID", Desc: false},
-			},
-			w(NewKeysetAdapter[*User](db)),
+			relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+				w(NewKeysetAdapter[*User](db)),
+			),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
@@ -870,56 +862,29 @@ func TestMiddleware(t *testing.T) {
 		testCase(t, cursor.AES[*User](encryptionKey), true)
 	})
 
-	t.Run("KeysetEncodeBySortableFields", func(t *testing.T) {
-		testCase(t, cursor.KeysetEncodeBySortableFields[*User]([]string{"ID", "Name"}), false)
-	})
-
-	t.Run("KeysetEncodeBySortableFieldsResult", func(t *testing.T) {
-		p := relay.New(
-			false,
-			10, 10,
-			[]relay.OrderBy{
-				{Field: "ID", Desc: false},
-			},
-			cursor.KeysetEncodeBySortableFields[*User]([]string{"ID", "Name"})(NewKeysetAdapter[*User](db)),
-		)
-		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			First: lo.ToPtr(10),
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.Edges, 10)
-		require.Equal(t, 1, resp.Edges[0].Node.ID)
-		require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
-
-		require.Equal(t, `{"ID":1,"Name":"name0"}`, resp.Edges[0].Cursor)
-	})
-
 	t.Run("MockError", func(t *testing.T) {
 		p := relay.New(
 			false,
 			10, 10,
-			[]relay.OrderBy{
-				{Field: "ID", Desc: false},
-			},
-			func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
-				return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-					resp, err := next(ctx, req)
-					if err != nil {
-						return nil, err
-					}
-
-					for i := range resp.Edges {
-						edge := &resp.Edges[i]
-						edge.Cursor = func(ctx context.Context, node *User) (string, error) {
-							return "", errors.New("mock error")
+			relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+				func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
+					return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+						resp, err := next(ctx, req)
+						if err != nil {
+							return nil, err
 						}
-					}
 
-					return resp, nil
-				}
-			}(NewKeysetAdapter[*User](db)),
+						for i := range resp.Edges {
+							edge := &resp.Edges[i]
+							edge.Cursor = func(ctx context.Context, node *User) (string, error) {
+								return "", errors.New("mock error")
+							}
+						}
+
+						return resp, nil
+					}
+				}(NewKeysetAdapter[*User](db)),
+			),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
@@ -935,10 +900,9 @@ func TestNodesOnly(t *testing.T) {
 	p := relay.New(
 		true,
 		10, 10,
-		[]relay.OrderBy{
-			{Field: "ID", Desc: false},
-		},
-		NewKeysetAdapter[*User](db),
+		relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+			NewKeysetAdapter[*User](db),
+		),
 	)
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		First: lo.ToPtr(10),
@@ -961,13 +925,12 @@ func TestKeysetGenericTypeAny(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				[]relay.OrderBy{
-					{Field: "ID", Desc: false},
-				},
-				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
-					// This is a generic(T: any) function, so we need to call db.Model(x)
-					return f(db.Model(&User{}))(ctx, req)
-				},
+				relay.PrimaryOrderBys[any](relay.OrderBy{Field: "ID", Desc: false})(
+					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+						// This is a generic(T: any) function, so we need to call db.Model(x)
+						return f(db.Model(&User{}))(ctx, req)
+					},
+				),
 			)
 			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 				First: lo.ToPtr(10),
@@ -993,13 +956,12 @@ func TestKeysetGenericTypeAny(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				[]relay.OrderBy{
-					{Field: "ID", Desc: false},
-				},
-				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
-					// This is wrong, we need to call db.Model(x) for generic(T: any) function
-					return f(db)(ctx, req)
-				},
+				relay.PrimaryOrderBys[any](relay.OrderBy{Field: "ID", Desc: false})(
+					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+						// This is wrong, we need to call db.Model(x) for generic(T: any) function
+						return f(db)(ctx, req)
+					},
+				),
 			)
 			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 				First: lo.ToPtr(10),
@@ -1017,10 +979,9 @@ func TestKeysetGenericTypeAny(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				[]relay.OrderBy{
-					{Field: "ID", Desc: false},
-				},
-				applyCursorsFunc,
+				relay.PrimaryOrderBys[any](relay.OrderBy{Field: "ID", Desc: false})(
+					applyCursorsFunc,
+				),
 			)
 			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 				First: lo.ToPtr(10),
@@ -1041,12 +1002,12 @@ func TestKeysetInvalidCursor(t *testing.T) {
 	p := relay.New(
 		false,
 		10, 10,
-		[]relay.OrderBy{
-			{Field: "ID", Desc: false},
-		}, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
-			// This is a generic(T: any) function, so we need to cast the model to the correct type
-			return NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
-		},
+		relay.PrimaryOrderBys[any](relay.OrderBy{Field: "ID", Desc: false})(
+			func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+				// This is a generic(T: any) function, so we need to cast the model to the correct type
+				return NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
+			},
+		),
 	)
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 		After: lo.ToPtr(`{"ID":1}`),
@@ -1070,7 +1031,8 @@ func TestKeysetInvalidCursor(t *testing.T) {
 		After: lo.ToPtr(`{"ID":1,"Name":"name0"}`),
 		First: lo.ToPtr(10),
 	})
-	require.NoError(t, err) // ignore extra fields
+	require.ErrorContains(t, err, `cursor has 2 keys, but 1 keys are expected`)
+	require.Nil(t, resp)
 
 	resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 		Before: lo.ToPtr(`invalid`),
@@ -1088,10 +1050,9 @@ func TestTotalCountZero(t *testing.T) {
 		p := relay.New(
 			false,
 			10, 10,
-			[]relay.OrderBy{
-				{Field: "ID", Desc: false},
-			},
-			f(db),
+			relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+				f(db),
+			),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),

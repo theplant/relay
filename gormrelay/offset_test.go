@@ -13,12 +13,12 @@ import (
 func TestOffsetCursor(t *testing.T) {
 	resetDB(t)
 
-	defaultOrderBys := []relay.OrderBy{
-		{Field: "ID", Desc: false},
-		{Field: "Age", Desc: true},
-	}
-
-	applyCursorsFunc := NewOffsetAdapter[*User](db)
+	applyCursorsFunc := relay.PrimaryOrderBys[*User](
+		relay.OrderBy{Field: "ID", Desc: false},
+		relay.OrderBy{Field: "Age", Desc: true},
+	)(
+		NewOffsetAdapter[*User](db),
+	)
 
 	testCases := []struct {
 		name             string
@@ -491,12 +491,12 @@ func TestOffsetCursor(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					relay.New(false, tc.maxLimit, tc.limitIfNotSet, defaultOrderBys, tc.applyCursorsFunc)
+					relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
 				})
 				return
 			}
 
-			p := relay.New(false, tc.maxLimit, tc.limitIfNotSet, defaultOrderBys, tc.applyCursorsFunc)
+			p := relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
 			resp, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {
@@ -524,10 +524,7 @@ func TestOffsetWithLastAndNilBeforeIfNoCounter(t *testing.T) {
 	p := relay.New(
 		false,
 		10, 10,
-		[]relay.OrderBy{
-			{Field: "ID", Desc: false},
-		},
-		cursor.NewOffsetAdapter(NewOffsetFinder[*User](db)),
+		relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(cursor.NewOffsetAdapter(NewOffsetFinder[*User](db))),
 	)
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		Last: lo.ToPtr(10),

@@ -19,9 +19,6 @@
 p := relay.New(
     true, // nodesOnly, default returns nodes and pageInfo
     10, 10, // maxLimit / limitIfNotSet
-    []relay.OrderBy{
-        {Field: "ID", Desc: false}, // default order if not provided
-    },
     func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
         // Offset-based pagination
         // return gormrelay.NewOffsetAdapter[*User](db)(ctx, req)
@@ -46,10 +43,15 @@ cursor.Base64(gormrelay.NewOffsetAdapter[*User](db))
 cursor.AES(encryptionKey)(gormrelay.NewKeysetAdapter[*User](db))
 ```
 
-If you use Keyset cursor and have multiple sortable fields, you can use `cursor.KeysetEncodeBySortableFields` to pack them into the cursor.
+If you need to append `PrimaryOrderBys` to `PaginateRequest.OrderBys`
 
 ```go
-cursor.KeysetEncodeBySortableFields([]string{"ID", "Name"})(gormrelay.NewKeysetAdapter[*User](db))
+relay.PrimaryOrderBys[*User](
+    relay.OrderBy{Field: "ID", Desc: true},
+    relay.OrderBy{Field: "Version", Desc: false},
+)(
+    gormrelay.NewKeysetAdapter[*User](db),
+)
 ```
 
 ### Skipping `TotalCount` Query for Optimization
@@ -73,9 +75,6 @@ If you do not use generics, you can create a paginator with the `any` type and c
 p := relay.New(
     false, // nodesOnly
     10, 10,
-    []relay.OrderBy{
-        {Field: "ID", Desc: false},
-    },
     func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
         // Since this is a generic function (T: any), we must call db.Model(x)
         return gormrelay.NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)

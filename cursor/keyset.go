@@ -24,6 +24,9 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 		keys := lo.Map(req.OrderBys, func(item relay.OrderBy, _ int) string {
 			return item.Field
 		})
+		if len(keys) == 0 {
+			return nil, errors.New("no keys to encode cursor, orderBys must be set for keyset")
+		}
 
 		after, before, err := decodeKeysetCursors[T](req.After, req.Before, keys)
 		if err != nil {
@@ -121,20 +124,15 @@ func DecodeKeysetCursor[T any](cursor string, keys []string) (map[string]any, er
 		return nil, errors.Wrap(err, "unmarshal cursor")
 	}
 
-	keysMap := lo.SliceToMap(keys, func(key string) (string, bool) {
-		return key, true
-	})
-	for k := range keysMap {
+	if len(m) != len(keys) {
+		return nil, errors.Errorf("cursor has %d keys, but %d keys are expected", len(m), len(keys))
+	}
+
+	for _, k := range keys {
 		if _, ok := m[k]; !ok {
 			return nil, errors.Errorf("key %q not found in cursor", k)
 		}
 	}
-	for k := range m {
-		if _, ok := keysMap[k]; !ok {
-			delete(m, k)
-		}
-	}
-
 	return m, nil
 }
 

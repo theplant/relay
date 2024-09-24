@@ -52,7 +52,7 @@ func (f PaginationFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]
 	return f(ctx, req)
 }
 
-func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, primaryOrderBys []OrderBy, applyCursorsFunc ApplyCursorsFunc[T]) Pagination[T] {
+func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, applyCursorsFunc ApplyCursorsFunc[T]) Pagination[T] {
 	if limitIfNotSet <= 0 {
 		panic("limitIfNotSet must be greater than 0")
 	}
@@ -61,9 +61,6 @@ func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, primaryOrderBys
 	}
 	if applyCursorsFunc == nil {
 		panic("applyCursorsFunc must be set")
-	}
-	if len(primaryOrderBys) == 0 {
-		panic("primaryOrderBys must be set")
 	}
 	return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
 		first, last := req.First, req.Last
@@ -82,17 +79,20 @@ func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, primaryOrderBys
 		}
 
 		orderBys := req.OrderBys
-		if len(orderBys) == 0 {
-			orderBys = primaryOrderBys
+		if len(orderBys) > 0 {
+			dups := lo.FindDuplicatesBy(orderBys, func(item OrderBy) string {
+				return item.Field
+			})
+			if (len(dups)) > 0 {
+				return nil, errors.Errorf("duplicated order by fields %v", lo.Map(dups, func(item OrderBy, _ int) string {
+					return item.Field
+				}))
+			}
 		}
 
-		dups := lo.FindDuplicatesBy(orderBys, func(item OrderBy) string {
-			return item.Field
-		})
-		if (len(dups)) > 0 {
-			return nil, errors.Errorf("duplicated order by fields %v", lo.Map(dups, func(item OrderBy, _ int) string {
-				return item.Field
-			}))
+		middlewares := ApplyCursorsMiddlewaresFromContext[T](ctx)
+		for _, middleware := range middlewares {
+			applyCursorsFunc = middleware(applyCursorsFunc)
 		}
 
 		edges, nodes, pageInfo, err := EdgesToReturn(ctx, req.Before, req.After, first, last, orderBys, nodesOnly, applyCursorsFunc)
@@ -125,9 +125,6 @@ type ApplyCursorsResponse[T any] struct {
 
 // https://relay.dev/graphql/connections.htm#ApplyCursorsToEdges()
 type ApplyCursorsFunc[T any] func(ctx context.Context, req *ApplyCursorsRequest) (*ApplyCursorsResponse[T], error)
-
-// ApplyCursorsFuncWrapper is a wrapper for ApplyCursorsFunc (middleware pattern)
-type ApplyCursorsFuncWrapper[T any] func(next ApplyCursorsFunc[T]) ApplyCursorsFunc[T]
 
 // https://relay.dev/graphql/connections.htm#sec-Pagination-algorithm
 // https://relay.dev/graphql/connections.htm#sec-undefined.PageInfo.Fields
