@@ -712,7 +712,7 @@ func TestKeysetWithoutCounter(t *testing.T) {
 		require.Len(t, resp.Edges, 10)
 		require.Equal(t, 1, resp.Edges[0].Node.ID)
 		require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Zero(t, resp.PageInfo.TotalCount)
+		require.Equal(t, relay.InvalidTotalCount, resp.PageInfo.TotalCount)
 	}
 
 	t.Run("keyset", func(t *testing.T) { testCase(t, cursor.NewKeysetAdapter(NewKeysetFinder[*User](db))) })

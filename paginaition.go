@@ -25,6 +25,8 @@ type Edge[T any] struct {
 	Cursor string `json:"cursor"`
 }
 
+const InvalidTotalCount = -1
+
 type PageInfo struct {
 	TotalCount      int     `json:"totalCount,omitempty"`
 	HasNextPage     bool    `json:"hasNextPage"`

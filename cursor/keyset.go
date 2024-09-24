@@ -30,7 +30,7 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 			return nil, err
 		}
 
-		var totalCount int
+		totalCount := relay.InvalidTotalCount
 		counter, ok := finder.(Counter)
 		if ok {
 			var err error

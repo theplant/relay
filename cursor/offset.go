@@ -27,7 +27,7 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			return nil, err
 		}
 
-		var totalCount int
+		totalCount := relay.InvalidTotalCount
 		counter, hasCounter := finder.(Counter)
 		if hasCounter {
 			var err error
