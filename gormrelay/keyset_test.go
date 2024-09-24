@@ -89,6 +89,23 @@ func TestScopeKeyset(t *testing.T) {
 	}
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
+			// with table alias
+			tx = tx.Table("company_users AS u").Model(&User{}).Scopes(scopeKeyset(
+				&map[string]interface{}{"Age": 85},
+				nil,
+				[]relay.OrderBy{
+					{Field: "Age", Desc: false},
+				},
+				10,
+				false,
+			)).Find(&User{})
+			require.NoError(t, tx.Error)
+			return tx
+		})
+		require.Equal(t, `SELECT * FROM company_users AS u WHERE "u"."age" > 85 ORDER BY "u"."age" LIMIT 10`, sql)
+	}
+	{
+		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
 				&map[string]interface{}{"Age": 85},
 				&map[string]interface{}{"Age": 88},
@@ -166,9 +183,7 @@ func TestKeysetCursor(t *testing.T) {
 		{Field: "Age", Desc: true},
 	}
 	defaultOrderByKeys := []string{"ID", "Age"}
-	applyCursorsFunc := func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-		return NewKeysetAdapter[*User](db)(ctx, req)
-	}
+	applyCursorsFunc := NewKeysetAdapter[*User](db)
 
 	testCases := []struct {
 		name             string
@@ -705,12 +720,12 @@ func TestKeysetWithoutCounter(t *testing.T) {
 }
 
 func TestUnexpectOrderBys(t *testing.T) {
-	require.PanicsWithValue(t, "orderBysIfNotSet must be set", func() {
+	require.PanicsWithValue(t, "primaryOrderBys must be set", func() {
 		relay.New(false, 10, 10, nil, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
 			return nil, nil
 		})
 	})
-	require.PanicsWithValue(t, "orderBysIfNotSet must be set", func() {
+	require.PanicsWithValue(t, "primaryOrderBys must be set", func() {
 		relay.New(false, 10, 10, []relay.OrderBy{}, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
 			return nil, nil
 		})
@@ -745,9 +760,7 @@ func TestContext(t *testing.T) {
 				[]relay.OrderBy{
 					{Field: "ID", Desc: false},
 				},
-				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-					return f(db)(ctx, req)
-				},
+				f(db),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -790,19 +803,17 @@ func generateAESKey(length int) ([]byte, error) {
 	return key, nil
 }
 
-func TestWrapEncrypt(t *testing.T) {
+func TestMiddleware(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, w func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User]) {
+	testCase := func(t *testing.T, w relay.ApplyCursorsFuncWrapper[*User], isEncrypt bool) {
 		p := relay.New(
 			false,
 			10, 10,
 			[]relay.OrderBy{
 				{Field: "ID", Desc: false},
 			},
-			func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-				return w(NewKeysetAdapter[*User](db))(ctx, req)
-			},
+			w(NewKeysetAdapter[*User](db)),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
@@ -838,54 +849,77 @@ func TestWrapEncrypt(t *testing.T) {
 		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
 		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
 
-		// invalid after cursor
-		resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			First: lo.ToPtr(5),
-			After: lo.ToPtr("invalid"),
-		})
-		require.ErrorContains(t, err, "invalid after cursor")
-		require.Nil(t, resp)
+		if isEncrypt {
+			// invalid after cursor
+			resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(5),
+				After: lo.ToPtr("invalid"),
+			})
+			require.ErrorContains(t, err, "invalid after cursor")
+			require.Nil(t, resp)
+		}
 	}
 
-	t.Run("WrapBase64", func(t *testing.T) {
-		testCase(t, func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
-			return cursor.WrapBase64(next)
-		})
-	})
-	t.Run("WrapAES", func(t *testing.T) {
-		encryptionKey, err := generateAESKey(32)
-		require.NoError(t, err)
-		testCase(t, func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
-			return cursor.WrapAES(next, encryptionKey)
-		})
+	t.Run("Base64", func(t *testing.T) {
+		testCase(t, cursor.Base64, true)
 	})
 
-	t.Run("WrapMockError", func(t *testing.T) {
+	t.Run("AES", func(t *testing.T) {
+		encryptionKey, err := generateAESKey(32)
+		require.NoError(t, err)
+		testCase(t, cursor.AES[*User](encryptionKey), true)
+	})
+
+	t.Run("KeysetEncodeBySortableFields", func(t *testing.T) {
+		testCase(t, cursor.KeysetEncodeBySortableFields[*User]([]string{"ID", "Name"}), false)
+	})
+
+	t.Run("KeysetEncodeBySortableFieldsResult", func(t *testing.T) {
 		p := relay.New(
 			false,
 			10, 10,
 			[]relay.OrderBy{
 				{Field: "ID", Desc: false},
 			},
-			func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-				return func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
-					return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-						resp, err := next(ctx, req)
-						if err != nil {
-							return nil, err
-						}
+			cursor.KeysetEncodeBySortableFields[*User]([]string{"ID", "Name"})(NewKeysetAdapter[*User](db)),
+		)
+		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(10),
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Edges, 10)
+		require.Equal(t, 1, resp.Edges[0].Node.ID)
+		require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
+		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
+		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
 
-						for i := range resp.Edges {
-							edge := &resp.Edges[i]
-							edge.Cursor = func(ctx context.Context, node *User) (string, error) {
-								return "", errors.New("mock error")
-							}
-						}
+		require.Equal(t, `{"ID":1,"Name":"name0"}`, resp.Edges[0].Cursor)
+	})
 
-						return resp, nil
-					}
-				}(NewKeysetAdapter[*User](db))(ctx, req)
+	t.Run("MockError", func(t *testing.T) {
+		p := relay.New(
+			false,
+			10, 10,
+			[]relay.OrderBy{
+				{Field: "ID", Desc: false},
 			},
+			func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
+				return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+					resp, err := next(ctx, req)
+					if err != nil {
+						return nil, err
+					}
+
+					for i := range resp.Edges {
+						edge := &resp.Edges[i]
+						edge.Cursor = func(ctx context.Context, node *User) (string, error) {
+							return "", errors.New("mock error")
+						}
+					}
+
+					return resp, nil
+				}
+			}(NewKeysetAdapter[*User](db)),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
@@ -904,9 +938,7 @@ func TestNodesOnly(t *testing.T) {
 		[]relay.OrderBy{
 			{Field: "ID", Desc: false},
 		},
-		func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-			return NewKeysetAdapter[*User](db)(ctx, req)
-		},
+		NewKeysetAdapter[*User](db),
 	)
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		First: lo.ToPtr(10),
@@ -931,7 +963,8 @@ func TestKeysetGenericTypeAny(t *testing.T) {
 				10, 10,
 				[]relay.OrderBy{
 					{Field: "ID", Desc: false},
-				}, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+				},
+				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
 					// This is a generic(T: any) function, so we need to call db.Model(x)
 					return f(db.Model(&User{}))(ctx, req)
 				},
@@ -962,7 +995,8 @@ func TestKeysetGenericTypeAny(t *testing.T) {
 				10, 10,
 				[]relay.OrderBy{
 					{Field: "ID", Desc: false},
-				}, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+				},
+				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
 					// This is wrong, we need to call db.Model(x) for generic(T: any) function
 					return f(db)(ctx, req)
 				},
@@ -1036,8 +1070,7 @@ func TestKeysetInvalidCursor(t *testing.T) {
 		After: lo.ToPtr(`{"ID":1,"Name":"name0"}`),
 		First: lo.ToPtr(10),
 	})
-	require.ErrorContains(t, err, `cursor length != keys length`)
-	require.Nil(t, resp)
+	require.NoError(t, err) // ignore extra fields
 
 	resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 		Before: lo.ToPtr(`invalid`),
@@ -1058,9 +1091,7 @@ func TestTotalCountZero(t *testing.T) {
 			[]relay.OrderBy{
 				{Field: "ID", Desc: false},
 			},
-			func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-				return f(db)(ctx, req)
-			},
+			f(db),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),

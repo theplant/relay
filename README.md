@@ -34,16 +34,22 @@ resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 })
 ```
 
-### Encrypting Cursors
+### Middleware
 
-If you need to encrypt cursors, you can use WrapBase64 or WrapAES wrappers:
+If you need to encrypt cursors, you can use `cursor.Base64` or `cursor.AES` middlewares:
 
 ```go
 // Encrypt cursors with Base64
-cursor.WrapBase64(gormrelay.NewOffsetAdapter[*User](db))
+cursor.Base64(gormrelay.NewOffsetAdapter[*User](db))
 
 // Encrypt cursors with AES
-cursor.WrapAES(gormrelay.NewKeysetAdapter[*User](db), encryptionKey)
+cursor.AES(encryptionKey)(gormrelay.NewKeysetAdapter[*User](db))
+```
+
+If you use Keyset cursor and have multiple sortable fields, you can use `cursor.KeysetEncodeBySortableFields` to pack them into the cursor.
+
+```go
+cursor.KeysetEncodeBySortableFields([]string{"ID", "Name"})(gormrelay.NewKeysetAdapter[*User](db))
 ```
 
 ### Skipping `TotalCount` Query for Optimization

@@ -9,7 +9,7 @@ import (
 	relay "github.com/theplant/gorelay"
 )
 
-func WrapBase64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
+func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 	return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
 		if req.After != nil {
 			cursor, err := base64.StdEncoding.DecodeString(*req.After)

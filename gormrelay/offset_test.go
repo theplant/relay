@@ -18,9 +18,7 @@ func TestOffsetCursor(t *testing.T) {
 		{Field: "Age", Desc: true},
 	}
 
-	applyCursorsFunc := func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-		return NewOffsetAdapter[*User](db)(ctx, req)
-	}
+	applyCursorsFunc := NewOffsetAdapter[*User](db)
 
 	testCases := []struct {
 		name             string
@@ -529,9 +527,7 @@ func TestOffsetWithLastAndNilBeforeIfNoCounter(t *testing.T) {
 		[]relay.OrderBy{
 			{Field: "ID", Desc: false},
 		},
-		func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-			return cursor.NewOffsetAdapter(NewOffsetFinder[*User](db))(ctx, req)
-		},
+		cursor.NewOffsetAdapter(NewOffsetFinder[*User](db)),
 	)
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		Last: lo.ToPtr(10),

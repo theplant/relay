@@ -50,7 +50,7 @@ func (f PaginationFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]
 	return f(ctx, req)
 }
 
-func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, orderBysIfNotSet []OrderBy, applyCursorsFunc ApplyCursorsFunc[T]) Pagination[T] {
+func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, primaryOrderBys []OrderBy, applyCursorsFunc ApplyCursorsFunc[T]) Pagination[T] {
 	if limitIfNotSet <= 0 {
 		panic("limitIfNotSet must be greater than 0")
 	}
@@ -60,8 +60,8 @@ func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, orderBysIfNotSe
 	if applyCursorsFunc == nil {
 		panic("applyCursorsFunc must be set")
 	}
-	if len(orderBysIfNotSet) == 0 {
-		panic("orderBysIfNotSet must be set")
+	if len(primaryOrderBys) == 0 {
+		panic("primaryOrderBys must be set")
 	}
 	return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
 		first, last := req.First, req.Last
@@ -81,7 +81,7 @@ func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, orderBysIfNotSe
 
 		orderBys := req.OrderBys
 		if len(orderBys) == 0 {
-			orderBys = orderBysIfNotSet
+			orderBys = primaryOrderBys
 		}
 
 		dups := lo.FindDuplicatesBy(orderBys, func(item OrderBy) string {
@@ -123,6 +123,9 @@ type ApplyCursorsResponse[T any] struct {
 
 // https://relay.dev/graphql/connections.htm#ApplyCursorsToEdges()
 type ApplyCursorsFunc[T any] func(ctx context.Context, req *ApplyCursorsRequest) (*ApplyCursorsResponse[T], error)
+
+// ApplyCursorsFuncWrapper is a wrapper for ApplyCursorsFunc (middleware pattern)
+type ApplyCursorsFuncWrapper[T any] func(next ApplyCursorsFunc[T]) ApplyCursorsFunc[T]
 
 // https://relay.dev/graphql/connections.htm#sec-Pagination-algorithm
 // https://relay.dev/graphql/connections.htm#sec-undefined.PageInfo.Fields

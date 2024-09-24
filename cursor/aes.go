@@ -63,45 +63,47 @@ func decryptAES(cipherText string, key []byte) (string, error) {
 	return string(plainText), nil
 }
 
-func WrapAES[T any](next relay.ApplyCursorsFunc[T], encryptionKey []byte) relay.ApplyCursorsFunc[T] {
-	return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
-		if req.After != nil {
-			decodedCursor, err := decryptAES(*req.After, encryptionKey)
-			if err != nil {
-				return nil, errors.Wrap(err, "invalid after cursor")
-			}
-			req.After = lo.ToPtr(decodedCursor)
-		}
-
-		if req.Before != nil {
-			decodedCursor, err := decryptAES(*req.Before, encryptionKey)
-			if err != nil {
-				return nil, errors.Wrap(err, "invalid before cursor")
-			}
-			req.Before = lo.ToPtr(decodedCursor)
-		}
-
-		resp, err := next(ctx, req)
-		if err != nil {
-			return nil, err
-		}
-
-		for i := range resp.Edges {
-			edge := &resp.Edges[i]
-			originalCursor := edge.Cursor
-			edge.Cursor = func(ctx context.Context, node T) (string, error) {
-				cursor, err := originalCursor(ctx, node)
+func AES[T any](encryptionKey []byte) relay.ApplyCursorsFuncWrapper[T] {
+	return func(next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
+		return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
+			if req.After != nil {
+				decodedCursor, err := decryptAES(*req.After, encryptionKey)
 				if err != nil {
-					return "", err
+					return nil, errors.Wrap(err, "invalid after cursor")
 				}
-				encryptedCursor, err := encryptAES(cursor, encryptionKey)
-				if err != nil {
-					return "", err
-				}
-				return encryptedCursor, nil
+				req.After = lo.ToPtr(decodedCursor)
 			}
-		}
 
-		return resp, nil
+			if req.Before != nil {
+				decodedCursor, err := decryptAES(*req.Before, encryptionKey)
+				if err != nil {
+					return nil, errors.Wrap(err, "invalid before cursor")
+				}
+				req.Before = lo.ToPtr(decodedCursor)
+			}
+
+			resp, err := next(ctx, req)
+			if err != nil {
+				return nil, err
+			}
+
+			for i := range resp.Edges {
+				edge := &resp.Edges[i]
+				originalCursor := edge.Cursor
+				edge.Cursor = func(ctx context.Context, node T) (string, error) {
+					cursor, err := originalCursor(ctx, node)
+					if err != nil {
+						return "", err
+					}
+					encryptedCursor, err := encryptAES(cursor, encryptionKey)
+					if err != nil {
+						return "", err
+					}
+					return encryptedCursor, nil
+				}
+			}
+
+			return resp, nil
+		}
 	}
 }

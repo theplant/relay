@@ -120,14 +120,21 @@ func DecodeKeysetCursor[T any](cursor string, keys []string) (map[string]any, er
 	if err := jsoniterForKeyset.Unmarshal([]byte(cursor), &m); err != nil {
 		return nil, errors.Wrap(err, "unmarshal cursor")
 	}
-	if len(m) != len(keys) {
-		return nil, errors.New("cursor length != keys length")
-	}
-	for _, key := range keys {
-		if _, ok := m[key]; !ok {
-			return nil, errors.Errorf("key %q not found in cursor", key)
+
+	keysMap := lo.SliceToMap(keys, func(key string) (string, bool) {
+		return key, true
+	})
+	for k := range keysMap {
+		if _, ok := m[k]; !ok {
+			return nil, errors.Errorf("key %q not found in cursor", k)
 		}
 	}
+	for k := range m {
+		if _, ok := keysMap[k]; !ok {
+			delete(m, k)
+		}
+	}
+
 	return m, nil
 }
 
