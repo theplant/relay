@@ -54,7 +54,7 @@ func NewOffsetFinder[T any](db *gorm.DB) cursor.OffsetFinder[T] {
 				}
 
 				orderByColumns = append(orderByColumns, clause.OrderByColumn{
-					Column: clause.Column{Name: field.DBName},
+					Column: clause.Column{Table: clause.CurrentTable, Name: field.DBName},
 					Desc:   orderBy.Desc,
 				})
 			}

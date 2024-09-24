@@ -32,11 +32,13 @@ func createWhereExpr(s *schema.Schema, orderBys []relay.OrderBy, keyset map[stri
 			desc = !desc
 		}
 
+		column := clause.Column{Table: clause.CurrentTable, Name: field.DBName}
+
 		var expr clause.Expression
 		if desc {
-			expr = clause.Lt{Column: field.DBName, Value: v}
+			expr = clause.Lt{Column: column, Value: v}
 		} else {
-			expr = clause.Gt{Column: field.DBName, Value: v}
+			expr = clause.Gt{Column: column, Value: v}
 		}
 
 		ands := make([]clause.Expression, len(eqs)+1)
@@ -45,7 +47,7 @@ func createWhereExpr(s *schema.Schema, orderBys []relay.OrderBy, keyset map[stri
 		ors = append(ors, clause.And(ands...))
 
 		if i < len(orderBys)-1 {
-			eqs = append(eqs, clause.Eq{Column: field.DBName, Value: v})
+			eqs = append(eqs, clause.Eq{Column: column, Value: v})
 		}
 	}
 	return clause.And(clause.Or(ors...)), nil
@@ -133,7 +135,7 @@ func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit 
 					desc = !desc
 				}
 				orderByColumns = append(orderByColumns, clause.OrderByColumn{
-					Column: clause.Column{Name: field.DBName},
+					Column: clause.Column{Table: clause.CurrentTable, Name: field.DBName},
 					Desc:   desc,
 				})
 			}

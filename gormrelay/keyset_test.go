@@ -85,7 +85,7 @@ func TestScopeKeyset(t *testing.T) {
 			require.NoError(t, tx.Error)
 			return tx
 		})
-		require.Equal(t, `SELECT * FROM "users" WHERE "age" > 85 ORDER BY "age" LIMIT 10`, sql)
+		require.Equal(t, `SELECT * FROM "users" WHERE "users"."age" > 85 ORDER BY "users"."age" LIMIT 10`, sql)
 	}
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
@@ -101,7 +101,7 @@ func TestScopeKeyset(t *testing.T) {
 			require.NoError(t, tx.Error)
 			return tx
 		})
-		require.Equal(t, `SELECT * FROM "users" WHERE "age" > 85 AND "age" < 88 ORDER BY "age" LIMIT 10`, sql)
+		require.Equal(t, `SELECT * FROM "users" WHERE "users"."age" > 85 AND "users"."age" < 88 ORDER BY "users"."age" LIMIT 10`, sql)
 	}
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
@@ -118,7 +118,7 @@ func TestScopeKeyset(t *testing.T) {
 			require.NoError(t, tx.Error)
 			return tx
 		})
-		require.Equal(t, `SELECT * FROM "users" WHERE ("age" > 85 OR ("age" = 85 AND "name" < 'name15')) AND ("age" < 88 OR ("age" = 88 AND "name" > 'name12')) ORDER BY "age","name" DESC LIMIT 10`, sql)
+		require.Equal(t, `SELECT * FROM "users" WHERE ("users"."age" > 85 OR ("users"."age" = 85 AND "users"."name" < 'name15')) AND ("users"."age" < 88 OR ("users"."age" = 88 AND "users"."name" > 'name12')) ORDER BY "users"."age","users"."name" DESC LIMIT 10`, sql)
 	}
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
@@ -135,7 +135,7 @@ func TestScopeKeyset(t *testing.T) {
 			require.NoError(t, tx.Error)
 			return tx
 		})
-		require.Equal(t, `SELECT * FROM "users" WHERE ("age" > 85 OR ("age" = 85 AND "name" < 'name15')) AND ("age" < 88 OR ("age" = 88 AND "name" > 'name12')) ORDER BY "age" DESC,"name" LIMIT 10`, sql)
+		require.Equal(t, `SELECT * FROM "users" WHERE ("users"."age" > 85 OR ("users"."age" = 85 AND "users"."name" < 'name15')) AND ("users"."age" < 88 OR ("users"."age" = 88 AND "users"."name" > 'name12')) ORDER BY "users"."age" DESC,"users"."name" LIMIT 10`, sql)
 	}
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
@@ -154,7 +154,7 @@ func TestScopeKeyset(t *testing.T) {
 			require.NoError(t, tx.Error)
 			return tx
 		})
-		require.Equal(t, `SELECT * FROM "users" WHERE name LIKE 'name%' AND (("age" > 85 OR ("age" = 85 AND "name" < 'name15')) AND ("age" < 88 OR ("age" = 88 AND "name" > 'name12'))) ORDER BY "age","name" DESC LIMIT 10`, sql)
+		require.Equal(t, `SELECT * FROM "users" WHERE name LIKE 'name%' AND (("users"."age" > 85 OR ("users"."age" = 85 AND "users"."name" < 'name15')) AND ("users"."age" < 88 OR ("users"."age" = 88 AND "users"."name" > 'name12'))) ORDER BY "users"."age","users"."name" DESC LIMIT 10`, sql)
 	}
 }
 
