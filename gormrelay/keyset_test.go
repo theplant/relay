@@ -799,7 +799,7 @@ func generateAESKey(length int) ([]byte, error) {
 func TestMiddleware(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, w relay.ApplyCursorsMiddleware[*User], isEncrypt bool) {
+	testCase := func(t *testing.T, w relay.Middleware[*User], isEncrypt bool) {
 		p := relay.New(
 			false,
 			10, 10,
