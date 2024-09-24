@@ -72,7 +72,7 @@ p := relay.New(
     },
     func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
         // Since this is a generic function (T: any), we must call db.Model(x)
-        return gormrelay.NewKeysetAdapter[*User](db.Model(&User{}))(ctx, req)
+        return gormrelay.NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
     },
 )
 resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
