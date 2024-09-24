@@ -1,6 +1,10 @@
 package relay
 
-import "context"
+import (
+	"context"
+
+	"github.com/samber/lo"
+)
 
 // Middleware is a wrapper for ApplyCursorsFunc (middleware pattern)
 type Middleware[T any] func(next ApplyCursorsFunc[T]) ApplyCursorsFunc[T]
@@ -29,16 +33,12 @@ func AppendMiddleware[T any](ws ...Middleware[T]) PaginationMiddleware[T] {
 func PrimaryOrderBys[T any](primaryOrderBys ...OrderBy) Middleware[T] {
 	return func(next ApplyCursorsFunc[T]) ApplyCursorsFunc[T] {
 		return func(ctx context.Context, req *ApplyCursorsRequest) (*ApplyCursorsResponse[T], error) {
+			orderByFields := lo.SliceToMap(req.OrderBys, func(orderBy OrderBy) (string, bool) {
+				return orderBy.Field, true
+			})
 			// If there are fields in primaryOrderBys that are not in orderBys, add them to orderBys
 			for _, primaryOrderBy := range primaryOrderBys {
-				found := false
-				for _, orderBy := range req.OrderBys {
-					if orderBy.Field == primaryOrderBy.Field {
-						found = true
-						break
-					}
-				}
-				if !found {
+				if _, ok := orderByFields[primaryOrderBy.Field]; !ok {
 					req.OrderBys = append(req.OrderBys, primaryOrderBy)
 				}
 			}
