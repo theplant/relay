@@ -30,7 +30,7 @@ func encryptAES(plainText string, key []byte) (string, error) {
 	}
 
 	cipherText := gcm.Seal(nonce, nonce, []byte(plainText), nil)
-	return base64.StdEncoding.EncodeToString(cipherText), nil
+	return base64.RawURLEncoding.EncodeToString(cipherText), nil
 }
 
 func decryptAES(cipherText string, key []byte) (string, error) {
@@ -44,7 +44,7 @@ func decryptAES(cipherText string, key []byte) (string, error) {
 		return "", err
 	}
 
-	decodedCipherText, err := base64.StdEncoding.DecodeString(cipherText)
+	decodedCipherText, err := base64.RawURLEncoding.DecodeString(cipherText)
 	if err != nil {
 		return "", err
 	}

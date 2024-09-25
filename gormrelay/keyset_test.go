@@ -848,7 +848,7 @@ func TestMiddleware(t *testing.T) {
 			// invalid after cursor
 			resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(5),
-				After: lo.ToPtr("invalid"),
+				After: lo.ToPtr("invalid%20x"),
 			})
 			require.ErrorContains(t, err, "invalid after cursor")
 			require.Nil(t, resp)
