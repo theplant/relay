@@ -46,12 +46,25 @@ cursor.AES(encryptionKey)(gormrelay.NewKeysetAdapter[*User](db))
 If you need to append `PrimaryOrderBys` to `PaginateRequest.OrderBys`
 
 ```go
-relay.PrimaryOrderBys[*User](
+// without middleware
+req.OrderBys = relay.AppendPrimaryOrderBy[*User](req.OrderBys, 
+    relay.OrderBy{Field: "ID", Desc: false},
+    relay.OrderBy{Field: "Version", Desc: false},
+)
+
+// use cursor middleware
+cursor.PrimaryOrderBy[*User](
     relay.OrderBy{Field: "ID", Desc: true},
     relay.OrderBy{Field: "Version", Desc: false},
 )(
     gormrelay.NewKeysetAdapter[*User](db),
 )
+
+// use pagination middleware
+relay.PrimaryOrderBy[*User](
+    relay.OrderBy{Field: "ID", Desc: false},
+    relay.OrderBy{Field: "Version", Desc: false},
+)(p)
 ```
 
 ### Skipping `TotalCount` Query for Optimization

@@ -13,7 +13,7 @@ import (
 func TestOffsetCursor(t *testing.T) {
 	resetDB(t)
 
-	applyCursorsFunc := relay.PrimaryOrderBys[*User](
+	applyCursorsFunc := cursor.PrimaryOrderBy[*User](
 		relay.OrderBy{Field: "ID", Desc: false},
 		relay.OrderBy{Field: "Age", Desc: true},
 	)(
@@ -524,7 +524,7 @@ func TestOffsetWithLastAndNilBeforeIfNoCounter(t *testing.T) {
 	p := relay.New(
 		false,
 		10, 10,
-		relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(cursor.NewOffsetAdapter(NewOffsetFinder[*User](db))),
+		cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(cursor.NewOffsetAdapter(NewOffsetFinder[*User](db))),
 	)
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		Last: lo.ToPtr(10),

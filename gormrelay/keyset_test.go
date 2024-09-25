@@ -179,7 +179,7 @@ func TestKeysetCursor(t *testing.T) {
 	resetDB(t)
 
 	primaryOrderByKeys := []string{"ID", "Age"}
-	applyCursorsFunc := relay.PrimaryOrderBys[*User](
+	applyCursorsFunc := cursor.PrimaryOrderBy[*User](
 		relay.OrderBy{Field: "ID", Desc: false},
 		relay.OrderBy{Field: "Age", Desc: true},
 	)(
@@ -701,10 +701,13 @@ func TestKeysetWithoutCounter(t *testing.T) {
 		p := relay.New(
 			false,
 			10, 10,
-			relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
 				applyCursorFunc,
 			),
 		)
+
+		relay.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(p)
+
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
 		})
@@ -751,7 +754,7 @@ func TestContext(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+				cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
 					f(db),
 				),
 			)
@@ -768,7 +771,7 @@ func TestContext(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+				cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
 					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
 						// Set WithContext here
 						return f(db.WithContext(ctx))(ctx, req)
@@ -799,11 +802,11 @@ func generateAESKey(length int) ([]byte, error) {
 func TestMiddleware(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, w relay.Middleware[*User], isEncrypt bool) {
+	testCase := func(t *testing.T, w relay.CursorMiddleware[*User], isEncrypt bool) {
 		p := relay.New(
 			false,
 			10, 10,
-			relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
 				w(NewKeysetAdapter[*User](db)),
 			),
 		)
@@ -866,7 +869,7 @@ func TestMiddleware(t *testing.T) {
 		p := relay.New(
 			false,
 			10, 10,
-			relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
 				func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
 					return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
 						resp, err := next(ctx, req)
@@ -900,7 +903,7 @@ func TestNodesOnly(t *testing.T) {
 	p := relay.New(
 		true,
 		10, 10,
-		relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+		cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
 			NewKeysetAdapter[*User](db),
 		),
 	)
@@ -925,7 +928,7 @@ func TestKeysetGenericTypeAny(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				relay.PrimaryOrderBys[any](relay.OrderBy{Field: "ID", Desc: false})(
+				cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
 					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
 						// This is a generic(T: any) function, so we need to call db.Model(x)
 						return f(db.Model(&User{}))(ctx, req)
@@ -956,7 +959,7 @@ func TestKeysetGenericTypeAny(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				relay.PrimaryOrderBys[any](relay.OrderBy{Field: "ID", Desc: false})(
+				cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
 					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
 						// This is wrong, we need to call db.Model(x) for generic(T: any) function
 						return f(db)(ctx, req)
@@ -979,7 +982,7 @@ func TestKeysetGenericTypeAny(t *testing.T) {
 			p := relay.New(
 				false,
 				10, 10,
-				relay.PrimaryOrderBys[any](relay.OrderBy{Field: "ID", Desc: false})(
+				cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
 					applyCursorsFunc,
 				),
 			)
@@ -1002,7 +1005,7 @@ func TestKeysetInvalidCursor(t *testing.T) {
 	p := relay.New(
 		false,
 		10, 10,
-		relay.PrimaryOrderBys[any](relay.OrderBy{Field: "ID", Desc: false})(
+		cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
 			func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
 				// This is a generic(T: any) function, so we need to cast the model to the correct type
 				return NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
@@ -1050,7 +1053,7 @@ func TestTotalCountZero(t *testing.T) {
 		p := relay.New(
 			false,
 			10, 10,
-			relay.PrimaryOrderBys[*User](relay.OrderBy{Field: "ID", Desc: false})(
+			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
 				f(db),
 			),
 		)

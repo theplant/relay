@@ -63,7 +63,7 @@ func decryptAES(cipherText string, key []byte) (string, error) {
 	return string(plainText), nil
 }
 
-func AES[T any](encryptionKey []byte) relay.Middleware[T] {
+func AES[T any](encryptionKey []byte) relay.CursorMiddleware[T] {
 	return func(next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 		return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
 			if req.After != nil {

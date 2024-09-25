@@ -90,7 +90,7 @@ func New[T any](nodesOnly bool, maxLimit int, limitIfNotSet int, applyCursorsFun
 			}
 		}
 
-		middlewares := MiddlewaresFromContext[T](ctx)
+		middlewares := CursorMiddlewaresFromContext[T](ctx)
 		for _, middleware := range middlewares {
 			applyCursorsFunc = middleware(applyCursorsFunc)
 		}
