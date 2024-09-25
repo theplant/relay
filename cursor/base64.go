@@ -12,7 +12,7 @@ import (
 func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 	return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
 		if req.After != nil {
-			cursor, err := base64.StdEncoding.DecodeString(*req.After)
+			cursor, err := base64.RawURLEncoding.DecodeString(*req.After)
 			if err != nil {
 				return nil, errors.Wrap(err, "invalid after cursor")
 			}
@@ -20,7 +20,7 @@ func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 		}
 
 		if req.Before != nil {
-			cursor, err := base64.StdEncoding.DecodeString(*req.Before)
+			cursor, err := base64.RawURLEncoding.DecodeString(*req.Before)
 			if err != nil {
 				return nil, errors.Wrap(err, "invalid before cursor")
 			}
@@ -41,7 +41,7 @@ func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 				if err != nil {
 					return "", err
 				}
-				return base64.StdEncoding.EncodeToString([]byte(cursor)), nil
+				return base64.RawURLEncoding.EncodeToString([]byte(cursor)), nil
 			}
 		}
 
