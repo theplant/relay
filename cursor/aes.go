@@ -10,7 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
-	relay "github.com/theplant/gorelay"
+	"github.com/theplant/relay"
 )
 
 func encryptAES(plainText string, key []byte) (string, error) {

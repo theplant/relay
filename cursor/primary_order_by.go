@@ -3,7 +3,7 @@ package cursor
 import (
 	"context"
 
-	relay "github.com/theplant/gorelay"
+	"github.com/theplant/relay"
 )
 
 func PrimaryOrderBy[T any](primaryOrderBys ...relay.OrderBy) relay.CursorMiddleware[T] {

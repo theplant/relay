@@ -6,8 +6,8 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	relay "github.com/theplant/gorelay"
-	"github.com/theplant/gorelay/cursor"
+	"github.com/theplant/relay"
+	"github.com/theplant/relay/cursor"
 )
 
 func TestOffsetCursor(t *testing.T) {

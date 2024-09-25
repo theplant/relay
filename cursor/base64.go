@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
-	relay "github.com/theplant/gorelay"
+	"github.com/theplant/relay"
 )
 
 func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {

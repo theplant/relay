@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	relay "github.com/theplant/gorelay"
+	"github.com/theplant/relay"
 )
 
 type OffsetFinder[T any] interface {

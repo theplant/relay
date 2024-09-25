@@ -1,4 +1,4 @@
-module github.com/theplant/gorelay
+module github.com/theplant/relay
 
 go 1.22.5
 
@@ -8,7 +8,7 @@ require (
 	github.com/samber/lo v1.47.0
 	github.com/stretchr/testify v1.9.0
 	github.com/theplant/testenv v0.0.1
-	gorm.io/gorm v1.25.12
+	gorm.io/gorm v1.25.11
 )
 
 require (

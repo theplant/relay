@@ -6,7 +6,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
-	relay "github.com/theplant/gorelay"
+	"github.com/theplant/relay"
 )
 
 type KeysetFinder[T any] interface {

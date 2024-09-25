@@ -6,8 +6,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
-	relay "github.com/theplant/gorelay"
-	"github.com/theplant/gorelay/cursor"
+	"github.com/theplant/relay"
+	"github.com/theplant/relay/cursor"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
