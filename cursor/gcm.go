@@ -48,12 +48,12 @@ func decryptGCM(gcm cipher.AEAD, cipherText string) (string, error) {
 func NewGCM(key []byte) (cipher.AEAD, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, errors.New("could not create cipher block")
+		return nil, errors.Wrap(err, "could not create cipher")
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, errors.New("could not create GCM")
+		return nil, errors.Wrap(err, "could not create AEAD")
 	}
 	return gcm, nil
 }
