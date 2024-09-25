@@ -245,10 +245,10 @@ func TestTotalCountZero(t *testing.T) {
 	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 }
 
-func generateAESKey(length int) ([]byte, error) {
+func generateGCMKey(length int) ([]byte, error) {
 	key := make([]byte, length)
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "could not generate key")
 	}
 	return key, nil
 }
@@ -320,19 +320,22 @@ func TestMiddleware(t *testing.T) {
 		})
 	})
 
-	t.Run("AES", func(t *testing.T) {
-		encryptionKey, err := generateAESKey(32)
+	t.Run("GCM", func(t *testing.T) {
+		encryptionKey, err := generateGCMKey(32)
+		require.NoError(t, err)
+
+		gcm, err := cursor.NewGCM(encryptionKey)
 		require.NoError(t, err)
 
 		t.Run("keyset", func(t *testing.T) {
 			testCase(t, func(db *gorm.DB) relay.ApplyCursorsFunc[*User] {
-				return cursor.AES[*User](encryptionKey)(NewKeysetAdapter[*User](db))
+				return cursor.GCM[*User](gcm)(NewKeysetAdapter[*User](db))
 			})
 		})
 
 		t.Run("offset", func(t *testing.T) {
 			testCase(t, func(db *gorm.DB) relay.ApplyCursorsFunc[*User] {
-				return cursor.AES[*User](encryptionKey)(NewOffsetAdapter[*User](db))
+				return cursor.GCM[*User](gcm)(NewOffsetAdapter[*User](db))
 			})
 		})
 	})
@@ -376,10 +379,13 @@ func TestMiddleware(t *testing.T) {
 func TestAppendCursorMiddleware(t *testing.T) {
 	resetDB(t)
 
-	encryptionKey, err := generateAESKey(32)
+	encryptionKey, err := generateGCMKey(32)
 	require.NoError(t, err)
 
-	aesMiddleware := cursor.AES[*User](encryptionKey)
+	gcm, err := cursor.NewGCM(encryptionKey)
+	require.NoError(t, err)
+
+	gcmMiddleware := cursor.GCM[*User](gcm)
 
 	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
@@ -387,8 +393,8 @@ func TestAppendCursorMiddleware(t *testing.T) {
 			10, 10,
 			f(db),
 		)
-		p = relay.AppendCursorMiddleware(aesMiddleware)(p)                          // test add single middleware
-		p = relay.AppendCursorMiddleware(cursor.Base64[*User], aesMiddleware)(p)    // test add multiple middlewares
+		p = relay.AppendCursorMiddleware(gcmMiddleware)(p)                          // test add single middleware
+		p = relay.AppendCursorMiddleware(cursor.Base64[*User], gcmMiddleware)(p)    // test add multiple middlewares
 		p = relay.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(p) // test a pagination middleware
 
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{

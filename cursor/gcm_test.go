@@ -6,41 +6,45 @@ import (
 	"io"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
-func generateAESKey(length int) ([]byte, error) {
+func generateGCMKey(length int) ([]byte, error) {
 	key := make([]byte, length)
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "could not generate key")
 	}
 	return key, nil
 }
 
-func TestAES(t *testing.T) {
-	aesKey, err := generateAESKey(32)
+func TestGCM(t *testing.T) {
+	gcmKey, err := generateGCMKey(32)
+	require.NoError(t, err)
+
+	gcm, err := NewGCM(gcmKey)
 	require.NoError(t, err)
 
 	plainText := `{"ID":225}`
 
 	{
-		cipherText, err := encryptAES(plainText, aesKey)
+		cipherText, err := encryptGCM(gcm, plainText)
 		require.NoError(t, err)
 
 		t.Logf("cipherText: %s", cipherText)
 
-		decryptedText, err := decryptAES(cipherText, aesKey)
+		decryptedText, err := decryptGCM(gcm, cipherText)
 		require.NoError(t, err)
 		require.Equal(t, plainText, decryptedText)
 	}
 
 	{
-		cipherText, err := encryptAES(base64.RawURLEncoding.EncodeToString([]byte(plainText)), aesKey)
+		cipherText, err := encryptGCM(gcm, base64.RawURLEncoding.EncodeToString([]byte(plainText)))
 		require.NoError(t, err)
 
 		t.Logf("cipherText: %s", cipherText)
 
-		decryptedText, err := decryptAES(cipherText, aesKey)
+		decryptedText, err := decryptGCM(gcm, cipherText)
 		require.NoError(t, err)
 
 		plainTextData, err := base64.RawURLEncoding.DecodeString(decryptedText)

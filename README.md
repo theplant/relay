@@ -7,7 +7,7 @@
 ## Features
 
 - **Supports keyset-based and offset-based pagination**: You can freely choose high-performance keyset pagination based on multiple indexed columns, or use offset pagination.
-- **Optional cursor encryption**: Supports encrypting cursors using `AES` or `Base64` to ensure the security of pagination information.
+- **Optional cursor encryption**: Supports encrypting cursors using `GCM(AES)` or `Base64` to ensure the security of pagination information.
 - **Flexible query strategies**: Optionally skip the `TotalCount` query to improve performance, especially in large datasets.
 - **Non-generic support**: Even without using Go generics, you can paginate using the `any` type for flexible use cases.
 
@@ -33,14 +33,16 @@ resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 
 ### Middleware
 
-If you need to encrypt cursors, you can use `cursor.Base64` or `cursor.AES` middlewares:
+If you need to encrypt cursors, you can use `cursor.Base64` or `cursor.GCM` middlewares:
 
 ```go
 // Encrypt cursors with Base64
 cursor.Base64(gormrelay.NewOffsetAdapter[*User](db))
 
-// Encrypt cursors with AES
-cursor.AES(encryptionKey)(gormrelay.NewKeysetAdapter[*User](db))
+// Encrypt cursors with GCM(AES)
+gcm, err := cursor.NewGCM(encryptionKey)
+require.NoError(t, err)
+cursor.GCM(gcm)(gormrelay.NewKeysetAdapter[*User](db))
 ```
 
 If you need to append `PrimaryOrderBys` to `PaginateRequest.OrderBys`

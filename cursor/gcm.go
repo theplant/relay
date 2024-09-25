@@ -13,40 +13,20 @@ import (
 	"github.com/theplant/relay"
 )
 
-func encryptAES(plainText string, key []byte) (string, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", errors.New("could not create cipher block")
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-
+func encryptGCM(gcm cipher.AEAD, plainText string) (string, error) {
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", err
+		return "", errors.Wrap(err, "could not generate nonce")
 	}
 
 	cipherText := gcm.Seal(nonce, nonce, []byte(plainText), nil)
 	return base64.RawURLEncoding.EncodeToString(cipherText), nil
 }
 
-func decryptAES(cipherText string, key []byte) (string, error) {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", errors.New("could not create cipher block")
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", err
-	}
-
+func decryptGCM(gcm cipher.AEAD, cipherText string) (string, error) {
 	decodedCipherText, err := base64.RawURLEncoding.DecodeString(cipherText)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "could not decode cipher text")
 	}
 
 	nonceSize := gcm.NonceSize()
@@ -57,17 +37,32 @@ func decryptAES(cipherText string, key []byte) (string, error) {
 	nonce, dataCipherText := decodedCipherText[:nonceSize], decodedCipherText[nonceSize:]
 	plainText, err := gcm.Open(nil, nonce, dataCipherText, nil)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "could not decrypt cipher text")
 	}
 
 	return string(plainText), nil
 }
 
-func AES[T any](encryptionKey []byte) relay.CursorMiddleware[T] {
+// NewGCM creates a new GCM cipher
+// Concurrent safe: https://github.com/golang/go/issues/41689
+func NewGCM(key []byte) (cipher.AEAD, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, errors.New("could not create cipher block")
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, errors.New("could not create GCM")
+	}
+	return gcm, nil
+}
+
+func GCM[T any](gcm cipher.AEAD) relay.CursorMiddleware[T] {
 	return func(next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 		return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
 			if req.After != nil {
-				decodedCursor, err := decryptAES(*req.After, encryptionKey)
+				decodedCursor, err := decryptGCM(gcm, *req.After)
 				if err != nil {
 					return nil, errors.Wrap(err, "invalid after cursor")
 				}
@@ -75,7 +70,7 @@ func AES[T any](encryptionKey []byte) relay.CursorMiddleware[T] {
 			}
 
 			if req.Before != nil {
-				decodedCursor, err := decryptAES(*req.Before, encryptionKey)
+				decodedCursor, err := decryptGCM(gcm, *req.Before)
 				if err != nil {
 					return nil, errors.Wrap(err, "invalid before cursor")
 				}
@@ -95,7 +90,7 @@ func AES[T any](encryptionKey []byte) relay.CursorMiddleware[T] {
 					if err != nil {
 						return "", err
 					}
-					encryptedCursor, err := encryptAES(cursor, encryptionKey)
+					encryptedCursor, err := encryptGCM(gcm, cursor)
 					if err != nil {
 						return "", err
 					}
