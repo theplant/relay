@@ -1,6 +1,6 @@
-# gorelay
+# relay
 
-`gorelay` is a library designed to simplify Relay-style pagination in Go applications, supporting both cursor-based and offset-based pagination. It helps developers efficiently implement pagination queries while offering optimization options, such as skipping `TotalCount` queries and encrypting cursors.
+`relay` is a library designed to simplify Relay-style pagination in Go applications, supporting both cursor-based and offset-based pagination. It helps developers efficiently implement pagination queries while offering optimization options, such as skipping `TotalCount` queries and encrypting cursors.
 
 **Currently, only the `GORM` adapter is provided by default. For other adapters, refer to `gormrelay` to implement them yourself.**
 
