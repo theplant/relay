@@ -705,9 +705,6 @@ func TestKeysetWithoutCounter(t *testing.T) {
 				applyCursorFunc,
 			),
 		)
-
-		relay.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(p)
-
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
 		})
@@ -1062,6 +1059,53 @@ func TestTotalCountZero(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, 0, resp.PageInfo.TotalCount)
+	}
+
+	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
+	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
+}
+
+func TestAppendCursorMiddleware(t *testing.T) {
+	resetDB(t)
+
+	encryptionKey, err := generateAESKey(32)
+	require.NoError(t, err)
+
+	aesMiddleware := cursor.AES[*User](encryptionKey)
+
+	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+		p := relay.New(
+			false,
+			10, 10,
+			f(db),
+		)
+		p = relay.AppendCursorMiddleware(aesMiddleware)(p)                          // test add single middleware
+		p = relay.AppendCursorMiddleware(cursor.Base64[*User], aesMiddleware)(p)    // test add multiple middlewares
+		p = relay.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(p) // test a pagination middleware
+
+		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(10),
+		})
+		require.NoError(t, err)
+		require.Equal(t, 100, resp.PageInfo.TotalCount)
+		require.Len(t, resp.Edges, 10)
+		require.Equal(t, 0+1, resp.Edges[0].Node.ID)
+		require.Equal(t, 9+1, resp.Edges[len(resp.Edges)-1].Node.ID)
+		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
+		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+
+		// next page
+		resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			After: resp.PageInfo.EndCursor,
+			First: lo.ToPtr(10),
+		})
+		require.NoError(t, err)
+		require.Equal(t, 100, resp.PageInfo.TotalCount)
+		require.Len(t, resp.Edges, 10)
+		require.Equal(t, 10+1, resp.Edges[0].Node.ID)
+		require.Equal(t, 19+1, resp.Edges[len(resp.Edges)-1].Node.ID)
+		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
+		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
 	}
 
 	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
