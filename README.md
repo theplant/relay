@@ -1,13 +1,13 @@
 # relay
 
-`relay` is a library designed to simplify Relay-style pagination in Go applications, supporting both cursor-based and offset-based pagination. It helps developers efficiently implement pagination queries while offering optimization options, such as skipping `TotalCount` queries and encrypting cursors.
+`relay` is a library designed to simplify Relay-style pagination in Go applications, supporting both keyset-based and offset-based pagination. It helps developers efficiently implement pagination queries while offering optimization options, such as skipping `TotalCount` queries and encrypting cursors.
 
 **Currently, only the `GORM` adapter is provided by default. For other adapters, refer to `gormrelay` to implement them yourself.**
 
 ## Features
 
-- **Supports cursor-based and offset-based pagination**: You can freely choose high-performance cursor pagination based on multiple indexed columns, or use offset pagination.
-- **Optional cursor encryption**: Supports encrypting cursors using AES or Base64 to ensure the security of pagination information.
+- **Supports keyset-based and offset-based pagination**: You can freely choose high-performance keyset pagination based on multiple indexed columns, or use offset pagination.
+- **Optional cursor encryption**: Supports encrypting cursors using `AES` or `Base64` to ensure the security of pagination information.
 - **Flexible query strategies**: Optionally skip the `TotalCount` query to improve performance, especially in large datasets.
 - **Non-generic support**: Even without using Go generics, you can paginate using the `any` type for flexible use cases.
 
@@ -22,7 +22,7 @@ p := relay.New(
     func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
         // Offset-based pagination
         // return gormrelay.NewOffsetAdapter[*User](db)(ctx, req)
-        // Cursor-based pagination
+        // Keyset-based pagination
         return gormrelay.NewKeysetAdapter[*User](db)(ctx, req)
     },
 )
@@ -69,15 +69,27 @@ relay.PrimaryOrderBy[*User](
 
 ### Skipping `TotalCount` Query for Optimization
 
-To improve performance, you can skip querying TotalCount, especially useful for large datasets:
+To improve performance, you can skip querying `TotalCount`, especially useful for large datasets:
 
 ```go
-// Cursor-based pagination without querying TotalCount
+// Keyset-based pagination without querying TotalCount
+// Note: The final PageInfo.TotalCount will be relay.InvalidTotalCount(-1)
 cursor.NewKeysetAdapter(gormrelay.NewKeysetFinder[any](db))
 
-// Note: For offset-based pagination, if you can't query TotalCount, 
-// using `Last != nil && Before == nil` is not possible.
+// Offset-based pagination without querying TotalCount
+// Note: The final PageInfo.TotalCount will be relay.InvalidTotalCount(-1)
+// Note: Using `Last != nil && Before == nil` is not supported for this case.
 cursor.NewOffsetAdapter(gormrelay.NewOffsetFinder[any](db))
+
+// Compared to the version that queries TotalCount
+
+cursor.NewKeysetAdapter(gormrelay.NewKeysetCounter[any](db))
+// equals
+gormrelay.NewKeysetAdapter[any](db)
+
+cursor.NewOffsetAdapter(gormrelay.NewOffsetCounter[any](db))
+// equals
+gormrelay.NewOffsetAdapter[any](db)
 ```
 
 ### Non-Generic Usage
