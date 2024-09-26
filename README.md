@@ -17,7 +17,7 @@
 
 ```go
 p := relay.New(
-    true, // nodesOnly, default returns nodes and pageInfo
+    true, // nodesOnly, true means only nodes are returned, otherwise only edges are returned
     10, 10, // maxLimit / limitIfNotSet
     func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
         // Offset-based pagination
