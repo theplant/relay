@@ -67,7 +67,7 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 		resp := &relay.ApplyCursorsResponse[T]{
 			Edges:      edges,
 			TotalCount: totalCount,
-			// If we don't have a counter, it would be very costly to check whether after and before really exist,
+			// It would be very costly to check whether after and before really exist,
 			// So it is usually not worth it. Normally, checking that it is not nil is sufficient.
 			HasAfterOrPrevious: after != nil,
 			HasBeforeOrNext:    before != nil,
