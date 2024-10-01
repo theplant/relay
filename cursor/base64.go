@@ -33,8 +33,8 @@ func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 		}
 
 		// Encrypt the cursor
-		for i := range resp.Edges {
-			edge := &resp.Edges[i]
+		for i := range resp.LazyEdges {
+			edge := &resp.LazyEdges[i]
 			originalCursor := edge.Cursor
 			edge.Cursor = func(ctx context.Context, node T) (string, error) {
 				cursor, err := originalCursor(ctx, node)

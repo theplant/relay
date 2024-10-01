@@ -75,7 +75,7 @@ To improve performance, you can skip querying `TotalCount`, especially useful fo
 
 ```go
 // Keyset-based pagination without querying TotalCount
-// Note: The final PageInfo.TotalCount will be relay.InvalidTotalCount(-1)
+// Note: The final PageInfo.TotalCount will be relay.InvalidTotalCount(-1) // TODO:
 cursor.NewKeysetAdapter(gormrelay.NewKeysetFinder[any](db))
 
 // Offset-based pagination without querying TotalCount

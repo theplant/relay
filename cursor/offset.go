@@ -27,21 +27,22 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			return nil, err
 		}
 
-		totalCount := relay.InvalidTotalCount
-		counter, hasCounter := finder.(Counter)
-		if hasCounter {
+		var totalCount *int
+		counter, ok := finder.(Counter)
+		if ok {
 			var err error
-			totalCount, err = counter.Count(ctx)
+			count, err := counter.Count(ctx)
 			if err != nil {
 				return nil, err
 			}
+			totalCount = &count
 		}
 
 		if req.FromLast && before == nil {
-			if !hasCounter {
+			if totalCount == nil {
 				return nil, errors.New("counter is required for fromLast and nil before")
 			}
-			before = &totalCount
+			before = totalCount
 		}
 
 		limit, skip := req.Limit, 0
@@ -67,7 +68,7 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 		}
 
 		var edges []relay.LazyEdge[T]
-		if limit <= 0 || (hasCounter && (skip >= totalCount || totalCount <= 0)) {
+		if limit <= 0 || (totalCount != nil && (skip >= *totalCount || *totalCount <= 0)) {
 			edges = make([]relay.LazyEdge[T], 0)
 		} else {
 			nodes, err := finder.Find(ctx, req.OrderBys, skip, limit)
@@ -87,13 +88,13 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 		}
 
 		resp := &relay.ApplyCursorsResponse[T]{
-			Edges:      edges,
+			LazyEdges:  edges,
 			TotalCount: totalCount,
 		}
 
-		if hasCounter {
-			resp.HasAfterOrPrevious = after != nil && *after < totalCount
-			resp.HasBeforeOrNext = before != nil && *before < totalCount
+		if totalCount != nil {
+			resp.HasAfterOrPrevious = after != nil && *after < *totalCount
+			resp.HasBeforeOrNext = before != nil && *before < *totalCount
 		} else {
 			// If we don't have a counter, it would be very costly to check whether after and before really exist,
 			// So it is usually not worth it. Normally, checking that it is not nil is sufficient.

@@ -130,7 +130,7 @@ func TestNodesOnly(t *testing.T) {
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
-		require.Equal(t, 100, resp.PageInfo.TotalCount)
+		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
 		require.NotNil(t, resp.PageInfo.StartCursor)
 		require.NotNil(t, resp.PageInfo.EndCursor)
 		require.Len(t, resp.Edges, 0)
@@ -238,7 +238,7 @@ func TestTotalCountZero(t *testing.T) {
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
-		require.Equal(t, 0, resp.PageInfo.TotalCount)
+		require.Equal(t, lo.ToPtr(0), resp.TotalCount)
 	}
 
 	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
@@ -353,8 +353,8 @@ func TestMiddleware(t *testing.T) {
 								return nil, err
 							}
 
-							for i := range resp.Edges {
-								edge := &resp.Edges[i]
+							for i := range resp.LazyEdges {
+								edge := &resp.LazyEdges[i]
 								edge.Cursor = func(ctx context.Context, node *User) (string, error) {
 									return "", errors.New("mock error")
 								}
@@ -401,7 +401,7 @@ func TestAppendCursorMiddleware(t *testing.T) {
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
-		require.Equal(t, 100, resp.PageInfo.TotalCount)
+		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
 		require.Len(t, resp.Edges, 10)
 		require.Equal(t, 0+1, resp.Edges[0].Node.ID)
 		require.Equal(t, 9+1, resp.Edges[len(resp.Edges)-1].Node.ID)
@@ -414,7 +414,7 @@ func TestAppendCursorMiddleware(t *testing.T) {
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
-		require.Equal(t, 100, resp.PageInfo.TotalCount)
+		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
 		require.Len(t, resp.Edges, 10)
 		require.Equal(t, 10+1, resp.Edges[0].Node.ID)
 		require.Equal(t, 19+1, resp.Edges[len(resp.Edges)-1].Node.ID)
