@@ -50,11 +50,9 @@ resp, err := p.Paginate(context.Background(),
 )
 ```
 
-### Cursor Middleware
+### Cursor Encryption
 
-// TODO: convert to pagination middleware ?
-
-If you need to encrypt cursors, you can use `cursor.Base64` or `cursor.GCM` middlewares:
+If you need to encrypt cursors, you can use `cursor.Base64` or `cursor.GCM` wrappers:
 
 ```go
 // Encrypt cursors with Base64

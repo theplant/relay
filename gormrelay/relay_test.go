@@ -257,6 +257,8 @@ func TestTotalCountZero(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, lo.ToPtr(0), resp.TotalCount)
+		require.Nil(t, resp.PageInfo.StartCursor)
+		require.Nil(t, resp.PageInfo.EndCursor)
 	}
 
 	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
