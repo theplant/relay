@@ -37,9 +37,9 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			totalCount = &count
 		}
 
-		if req.FromLast && before == nil {
+		if req.FromEnd && before == nil {
 			if totalCount == nil {
-				return nil, errors.New("totalCount is required for fromLast and nil before")
+				return nil, errors.New("totalCount is required for fromEnd and nil before")
 			}
 			before = totalCount
 		}
@@ -61,7 +61,7 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			if limit > rangeLen {
 				limit = rangeLen
 			}
-			if req.FromLast && limit < rangeLen {
+			if req.FromEnd && limit < rangeLen {
 				skip = *before - limit
 			}
 		}

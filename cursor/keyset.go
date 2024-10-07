@@ -10,7 +10,7 @@ import (
 )
 
 type KeysetFinder[T any] interface {
-	Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error)
+	Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]T, error)
 	Count(ctx context.Context) (int, error)
 }
 
@@ -45,7 +45,7 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 		if req.Limit <= 0 || (totalCount != nil && *totalCount <= 0) {
 			edges = make([]relay.LazyEdge[T], 0)
 		} else {
-			nodes, err := finder.Find(ctx, after, before, req.OrderBys, req.Limit, req.FromLast)
+			nodes, err := finder.Find(ctx, after, before, req.OrderBys, req.Limit, req.FromEnd)
 			if err != nil {
 				return nil, err
 			}

@@ -88,7 +88,7 @@ func createWhereExpr(s *schema.Schema, orderBys []relay.OrderBy, keyset map[stri
 //		clause.Limit{Limit: &limit},
 //
 // )
-func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) func(db *gorm.DB) *gorm.DB {
+func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if db.Statement.Model == nil {
 			db.AddError(errors.New("model is nil"))
@@ -131,7 +131,7 @@ func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit 
 				}
 
 				desc := orderBy.Desc
-				if fromLast {
+				if fromEnd {
 					desc = !desc
 				}
 				orderByColumns = append(orderByColumns, clause.OrderByColumn{
@@ -150,7 +150,7 @@ func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit 
 	}
 }
 
-func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error) {
+func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]T, error) {
 	var nodes []T
 	if limit == 0 {
 		return nodes, nil
@@ -166,7 +166,7 @@ func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []
 		sliceType := reflect.SliceOf(modelType)
 		nodesVal := reflect.New(sliceType).Elem()
 
-		err := db.Scopes(scopeKeyset(after, before, orderBys, limit, fromLast)).Find(nodesVal.Addr().Interface()).Error
+		err := db.Scopes(scopeKeyset(after, before, orderBys, limit, fromEnd)).Find(nodesVal.Addr().Interface()).Error
 		if err != nil {
 			return nil, errors.Wrap(err, "find")
 		}
@@ -176,7 +176,7 @@ func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []
 			nodes[i] = nodesVal.Index(i).Interface().(T)
 		}
 
-		if fromLast {
+		if fromEnd {
 			lo.Reverse(nodes)
 		}
 		return nodes, nil
@@ -187,11 +187,11 @@ func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []
 		db = db.Model(t)
 	}
 
-	err = db.Scopes(scopeKeyset(after, before, orderBys, limit, fromLast)).Find(&nodes).Error
+	err = db.Scopes(scopeKeyset(after, before, orderBys, limit, fromEnd)).Find(&nodes).Error
 	if err != nil {
 		return nil, errors.Wrap(err, "find")
 	}
-	if fromLast {
+	if fromEnd {
 		lo.Reverse(nodes)
 	}
 	return nodes, nil
@@ -205,7 +205,7 @@ func NewKeysetFinder[T any](db *gorm.DB) *KeysetFinder[T] {
 	return &KeysetFinder[T]{db: db}
 }
 
-func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error) {
+func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]T, error) {
 	if limit == 0 {
 		return []T{}, nil
 	}
@@ -215,7 +215,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 		db = db.WithContext(ctx)
 	}
 
-	nodes, err := findByKeyset[T](db, after, before, orderBys, limit, fromLast)
+	nodes, err := findByKeyset[T](db, after, before, orderBys, limit, fromEnd)
 	if err != nil {
 		return nil, err
 	}

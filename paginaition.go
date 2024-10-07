@@ -44,7 +44,7 @@ type ApplyCursorsRequest struct {
 	After    *string
 	OrderBys []OrderBy
 	Limit    int
-	FromLast bool
+	FromEnd  bool
 }
 
 type LazyEdge[T any] struct {
@@ -106,7 +106,7 @@ func Paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		After:    req.After,
 		OrderBys: orderBys,
 		Limit:    limit,
-		FromLast: req.Last != nil,
+		FromEnd:  req.Last != nil,
 	})
 	if err != nil {
 		return nil, err

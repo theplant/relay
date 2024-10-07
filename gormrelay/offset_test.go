@@ -545,6 +545,6 @@ func TestOffsetWithLastAndNilBeforeIfSkipTotalCount(t *testing.T) {
 			Last: lo.ToPtr(10),
 		},
 	)
-	require.ErrorContains(t, err, "totalCount is required for fromLast and nil before")
+	require.ErrorContains(t, err, "totalCount is required for fromEnd and nil before")
 	require.Nil(t, resp)
 }
