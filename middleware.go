@@ -72,11 +72,13 @@ func CursorMiddlewaresFromContext[T any](ctx context.Context) []CursorMiddleware
 	return middlewares
 }
 
-func AppendCursorMiddleware[T any](ws ...CursorMiddleware[T]) PaginationMiddleware[T] {
+func AppendCursorMiddleware[T any](cursorMiddlewares ...CursorMiddleware[T]) PaginationMiddleware[T] {
 	return func(next Pagination[T]) Pagination[T] {
 		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
-			middlewares := append(CursorMiddlewaresFromContext[T](ctx), ws...)
-			ctx = context.WithValue(ctx, ctxCursorMiddlewares{}, middlewares)
+			if len(cursorMiddlewares) > 0 {
+				cursorMiddlewares := append(CursorMiddlewaresFromContext[T](ctx), cursorMiddlewares...)
+				ctx = context.WithValue(ctx, ctxCursorMiddlewares{}, cursorMiddlewares)
+			}
 			return next.Paginate(ctx, req)
 		})
 	}
