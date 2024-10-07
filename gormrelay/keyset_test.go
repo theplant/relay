@@ -127,24 +127,27 @@ func TestScopeKeyset(t *testing.T) {
 func TestKeysetCursor(t *testing.T) {
 	resetDB(t)
 
+	applyCursorsFunc := NewKeysetAdapter[*User](db)
+
 	primaryOrderByKeys := []string{"ID", "Age"}
-	applyCursorsFunc := cursor.PrimaryOrderBy[*User](
-		relay.OrderBy{Field: "ID", Desc: false},
-		relay.OrderBy{Field: "Age", Desc: true},
-	)(
-		NewKeysetAdapter[*User](db),
-	)
+	otherMiddlewares := []relay.PaginationMiddleware[*User]{
+		relay.EnsurePrimaryOrderBy[*User](
+			relay.OrderBy{Field: "ID", Desc: false},
+			relay.OrderBy{Field: "Age", Desc: true},
+		),
+	}
 
 	testCases := []struct {
-		name             string
-		limitIfNotSet    int
-		maxLimit         int
-		applyCursorsFunc relay.ApplyCursorsFunc[*User]
-		paginateRequest  *relay.PaginateRequest[*User]
-		expectedEdgesLen int
-		expectedPageInfo relay.PageInfo
-		expectedError    string
-		expectedPanic    string
+		name               string
+		limitIfNotSet      int
+		maxLimit           int
+		applyCursorsFunc   relay.ApplyCursorsFunc[*User]
+		paginateRequest    *relay.PaginateRequest[*User]
+		expectedEdgesLen   int
+		expectedTotalCount *int
+		expectedPageInfo   relay.PageInfo
+		expectedError      string
+		expectedPanic      string
 	}{
 		{
 			name:             "Invalid: Both First and Last",
@@ -237,14 +240,14 @@ func TestKeysetCursor(t *testing.T) {
 			expectedError: "after == before",
 		},
 		{
-			name:             "Limit if not set",
-			limitIfNotSet:    10,
-			maxLimit:         20,
-			applyCursorsFunc: applyCursorsFunc,
-			paginateRequest:  &relay.PaginateRequest[*User]{},
-			expectedEdgesLen: 10,
+			name:               "Limit if not set",
+			limitIfNotSet:      10,
+			maxLimit:           20,
+			applyCursorsFunc:   applyCursorsFunc,
+			paginateRequest:    &relay.PaginateRequest[*User]{},
+			expectedEdgesLen:   10,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -266,9 +269,9 @@ func TestKeysetCursor(t *testing.T) {
 				)),
 				First: lo.ToPtr(2),
 			},
-			expectedEdgesLen: 2,
+			expectedEdgesLen:   2,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -287,9 +290,9 @@ func TestKeysetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(2),
 			},
-			expectedEdgesLen: 2,
+			expectedEdgesLen:   2,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -311,9 +314,9 @@ func TestKeysetCursor(t *testing.T) {
 				)),
 				Last: lo.ToPtr(2),
 			},
-			expectedEdgesLen: 2,
+			expectedEdgesLen:   2,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -332,9 +335,9 @@ func TestKeysetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Last: lo.ToPtr(10),
 			},
-			expectedEdgesLen: 10,
+			expectedEdgesLen:   10,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -359,9 +362,9 @@ func TestKeysetCursor(t *testing.T) {
 				)),
 				First: lo.ToPtr(5),
 			},
-			expectedEdgesLen: 5,
+			expectedEdgesLen:   5,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -386,9 +389,9 @@ func TestKeysetCursor(t *testing.T) {
 				)),
 				First: lo.ToPtr(8),
 			},
-			expectedEdgesLen: 3,
+			expectedEdgesLen:   3,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -413,9 +416,9 @@ func TestKeysetCursor(t *testing.T) {
 				)),
 				Last: lo.ToPtr(5),
 			},
-			expectedEdgesLen: 5,
+			expectedEdgesLen:   5,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -440,9 +443,9 @@ func TestKeysetCursor(t *testing.T) {
 				)),
 				Last: lo.ToPtr(8),
 			},
-			expectedEdgesLen: 3,
+			expectedEdgesLen:   3,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -463,9 +466,9 @@ func TestKeysetCursor(t *testing.T) {
 					&User{ID: 99 + 1, Name: "name99", Age: 1}, primaryOrderByKeys,
 				)),
 			},
-			expectedEdgesLen: 0,
+			expectedEdgesLen:   0,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor:     nil,
@@ -482,9 +485,9 @@ func TestKeysetCursor(t *testing.T) {
 					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
 				)),
 			},
-			expectedEdgesLen: 0,
+			expectedEdgesLen:   0,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     nil,
@@ -499,9 +502,9 @@ func TestKeysetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(200),
 			},
-			expectedEdgesLen: 100,
+			expectedEdgesLen:   100,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     false,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -520,9 +523,9 @@ func TestKeysetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Last: lo.ToPtr(200),
 			},
-			expectedEdgesLen: 100,
+			expectedEdgesLen:   100,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     false,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -541,9 +544,9 @@ func TestKeysetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(0),
 			},
-			expectedEdgesLen: 0,
+			expectedEdgesLen:   0,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     nil,
@@ -558,9 +561,9 @@ func TestKeysetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Last: lo.ToPtr(0),
 			},
-			expectedEdgesLen: 0,
+			expectedEdgesLen:   0,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor:     nil,
@@ -578,9 +581,9 @@ func TestKeysetCursor(t *testing.T) {
 				)),
 				First: lo.ToPtr(10),
 			},
-			expectedEdgesLen: 4,
+			expectedEdgesLen:   4,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -602,9 +605,9 @@ func TestKeysetCursor(t *testing.T) {
 				)),
 				Last: lo.ToPtr(10),
 			},
-			expectedEdgesLen: 4,
+			expectedEdgesLen:   4,
+			expectedTotalCount: lo.ToPtr(100),
 			expectedPageInfo: relay.PageInfo{
-				TotalCount:      100,
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -622,12 +625,18 @@ func TestKeysetCursor(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
+					relay.New(
+						tc.applyCursorsFunc,
+						append(otherMiddlewares, relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet))...,
+					)
 				})
 				return
 			}
 
-			p := relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
+			p := relay.New(
+				tc.applyCursorsFunc,
+				append(otherMiddlewares, relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet))...,
+			)
 			resp, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {
@@ -638,41 +647,19 @@ func TestKeysetCursor(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Len(t, resp.Edges, tc.expectedEdgesLen)
+			require.Equal(t, tc.expectedTotalCount, resp.TotalCount)
 			require.Equal(t, tc.expectedPageInfo, resp.PageInfo)
 		})
 	}
 }
 
-func TestKeysetWithoutCounter(t *testing.T) {
-	resetDB(t)
-
-	testCase := func(t *testing.T, applyCursorFunc relay.ApplyCursorsFunc[*User]) {
-		p := relay.New(
-			false,
-			10, 10,
-			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
-				applyCursorFunc,
-			),
-		)
-		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			First: lo.ToPtr(10),
-		})
-		require.NoError(t, err)
-		require.Len(t, resp.Edges, 10)
-		require.Equal(t, 1, resp.Edges[0].Node.ID)
-		require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, relay.InvalidTotalCount, resp.PageInfo.TotalCount)
-	}
-
-	t.Run("keyset", func(t *testing.T) { testCase(t, cursor.NewKeysetAdapter(NewKeysetFinder[*User](db))) })
-	t.Run("offset", func(t *testing.T) { testCase(t, cursor.NewOffsetAdapter(NewOffsetFinder[*User](db))) })
-}
-
 func TestKeysetEmptyOrderBys(t *testing.T) {
-	resp, err := relay.New(false, 10, 10, NewKeysetAdapter[*User](db)).
-		Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			First: lo.ToPtr(10),
-		})
+	resp, err := relay.New(
+		NewKeysetAdapter[*User](db),
+		relay.EnsureLimits[*User](10, 10),
+	).Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		First: lo.ToPtr(10),
+	})
 	require.ErrorContains(t, err, "no keys to encode cursor, orderBys must be set for keyset")
 	require.Nil(t, resp)
 }
@@ -681,14 +668,12 @@ func TestKeysetInvalidCursor(t *testing.T) {
 	resetDB(t)
 
 	p := relay.New(
-		false,
-		10, 10,
-		cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
-			func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
-				// This is a generic(T: any) function, so we need to cast the model to the correct type
-				return NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
-			},
-		),
+		func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+			// This is a generic(T: any) function, so we need to cast the model to the correct type
+			return NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
+		},
+		relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+		relay.EnsureLimits[any](10, 10),
 	)
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 		After: lo.ToPtr(`{"ID":1}`),
