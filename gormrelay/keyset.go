@@ -197,43 +197,33 @@ func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []
 	return nodes, nil
 }
 
-func NewKeysetFinder[T any](db *gorm.DB) cursor.KeysetFinder[T] {
-	return cursor.KeysetFinderFunc[T](func(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error) {
-		if limit == 0 {
-			return []T{}, nil
-		}
-
-		db := db
-		if db.Statement.Context != ctx {
-			db = db.WithContext(ctx)
-		}
-
-		nodes, err := findByKeyset[T](db, after, before, orderBys, limit, fromLast)
-		if err != nil {
-			return nil, err
-		}
-
-		return nodes, nil
-	})
+type KeysetFinder[T any] struct {
+	db *gorm.DB
 }
 
-type KeysetCounter[T any] struct {
-	db     *gorm.DB
-	finder cursor.KeysetFinder[T]
+func NewKeysetFinder[T any](db *gorm.DB) *KeysetFinder[T] {
+	return &KeysetFinder[T]{db: db}
 }
 
-func NewKeysetCounter[T any](db *gorm.DB) *KeysetCounter[T] {
-	return &KeysetCounter[T]{
-		db:     db,
-		finder: NewKeysetFinder[T](db),
+func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error) {
+	if limit == 0 {
+		return []T{}, nil
 	}
+
+	db := a.db
+	if db.Statement.Context != ctx {
+		db = db.WithContext(ctx)
+	}
+
+	nodes, err := findByKeyset[T](db, after, before, orderBys, limit, fromLast)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
 }
 
-func (a *KeysetCounter[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error) {
-	return a.finder.Find(ctx, after, before, orderBys, limit, fromLast)
-}
-
-func (a *KeysetCounter[T]) Count(ctx context.Context) (int, error) {
+func (a *KeysetFinder[T]) Count(ctx context.Context) (int, error) {
 	db := a.db
 
 	basedOnModel, err := shouldBasedOnModel[T](db)
@@ -258,5 +248,5 @@ func (a *KeysetCounter[T]) Count(ctx context.Context) (int, error) {
 }
 
 func NewKeysetAdapter[T any](db *gorm.DB) relay.ApplyCursorsFunc[T] {
-	return cursor.NewKeysetAdapter(NewKeysetCounter[T](db))
+	return cursor.NewKeysetAdapter(NewKeysetFinder[T](db))
 }

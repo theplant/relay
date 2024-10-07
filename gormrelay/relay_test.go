@@ -56,7 +56,7 @@ type User struct {
 func TestUnexpectOrderBys(t *testing.T) {
 	resetDB(t)
 
-	p := relay.New(false, 10, 10, func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+	p := relay.New(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
 		return nil, nil
 	})
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
@@ -76,11 +76,9 @@ func TestContext(t *testing.T) {
 	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
 		{
 			p := relay.New(
-				false,
-				10, 10,
-				cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
-					f(db),
-				),
+				f(db),
+				relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsureLimits[*User](10, 10),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -93,14 +91,12 @@ func TestContext(t *testing.T) {
 
 		{
 			p := relay.New(
-				false,
-				10, 10,
-				cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
-					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-						// Set WithContext here
-						return f(db.WithContext(ctx))(ctx, req)
-					},
-				),
+				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+					// Set WithContext here
+					return f(db.WithContext(ctx))(ctx, req)
+				},
+				relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsureLimits[*User](10, 10),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -115,28 +111,55 @@ func TestContext(t *testing.T) {
 	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 }
 
-func TestNodesOnly(t *testing.T) {
+func TestSkipEdgesOrNodes(t *testing.T) {
 	resetDB(t)
 
 	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
-			true,
-			10, 10,
-			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
-				f(db),
-			),
+			f(db),
+			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsureLimits[*User](10, 10),
 		)
-		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			First: lo.ToPtr(10),
+		t.Run("SkipEdges", func(t *testing.T) {
+			ctx := relay.WithSkipEdges(context.Background())
+			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+			})
+			require.NoError(t, err)
+			require.Equal(t, lo.ToPtr(100), resp.TotalCount)
+			require.NotNil(t, resp.PageInfo.StartCursor)
+			require.NotNil(t, resp.PageInfo.EndCursor)
+			require.Nil(t, resp.Edges)
+			require.Len(t, resp.Nodes, 10)
+			require.Equal(t, 1, resp.Nodes[0].ID)
+			require.Equal(t, 10, resp.Nodes[len(resp.Nodes)-1].ID)
 		})
-		require.NoError(t, err)
-		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-		require.NotNil(t, resp.PageInfo.StartCursor)
-		require.NotNil(t, resp.PageInfo.EndCursor)
-		require.Len(t, resp.Edges, 0)
-		require.Len(t, resp.Nodes, 10)
-		require.Equal(t, 1, resp.Nodes[0].ID)
-		require.Equal(t, 10, resp.Nodes[len(resp.Nodes)-1].ID)
+		t.Run("SkipNodes", func(t *testing.T) {
+			ctx := relay.WithSkipNodes(context.Background())
+			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+			})
+			require.NoError(t, err)
+			require.Equal(t, lo.ToPtr(100), resp.TotalCount)
+			require.NotNil(t, resp.PageInfo.StartCursor)
+			require.NotNil(t, resp.PageInfo.EndCursor)
+			require.Len(t, resp.Edges, 10)
+			require.Nil(t, resp.Nodes)
+			require.Equal(t, 1, resp.Edges[0].Node.ID)
+			require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
+		})
+		t.Run("SkipEdgesAndNodes", func(t *testing.T) {
+			ctx := relay.WithSkipEdges(relay.WithSkipNodes(context.Background()))
+			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+			})
+			require.NoError(t, err)
+			require.Equal(t, lo.ToPtr(100), resp.TotalCount)
+			require.NotNil(t, resp.PageInfo.StartCursor)
+			require.NotNil(t, resp.PageInfo.EndCursor)
+			require.Len(t, resp.Edges, 0)
+			require.Len(t, resp.Nodes, 0)
+		})
 	}
 
 	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
@@ -149,14 +172,12 @@ func TestGenericTypeAny(t *testing.T) {
 	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[any]) {
 		t.Run("Correct", func(t *testing.T) {
 			p := relay.New(
-				false,
-				10, 10,
-				cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
-					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
-						// This is a generic(T: any) function, so we need to call db.Model(x)
-						return f(db.Model(&User{}))(ctx, req)
-					},
-				),
+				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+					// This is a generic(T: any) function, so we need to call db.Model(x)
+					return f(db.Model(&User{}))(ctx, req)
+				},
+				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsureLimits[any](10, 10),
 			)
 			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 				First: lo.ToPtr(10),
@@ -180,14 +201,12 @@ func TestGenericTypeAny(t *testing.T) {
 		})
 		t.Run("Wrong", func(t *testing.T) {
 			p := relay.New(
-				false,
-				10, 10,
-				cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
-					func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
-						// This is wrong, we need to call db.Model(x) for generic(T: any) function
-						return f(db)(ctx, req)
-					},
-				),
+				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+					// This is wrong, we need to call db.Model(x) for generic(T: any) function
+					return f(db)(ctx, req)
+				},
+				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsureLimits[any](10, 10),
 			)
 			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 				First: lo.ToPtr(10),
@@ -201,25 +220,26 @@ func TestGenericTypeAny(t *testing.T) {
 	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 
 	anotherTestCase := func(t *testing.T, applyCursorsFunc relay.ApplyCursorsFunc[any]) {
-		t.Run("Wrong(WithoutCounter)", func(t *testing.T) {
+		t.Run("Wrong(SkipTotalCount)", func(t *testing.T) {
 			p := relay.New(
-				false,
-				10, 10,
-				cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
-					applyCursorsFunc,
-				),
+				applyCursorsFunc,
+				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsureLimits[any](10, 10),
 			)
-			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
-				First: lo.ToPtr(10),
-			})
+			resp, err := p.Paginate(
+				relay.WithSkipTotalCount(context.Background()),
+				&relay.PaginateRequest[any]{
+					First: lo.ToPtr(10),
+				},
+			)
 			require.ErrorContains(t, err, "db.Statement.Model is nil and T is not a struct or struct pointer")
 			require.Nil(t, resp)
 		})
 	}
 
 	// This is wrong, we need to call db.Model(x) for generic(T: any) function
-	t.Run("keyset", func(t *testing.T) { anotherTestCase(t, cursor.NewKeysetAdapter(NewKeysetFinder[any](db))) })
-	t.Run("offset", func(t *testing.T) { anotherTestCase(t, cursor.NewOffsetAdapter(NewOffsetFinder[any](db))) })
+	t.Run("keyset", func(t *testing.T) { anotherTestCase(t, NewKeysetAdapter[any](db)) })
+	t.Run("offset", func(t *testing.T) { anotherTestCase(t, NewOffsetAdapter[any](db)) })
 }
 
 func TestTotalCountZero(t *testing.T) {
@@ -228,11 +248,9 @@ func TestTotalCountZero(t *testing.T) {
 
 	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
-			false,
-			10, 10,
-			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
-				f(db),
-			),
+			f(db),
+			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsureLimits[*User](10, 10),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
@@ -253,16 +271,14 @@ func generateGCMKey(length int) ([]byte, error) {
 	return key, nil
 }
 
-func TestMiddleware(t *testing.T) {
+func TestCursorMiddleware(t *testing.T) {
 	resetDB(t)
 
 	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
-			false,
-			10, 10,
-			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
-				f(db),
-			),
+			f(db),
+			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsureLimits[*User](10, 10),
 		)
 		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
@@ -343,27 +359,25 @@ func TestMiddleware(t *testing.T) {
 	t.Run("MockError", func(t *testing.T) {
 		testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
 			p := relay.New(
-				false,
-				10, 10,
-				cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
-					func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
-						return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-							resp, err := next(ctx, req)
-							if err != nil {
-								return nil, err
-							}
-
-							for i := range resp.LazyEdges {
-								edge := &resp.LazyEdges[i]
-								edge.Cursor = func(ctx context.Context, node *User) (string, error) {
-									return "", errors.New("mock error")
-								}
-							}
-
-							return resp, nil
+				func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
+					return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+						resp, err := next(ctx, req)
+						if err != nil {
+							return nil, err
 						}
-					}(f(db)),
-				),
+
+						for i := range resp.LazyEdges {
+							edge := &resp.LazyEdges[i]
+							edge.Cursor = func(ctx context.Context, node *User) (string, error) {
+								return "", errors.New("mock error")
+							}
+						}
+
+						return resp, nil
+					}
+				}(f(db)),
+				relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsureLimits[*User](10, 10),
 			)
 			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
@@ -374,54 +388,4 @@ func TestMiddleware(t *testing.T) {
 		t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
 		t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 	})
-}
-
-func TestAppendCursorMiddleware(t *testing.T) {
-	resetDB(t)
-
-	encryptionKey, err := generateGCMKey(32)
-	require.NoError(t, err)
-
-	gcm, err := cursor.NewGCM(encryptionKey)
-	require.NoError(t, err)
-
-	gcmMiddleware := cursor.GCM[*User](gcm)
-
-	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
-		p := relay.New(
-			false,
-			10, 10,
-			f(db),
-		)
-		p = relay.AppendCursorMiddleware(gcmMiddleware)(p)                          // test add single middleware
-		p = relay.AppendCursorMiddleware(cursor.Base64[*User], gcmMiddleware)(p)    // test add multiple middlewares
-		p = relay.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(p) // test a pagination middleware
-
-		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			First: lo.ToPtr(10),
-		})
-		require.NoError(t, err)
-		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-		require.Len(t, resp.Edges, 10)
-		require.Equal(t, 0+1, resp.Edges[0].Node.ID)
-		require.Equal(t, 9+1, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
-
-		// next page
-		resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			After: resp.PageInfo.EndCursor,
-			First: lo.ToPtr(10),
-		})
-		require.NoError(t, err)
-		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-		require.Len(t, resp.Edges, 10)
-		require.Equal(t, 10+1, resp.Edges[0].Node.ID)
-		require.Equal(t, 19+1, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
-	}
-
-	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
-	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 }

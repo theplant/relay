@@ -127,13 +127,15 @@ func TestScopeKeyset(t *testing.T) {
 func TestKeysetCursor(t *testing.T) {
 	resetDB(t)
 
+	applyCursorsFunc := NewKeysetAdapter[*User](db)
+
 	primaryOrderByKeys := []string{"ID", "Age"}
-	applyCursorsFunc := cursor.PrimaryOrderBy[*User](
-		relay.OrderBy{Field: "ID", Desc: false},
-		relay.OrderBy{Field: "Age", Desc: true},
-	)(
-		NewKeysetAdapter[*User](db),
-	)
+	otherMiddlewares := []relay.PaginationMiddleware[*User]{
+		relay.EnsurePrimaryOrderBy[*User](
+			relay.OrderBy{Field: "ID", Desc: false},
+			relay.OrderBy{Field: "Age", Desc: true},
+		),
+	}
 
 	testCases := []struct {
 		name               string
@@ -623,12 +625,18 @@ func TestKeysetCursor(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
+					relay.New(
+						tc.applyCursorsFunc,
+						append(otherMiddlewares, relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet))...,
+					)
 				})
 				return
 			}
 
-			p := relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
+			p := relay.New(
+				tc.applyCursorsFunc,
+				append(otherMiddlewares, relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet))...,
+			)
 			resp, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {
@@ -645,18 +653,17 @@ func TestKeysetCursor(t *testing.T) {
 	}
 }
 
-func TestKeysetWithoutCounter(t *testing.T) {
+func TestKeysetSkipTotalCount(t *testing.T) {
 	resetDB(t)
 
 	testCase := func(t *testing.T, applyCursorFunc relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
-			false,
-			10, 10,
-			cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(
-				applyCursorFunc,
-			),
+			applyCursorFunc,
+			relay.EnsureLimits[*User](10, 10),
+			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
 		)
-		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		ctx := relay.WithSkipTotalCount(context.Background())
+		resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
@@ -666,15 +673,17 @@ func TestKeysetWithoutCounter(t *testing.T) {
 		require.Nil(t, resp.TotalCount)
 	}
 
-	t.Run("keyset", func(t *testing.T) { testCase(t, cursor.NewKeysetAdapter(NewKeysetFinder[*User](db))) })
-	t.Run("offset", func(t *testing.T) { testCase(t, cursor.NewOffsetAdapter(NewOffsetFinder[*User](db))) })
+	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter[*User](db)) })
+	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter[*User](db)) })
 }
 
 func TestKeysetEmptyOrderBys(t *testing.T) {
-	resp, err := relay.New(false, 10, 10, NewKeysetAdapter[*User](db)).
-		Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			First: lo.ToPtr(10),
-		})
+	resp, err := relay.New(
+		NewKeysetAdapter[*User](db),
+		relay.EnsureLimits[*User](10, 10),
+	).Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		First: lo.ToPtr(10),
+	})
 	require.ErrorContains(t, err, "no keys to encode cursor, orderBys must be set for keyset")
 	require.Nil(t, resp)
 }
@@ -683,14 +692,12 @@ func TestKeysetInvalidCursor(t *testing.T) {
 	resetDB(t)
 
 	p := relay.New(
-		false,
-		10, 10,
-		cursor.PrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false})(
-			func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
-				// This is a generic(T: any) function, so we need to cast the model to the correct type
-				return NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
-			},
-		),
+		func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
+			// This is a generic(T: any) function, so we need to cast the model to the correct type
+			return NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
+		},
+		relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+		relay.EnsureLimits[any](10, 10),
 	)
 	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 		After: lo.ToPtr(`{"ID":1}`),

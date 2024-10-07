@@ -11,12 +11,7 @@ import (
 
 type KeysetFinder[T any] interface {
 	Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error)
-}
-
-type KeysetFinderFunc[T any] func(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error)
-
-func (f KeysetFinderFunc[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromLast bool) ([]T, error) {
-	return f(ctx, after, before, orderBys, limit, fromLast)
+	Count(ctx context.Context) (int, error)
 }
 
 func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
@@ -34,10 +29,8 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 		}
 
 		var totalCount *int
-		counter, ok := finder.(Counter)
-		if ok {
-			var err error
-			count, err := counter.Count(ctx)
+		if !relay.ShouldSkipTotalCount(ctx) {
+			count, err := finder.Count(ctx)
 			if err != nil {
 				return nil, err
 			}

@@ -10,6 +10,7 @@ import (
 
 type OffsetFinder[T any] interface {
 	Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]T, error)
+	Count(ctx context.Context) (int, error)
 }
 
 type OffsetFinderFunc[T any] func(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]T, error)
@@ -19,7 +20,7 @@ func (f OffsetFinderFunc[T]) Find(ctx context.Context, orderBys []relay.OrderBy,
 }
 
 // NewOffsetAdapter creates a relay.ApplyCursorsFunc from an OffsetFinder.
-// If you want to use `last!=nil&&before==nil`, the finder must implement Counter.
+// If you want to use `last!=nil&&before==nil`, you can't skip totalCount.
 func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 	return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
 		after, before, err := decodeOffsetCursors(req.After, req.Before)
@@ -28,10 +29,8 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 		}
 
 		var totalCount *int
-		counter, ok := finder.(Counter)
-		if ok {
-			var err error
-			count, err := counter.Count(ctx)
+		if !relay.ShouldSkipTotalCount(ctx) {
+			count, err := finder.Count(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -40,7 +39,7 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 
 		if req.FromLast && before == nil {
 			if totalCount == nil {
-				return nil, errors.New("counter is required for fromLast and nil before")
+				return nil, errors.New("totalCount is required for fromLast and nil before")
 			}
 			before = totalCount
 		}
@@ -96,7 +95,7 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			resp.HasAfterOrPrevious = after != nil && *after < *totalCount
 			resp.HasBeforeOrNext = before != nil && *before < *totalCount
 		} else {
-			// If we don't have a counter, it would be very costly to check whether after and before really exist,
+			// If we don't have totalCount, it would be very costly to check whether after and before really exist,
 			// So it is usually not worth it. Normally, checking that it is not nil is sufficient.
 			resp.HasAfterOrPrevious = after != nil
 			resp.HasBeforeOrNext = before != nil

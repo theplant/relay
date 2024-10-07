@@ -13,12 +13,7 @@ import (
 func TestOffsetCursor(t *testing.T) {
 	resetDB(t)
 
-	applyCursorsFunc := cursor.PrimaryOrderBy[*User](
-		relay.OrderBy{Field: "ID", Desc: false},
-		relay.OrderBy{Field: "Age", Desc: true},
-	)(
-		NewOffsetAdapter[*User](db),
-	)
+	applyCursorsFunc := NewOffsetAdapter[*User](db)
 
 	testCases := []struct {
 		name               string
@@ -492,12 +487,26 @@ func TestOffsetCursor(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
+					relay.New(
+						tc.applyCursorsFunc,
+						relay.EnsurePrimaryOrderBy[*User](
+							relay.OrderBy{Field: "ID", Desc: false},
+							relay.OrderBy{Field: "Age", Desc: true},
+						),
+						relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet),
+					)
 				})
 				return
 			}
 
-			p := relay.New(false, tc.maxLimit, tc.limitIfNotSet, tc.applyCursorsFunc)
+			p := relay.New(
+				tc.applyCursorsFunc,
+				relay.EnsurePrimaryOrderBy[*User](
+					relay.OrderBy{Field: "ID", Desc: false},
+					relay.OrderBy{Field: "Age", Desc: true},
+				),
+				relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet),
+			)
 			resp, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {
@@ -520,17 +529,22 @@ func TestOffsetCursor(t *testing.T) {
 	}
 }
 
-func TestOffsetWithLastAndNilBeforeIfNoCounter(t *testing.T) {
+func TestOffsetWithLastAndNilBeforeIfSkipTotalCount(t *testing.T) {
 	resetDB(t)
 
 	p := relay.New(
-		false,
-		10, 10,
-		cursor.PrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false})(cursor.NewOffsetAdapter(NewOffsetFinder[*User](db))),
+		cursor.NewOffsetAdapter(NewOffsetFinder[*User](db)),
+		relay.EnsurePrimaryOrderBy[*User](
+			relay.OrderBy{Field: "ID", Desc: false},
+		),
+		relay.EnsureLimits[*User](10, 10),
 	)
-	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-		Last: lo.ToPtr(10),
-	})
-	require.ErrorContains(t, err, "counter is required for fromLast and nil before")
+	resp, err := p.Paginate(
+		relay.WithSkipTotalCount(context.Background()),
+		&relay.PaginateRequest[*User]{
+			Last: lo.ToPtr(10),
+		},
+	)
+	require.ErrorContains(t, err, "totalCount is required for fromLast and nil before")
 	require.Nil(t, resp)
 }

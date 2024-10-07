@@ -70,7 +70,7 @@ func Paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 	}
 
 	if req.First == nil && req.Last == nil {
-		return nil, errors.New("first and last cannot be empty together") // TODO:
+		return nil, errors.New("first or last must be set")
 	}
 	if req.First != nil && req.Last != nil {
 		return nil, errors.New("first and last cannot be used together")
@@ -201,6 +201,10 @@ func (f PaginationFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]
 }
 
 func New[T any](applyCursorsFunc ApplyCursorsFunc[T], middlewares ...PaginationMiddleware[T]) Pagination[T] {
+	if applyCursorsFunc == nil {
+		panic("applyCursorsFunc must be set")
+	}
+
 	var p Pagination[T] = PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
 		return Paginate(ctx, req, applyCursorsFunc)
 	})
