@@ -26,14 +26,14 @@ p := relay.New(
     },
     // maxLimit / limitIfNotSet
     relay.EnsureLimits[*User](100, 10),
-    // Add primary sorting fields if not specified
+    // Append primary sorting fields, if any are unspecified
     relay.EnsurePrimaryOrderBy[*User](
         relay.OrderBy{Field: "ID", Desc: false},
         relay.OrderBy{Field: "Version", Desc: false},
     ),
 )
 
-resp, err := p.Paginate(context.Background(),
+resp, err := p.Paginate(
     // If you do not want to return edges
     // relay.WithSkipEdges(context.Background()),
 

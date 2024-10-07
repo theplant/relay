@@ -58,7 +58,7 @@ func NewGCM(key []byte) (cipher.AEAD, error) {
 	return gcm, nil
 }
 
-func GCM[T any](gcm cipher.AEAD) func(next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
+func GCM[T any](gcm cipher.AEAD) relay.CursorMiddleware[T] {
 	return func(next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 		return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
 			if req.After != nil {

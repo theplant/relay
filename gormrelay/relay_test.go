@@ -391,3 +391,51 @@ func TestCursorMiddleware(t *testing.T) {
 		t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 	})
 }
+
+func TestAppendCursorMiddleware(t *testing.T) {
+	resetDB(t)
+
+	encryptionKey, err := generateGCMKey(32)
+	require.NoError(t, err)
+
+	gcm, err := cursor.NewGCM(encryptionKey)
+	require.NoError(t, err)
+
+	gcmMiddleware := cursor.GCM[*User](gcm)
+
+	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+		p := relay.New(
+			f(db),
+			relay.AppendCursorMiddleware(gcmMiddleware),
+			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsureLimits[*User](10, 10),
+		)
+
+		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(10),
+		})
+		require.NoError(t, err)
+		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
+		require.Len(t, resp.Edges, 10)
+		require.Equal(t, 0+1, resp.Edges[0].Node.ID)
+		require.Equal(t, 9+1, resp.Edges[len(resp.Edges)-1].Node.ID)
+		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
+		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+
+		// next page
+		resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			After: resp.PageInfo.EndCursor,
+			First: lo.ToPtr(10),
+		})
+		require.NoError(t, err)
+		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
+		require.Len(t, resp.Edges, 10)
+		require.Equal(t, 10+1, resp.Edges[0].Node.ID)
+		require.Equal(t, 19+1, resp.Edges[len(resp.Edges)-1].Node.ID)
+		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
+		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+	}
+
+	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
+	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
+}
