@@ -265,6 +265,30 @@ func TestTotalCountZero(t *testing.T) {
 	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 }
 
+func TestSkipTotalCount(t *testing.T) {
+	resetDB(t)
+
+	testCase := func(t *testing.T, applyCursorFunc relay.ApplyCursorsFunc[*User]) {
+		p := relay.New(
+			applyCursorFunc,
+			relay.EnsureLimits[*User](10, 10),
+			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+		)
+		ctx := relay.WithSkipTotalCount(context.Background())
+		resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(10),
+		})
+		require.NoError(t, err)
+		require.Len(t, resp.Edges, 10)
+		require.Equal(t, 1, resp.Edges[0].Node.ID)
+		require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
+		require.Nil(t, resp.TotalCount)
+	}
+
+	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter[*User](db)) })
+	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter[*User](db)) })
+}
+
 func generateGCMKey(length int) ([]byte, error) {
 	key := make([]byte, length)
 	if _, err := io.ReadFull(rand.Reader, key); err != nil {
