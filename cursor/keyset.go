@@ -41,17 +41,17 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 			return EncodeKeysetCursor(node, keys)
 		}
 
-		var edges []relay.LazyEdge[T]
+		var edges []*relay.LazyEdge[T]
 		if req.Limit <= 0 || (totalCount != nil && *totalCount <= 0) {
-			edges = make([]relay.LazyEdge[T], 0)
+			edges = make([]*relay.LazyEdge[T], 0)
 		} else {
 			nodes, err := finder.Find(ctx, after, before, req.OrderBys, req.Limit, req.FromEnd)
 			if err != nil {
 				return nil, err
 			}
-			edges = make([]relay.LazyEdge[T], len(nodes))
+			edges = make([]*relay.LazyEdge[T], len(nodes))
 			for i, node := range nodes {
-				edges[i] = relay.LazyEdge[T]{
+				edges[i] = &relay.LazyEdge[T]{
 					Node:   node,
 					Cursor: cursorEncoder,
 				}

@@ -393,7 +393,7 @@ func TestCursorMiddleware(t *testing.T) {
 						}
 
 						for i := range resp.LazyEdges {
-							edge := &resp.LazyEdges[i]
+							edge := resp.LazyEdges[i]
 							edge.Cursor = func(ctx context.Context, node *User) (string, error) {
 								return "", errors.New("mock error")
 							}

@@ -82,8 +82,7 @@ func GCM[T any](gcm cipher.AEAD) relay.CursorMiddleware[T] {
 				return nil, err
 			}
 
-			for i := range resp.LazyEdges {
-				edge := &resp.LazyEdges[i]
+			for _, edge := range resp.LazyEdges {
 				originalCursor := edge.Cursor
 				edge.Cursor = func(ctx context.Context, node T) (string, error) {
 					cursor, err := originalCursor(ctx, node)

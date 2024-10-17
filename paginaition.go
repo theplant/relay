@@ -33,10 +33,10 @@ type PageInfo struct {
 }
 
 type PaginateResponse[T any] struct {
-	Edges      []Edge[T] `json:"edges,omitempty"`
-	Nodes      []T       `json:"nodes,omitempty"`
-	PageInfo   PageInfo  `json:"pageInfo"`
-	TotalCount *int      `json:"totalCount,omitempty"`
+	Edges      []*Edge[T] `json:"edges,omitempty"`
+	Nodes      []T        `json:"nodes,omitempty"`
+	PageInfo   PageInfo   `json:"pageInfo"`
+	TotalCount *int       `json:"totalCount,omitempty"`
 }
 
 type ApplyCursorsRequest struct {
@@ -53,7 +53,7 @@ type LazyEdge[T any] struct {
 }
 
 type ApplyCursorsResponse[T any] struct {
-	LazyEdges          []LazyEdge[T]
+	LazyEdges          []*LazyEdge[T]
 	TotalCount         *int
 	HasBeforeOrNext    bool // `before` exists or it's next exists
 	HasAfterOrPrevious bool // `after` exists or it's previous exists
@@ -135,13 +135,13 @@ func Paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 	resp := &PaginateResponse[T]{}
 
 	if !ShouldSkipEdges(ctx) {
-		edges := make([]Edge[T], len(lazyEdges))
+		edges := make([]*Edge[T], len(lazyEdges))
 		for i, lazyEdge := range lazyEdges {
 			cursor, err := lazyEdge.Cursor(ctx, lazyEdge.Node)
 			if err != nil {
 				return nil, err
 			}
-			edges[i] = Edge[T]{Node: lazyEdge.Node, Cursor: cursor}
+			edges[i] = &Edge[T]{Node: lazyEdge.Node, Cursor: cursor}
 		}
 		resp.Edges = edges
 	}

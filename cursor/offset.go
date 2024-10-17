@@ -66,18 +66,18 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			}
 		}
 
-		var edges []relay.LazyEdge[T]
+		var edges []*relay.LazyEdge[T]
 		if limit <= 0 || (totalCount != nil && (skip >= *totalCount || *totalCount <= 0)) {
-			edges = make([]relay.LazyEdge[T], 0)
+			edges = make([]*relay.LazyEdge[T], 0)
 		} else {
 			nodes, err := finder.Find(ctx, req.OrderBys, skip, limit)
 			if err != nil {
 				return nil, err
 			}
-			edges = make([]relay.LazyEdge[T], len(nodes))
+			edges = make([]*relay.LazyEdge[T], len(nodes))
 			for i, node := range nodes {
 				i := i
-				edges[i] = relay.LazyEdge[T]{
+				edges[i] = &relay.LazyEdge[T]{
 					Node: node,
 					Cursor: func(_ context.Context, _ T) (string, error) {
 						return EncodeOffsetCursor(skip + i), nil
