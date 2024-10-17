@@ -32,7 +32,7 @@ type PageInfo struct {
 	EndCursor       *string `json:"endCursor"`
 }
 
-type PaginateResponse[T any] struct {
+type Connection[T any] struct {
 	Edges      []*Edge[T] `json:"edges,omitempty"`
 	Nodes      []T        `json:"nodes,omitempty"`
 	PageInfo   PageInfo   `json:"pageInfo"`
@@ -64,7 +64,7 @@ type ApplyCursorsFunc[T any] func(ctx context.Context, req *ApplyCursorsRequest)
 
 // https://relay.dev/graphql/connections.htm#sec-Pagination-algorithm
 // https://relay.dev/graphql/connections.htm#sec-undefined.PageInfo.Fields
-func Paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsFunc ApplyCursorsFunc[T]) (*PaginateResponse[T], error) {
+func Paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsFunc ApplyCursorsFunc[T]) (*Connection[T], error) {
 	if applyCursorsFunc == nil {
 		panic("applyCursorsFunc must be set")
 	}
@@ -132,7 +132,7 @@ func Paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		hasPreviousPage = true
 	}
 
-	resp := &PaginateResponse[T]{}
+	resp := &Connection[T]{}
 
 	if !ShouldSkipEdges(ctx) {
 		edges := make([]*Edge[T], len(lazyEdges))
@@ -191,12 +191,12 @@ func Paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 }
 
 type Pagination[T any] interface {
-	Paginate(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error)
+	Paginate(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error)
 }
 
-type PaginationFunc[T any] func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error)
+type PaginationFunc[T any] func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error)
 
-func (f PaginationFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
+func (f PaginationFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 	return f(ctx, req)
 }
 
@@ -205,7 +205,7 @@ func New[T any](applyCursorsFunc ApplyCursorsFunc[T], middlewares ...PaginationM
 		panic("applyCursorsFunc must be set")
 	}
 
-	var p Pagination[T] = PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
+	var p Pagination[T] = PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 		applyCursorsFunc := applyCursorsFunc
 		cursorMiddlewares := CursorMiddlewaresFromContext[T](ctx)
 		for _, cursorMiddleware := range cursorMiddlewares {
