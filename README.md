@@ -17,13 +17,13 @@
 
 ```go
 p := relay.New(
-    func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+    cursor.Base64(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
         // Offset-based pagination
         // return gormrelay.NewOffsetAdapter[*User](db)(ctx, req)
 
         // Keyset-based pagination
         return gormrelay.NewKeysetAdapter[*User](db)(ctx, req)
-    },
+    }),
     // maxLimit / limitIfNotSet
     relay.EnsureLimits[*User](100, 10),
     // Append primary sorting fields, if any are unspecified
