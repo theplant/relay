@@ -145,7 +145,7 @@ func TestKeysetCursor(t *testing.T) {
 		paginateRequest    *relay.PaginateRequest[*User]
 		expectedEdgesLen   int
 		expectedTotalCount *int
-		expectedPageInfo   relay.PageInfo
+		expectedPageInfo   *relay.PageInfo
 		expectedError      string
 		expectedPanic      string
 	}{
@@ -247,7 +247,7 @@ func TestKeysetCursor(t *testing.T) {
 			paginateRequest:    &relay.PaginateRequest[*User]{},
 			expectedEdgesLen:   10,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -271,7 +271,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   2,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -292,7 +292,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   2,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -316,7 +316,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   2,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -337,7 +337,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   10,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -364,7 +364,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   5,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -391,7 +391,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   3,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -418,7 +418,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   5,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -445,7 +445,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   3,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -468,7 +468,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   0,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor:     nil,
@@ -487,7 +487,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   0,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     nil,
@@ -504,7 +504,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   100,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -525,7 +525,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   100,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -546,7 +546,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   0,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     nil,
@@ -563,7 +563,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   0,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor:     nil,
@@ -583,7 +583,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   4,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
@@ -607,7 +607,7 @@ func TestKeysetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   4,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(

@@ -28,13 +28,21 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 			return nil, err
 		}
 
+		skip := relay.GetSkip(ctx)
+
 		var totalCount *int
-		if !relay.ShouldSkipTotalCount(ctx) {
+		if !skip.TotalCount {
 			count, err := finder.Count(ctx)
 			if err != nil {
 				return nil, err
 			}
 			totalCount = &count
+		}
+
+		if skip.Edges && skip.Nodes && skip.PageInfo {
+			return &relay.ApplyCursorsResponse[T]{
+				TotalCount: totalCount,
+			}, nil
 		}
 
 		cursorEncoder := func(_ context.Context, node T) (string, error) {

@@ -34,14 +34,12 @@ p := relay.New(
 )
 
 resp, err := p.Paginate(
-    // If you do not want to return edges
-    // relay.WithSkipEdges(context.Background()),
-
-    // If you do not want to return nodes
-    // relay.WithSkipNodes(context.Background()),
-
-    // If you want to skip the total count
-    relay.WithSkipTotalCount(context.Background()),
+    // relay.WithSkip(context.Background(), relay.Skip{
+    //     Edges:      true,
+    //     Nodes:      true,
+    //     PageInfo:   true,
+    //     TotalCount: true,
+    // }),
 
     // Query first 10 records
     &relay.PaginateRequest[*User]{

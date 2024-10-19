@@ -28,13 +28,26 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			return nil, err
 		}
 
+		var skipCount, skipFind bool
+		{
+			skip := relay.GetSkip(ctx)
+			skipCount = skip.TotalCount
+			skipFind = skip.Nodes && skip.Edges && skip.PageInfo
+		}
+
 		var totalCount *int
-		if !relay.ShouldSkipTotalCount(ctx) {
+		if !skipCount {
 			count, err := finder.Count(ctx)
 			if err != nil {
 				return nil, err
 			}
 			totalCount = &count
+		}
+
+		if skipFind {
+			return &relay.ApplyCursorsResponse[T]{
+				TotalCount: totalCount,
+			}, nil
 		}
 
 		if req.FromEnd && before == nil {

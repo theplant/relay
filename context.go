@@ -2,35 +2,32 @@ package relay
 
 import "context"
 
-type ctxKeySkipTotalCount struct{}
-
-func WithSkipTotalCount(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxKeySkipTotalCount{}, true)
+type Skip struct {
+	Edges, Nodes, TotalCount, PageInfo bool
 }
 
-func ShouldSkipTotalCount(ctx context.Context) bool {
-	b, _ := ctx.Value(ctxKeySkipTotalCount{}).(bool)
-	return b
+func (s Skip) All() bool {
+	return s.Edges && s.Nodes && s.TotalCount && s.PageInfo
 }
 
-type ctxKeySkipEdges struct{}
+type ctxKeySkip struct{}
 
-func WithSkipEdges(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxKeySkipEdges{}, true)
+func WithSkip(ctx context.Context, skip Skip) context.Context {
+	return context.WithValue(ctx, ctxKeySkip{}, skip)
 }
 
-func ShouldSkipEdges(ctx context.Context) bool {
-	b, _ := ctx.Value(ctxKeySkipEdges{}).(bool)
-	return b
+func GetSkip(ctx context.Context) Skip {
+	skip, _ := ctx.Value(ctxKeySkip{}).(Skip)
+	return skip
 }
 
-type ctxKeySkipNodes struct{}
+type ctxKeyNodeProcessor struct{}
 
-func WithSkipNodes(ctx context.Context) context.Context {
-	return context.WithValue(ctx, ctxKeySkipNodes{}, true)
+func WithNodeProcessor[T any](ctx context.Context, processor func(node T) T) context.Context {
+	return context.WithValue(ctx, ctxKeyNodeProcessor{}, processor)
 }
 
-func ShouldSkipNodes(ctx context.Context) bool {
-	b, _ := ctx.Value(ctxKeySkipNodes{}).(bool)
-	return b
+func GetNodeProcessor[T any](ctx context.Context) func(node T) T {
+	processor, _ := ctx.Value(ctxKeyNodeProcessor{}).(func(node T) T)
+	return processor
 }

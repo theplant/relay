@@ -25,7 +25,7 @@ func TestOffsetCursor(t *testing.T) {
 		expectedFirstKey   int
 		expectedLastKey    int
 		expectedTotalCount *int
-		expectedPageInfo   relay.PageInfo
+		expectedPageInfo   *relay.PageInfo
 		expectedError      string
 		expectedPanic      string
 	}{
@@ -165,7 +165,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   0 + 1,
 			expectedLastKey:    9 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(0)),
@@ -185,7 +185,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   1 + 1,
 			expectedLastKey:    2 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(1)),
@@ -204,7 +204,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   0 + 1,
 			expectedLastKey:    1 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(0)),
@@ -224,7 +224,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   16 + 1,
 			expectedLastKey:    17 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(16)),
@@ -243,7 +243,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   90 + 1,
 			expectedLastKey:    99 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(90)),
@@ -264,7 +264,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   1 + 1,
 			expectedLastKey:    5 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(1)),
@@ -285,7 +285,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   1 + 1,
 			expectedLastKey:    3 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(1)),
@@ -306,7 +306,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   3 + 1,
 			expectedLastKey:    7 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(3)),
@@ -327,7 +327,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   1 + 1,
 			expectedLastKey:    3 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: true,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(1)),
@@ -344,7 +344,7 @@ func TestOffsetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   0,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor:     nil,
@@ -361,7 +361,7 @@ func TestOffsetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   0,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     nil,
@@ -380,7 +380,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   0 + 1,
 			expectedLastKey:    99 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: false,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(0)),
@@ -399,7 +399,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   0 + 1,
 			expectedLastKey:    99 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: false,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(0)),
@@ -416,7 +416,7 @@ func TestOffsetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   0,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     nil,
@@ -433,7 +433,7 @@ func TestOffsetCursor(t *testing.T) {
 			},
 			expectedEdgesLen:   0,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor:     nil,
@@ -453,7 +453,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   96 + 1,
 			expectedLastKey:    99 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     false,
 				HasPreviousPage: true,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(96)),
@@ -473,7 +473,7 @@ func TestOffsetCursor(t *testing.T) {
 			expectedFirstKey:   0 + 1,
 			expectedLastKey:    3 + 1,
 			expectedTotalCount: lo.ToPtr(100),
-			expectedPageInfo: relay.PageInfo{
+			expectedPageInfo: &relay.PageInfo{
 				HasNextPage:     true,
 				HasPreviousPage: false,
 				StartCursor:     lo.ToPtr(cursor.EncodeOffsetCursor(0)),
@@ -540,7 +540,9 @@ func TestOffsetWithLastAndNilBeforeIfSkipTotalCount(t *testing.T) {
 		relay.EnsureLimits[*User](10, 10),
 	)
 	resp, err := p.Paginate(
-		relay.WithSkipTotalCount(context.Background()),
+		relay.WithSkip(context.Background(), relay.Skip{
+			TotalCount: true,
+		}),
 		&relay.PaginateRequest[*User]{
 			Last: lo.ToPtr(10),
 		},
