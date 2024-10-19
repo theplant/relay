@@ -59,7 +59,7 @@ func TestUnexpectOrderBys(t *testing.T) {
 	p := relay.New(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
 		return nil, nil
 	})
-	resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+	conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		First: lo.ToPtr(10),
 		OrderBys: []relay.OrderBy{
 			{Field: "ID", Desc: false},
@@ -67,7 +67,7 @@ func TestUnexpectOrderBys(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "duplicated order by fields [ID]")
-	require.Nil(t, resp)
+	require.Nil(t, conn)
 }
 
 func TestContext(t *testing.T) {
@@ -82,11 +82,11 @@ func TestContext(t *testing.T) {
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.ErrorContains(t, err, "context canceled")
-			require.Nil(t, resp)
+			require.Nil(t, conn)
 		}
 
 		{
@@ -100,11 +100,11 @@ func TestContext(t *testing.T) {
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.ErrorContains(t, err, "context canceled")
-			require.Nil(t, resp)
+			require.Nil(t, conn)
 		}
 	}
 	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
@@ -124,83 +124,83 @@ func TestSkip(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
 				Edges: true,
 			})
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-			require.NotNil(t, resp.PageInfo.StartCursor)
-			require.NotNil(t, resp.PageInfo.EndCursor)
-			require.Nil(t, resp.Edges)
-			require.Len(t, resp.Nodes, 10)
-			require.Equal(t, 1, resp.Nodes[0].ID)
-			require.Equal(t, 10, resp.Nodes[len(resp.Nodes)-1].ID)
+			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+			require.NotNil(t, conn.PageInfo.StartCursor)
+			require.NotNil(t, conn.PageInfo.EndCursor)
+			require.Nil(t, conn.Edges)
+			require.Len(t, conn.Nodes, 10)
+			require.Equal(t, 1, conn.Nodes[0].ID)
+			require.Equal(t, 10, conn.Nodes[len(conn.Nodes)-1].ID)
 		})
 		t.Run("SkipNodes", func(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
 				Nodes: true,
 			})
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-			require.NotNil(t, resp.PageInfo.StartCursor)
-			require.NotNil(t, resp.PageInfo.EndCursor)
-			require.Len(t, resp.Edges, 10)
-			require.Nil(t, resp.Nodes)
-			require.Equal(t, 1, resp.Edges[0].Node.ID)
-			require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
+			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+			require.NotNil(t, conn.PageInfo.StartCursor)
+			require.NotNil(t, conn.PageInfo.EndCursor)
+			require.Len(t, conn.Edges, 10)
+			require.Nil(t, conn.Nodes)
+			require.Equal(t, 1, conn.Edges[0].Node.ID)
+			require.Equal(t, 10, conn.Edges[len(conn.Edges)-1].Node.ID)
 		})
 		t.Run("SkipPageInfo", func(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
 				PageInfo: true,
 			})
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-			require.Nil(t, resp.PageInfo)
-			require.Len(t, resp.Edges, 10)
-			require.Equal(t, 1, resp.Edges[0].Node.ID)
-			require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
-			require.Len(t, resp.Nodes, 10)
-			require.Equal(t, 1, resp.Nodes[0].ID)
-			require.Equal(t, 10, resp.Nodes[len(resp.Nodes)-1].ID)
+			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+			require.Nil(t, conn.PageInfo)
+			require.Len(t, conn.Edges, 10)
+			require.Equal(t, 1, conn.Edges[0].Node.ID)
+			require.Equal(t, 10, conn.Edges[len(conn.Edges)-1].Node.ID)
+			require.Len(t, conn.Nodes, 10)
+			require.Equal(t, 1, conn.Nodes[0].ID)
+			require.Equal(t, 10, conn.Nodes[len(conn.Nodes)-1].ID)
 		})
 		t.Run("SkipTotalCount", func(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
 				TotalCount: true,
 			})
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Nil(t, resp.TotalCount)
-			require.NotNil(t, resp.PageInfo.StartCursor)
-			require.NotNil(t, resp.PageInfo.EndCursor)
-			require.Len(t, resp.Edges, 10)
-			require.Equal(t, 1, resp.Edges[0].Node.ID)
-			require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
-			require.Len(t, resp.Nodes, 10)
-			require.Equal(t, 1, resp.Nodes[0].ID)
-			require.Equal(t, 10, resp.Nodes[len(resp.Nodes)-1].ID)
+			require.Nil(t, conn.TotalCount)
+			require.NotNil(t, conn.PageInfo.StartCursor)
+			require.NotNil(t, conn.PageInfo.EndCursor)
+			require.Len(t, conn.Edges, 10)
+			require.Equal(t, 1, conn.Edges[0].Node.ID)
+			require.Equal(t, 10, conn.Edges[len(conn.Edges)-1].Node.ID)
+			require.Len(t, conn.Nodes, 10)
+			require.Equal(t, 1, conn.Nodes[0].ID)
+			require.Equal(t, 10, conn.Nodes[len(conn.Nodes)-1].ID)
 		})
 		t.Run("SkipEdgesAndNodes", func(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
 				Edges: true,
 				Nodes: true,
 			})
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-			require.NotNil(t, resp.PageInfo.StartCursor)
-			require.NotNil(t, resp.PageInfo.EndCursor)
-			require.Len(t, resp.Edges, 0)
-			require.Len(t, resp.Nodes, 0)
+			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+			require.NotNil(t, conn.PageInfo.StartCursor)
+			require.NotNil(t, conn.PageInfo.EndCursor)
+			require.Len(t, conn.Edges, 0)
+			require.Len(t, conn.Nodes, 0)
 		})
 		t.Run("SkipEdgesAndNodesAndPageInfo", func(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
@@ -208,14 +208,14 @@ func TestSkip(t *testing.T) {
 				Nodes:    true,
 				PageInfo: true,
 			})
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-			require.Nil(t, resp.PageInfo)
-			require.Len(t, resp.Edges, 0)
-			require.Len(t, resp.Nodes, 0)
+			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+			require.Nil(t, conn.PageInfo)
+			require.Len(t, conn.Edges, 0)
+			require.Len(t, conn.Nodes, 0)
 		})
 		t.Run("SkipAll", func(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
@@ -224,14 +224,14 @@ func TestSkip(t *testing.T) {
 				PageInfo:   true,
 				TotalCount: true,
 			})
-			resp, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Nil(t, resp.TotalCount)
-			require.Nil(t, resp.PageInfo)
-			require.Len(t, resp.Edges, 0)
-			require.Len(t, resp.Nodes, 0)
+			require.Nil(t, conn.TotalCount)
+			require.Nil(t, conn.PageInfo)
+			require.Len(t, conn.Edges, 0)
+			require.Len(t, conn.Nodes, 0)
 		})
 	}
 
@@ -252,25 +252,25 @@ func TestGenericTypeAny(t *testing.T) {
 				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
 				relay.EnsureLimits[any](10, 10),
 			)
-			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
+			conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 				First: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Len(t, resp.Edges, 10)
-			require.Equal(t, 1, resp.Edges[0].Node.(*User).ID)
-			require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.(*User).ID)
-			require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-			require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+			require.Len(t, conn.Edges, 10)
+			require.Equal(t, 1, conn.Edges[0].Node.(*User).ID)
+			require.Equal(t, 10, conn.Edges[len(conn.Edges)-1].Node.(*User).ID)
+			require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+			require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
 
-			resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[any]{
+			conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 				Last: lo.ToPtr(10),
 			})
 			require.NoError(t, err)
-			require.Len(t, resp.Edges, 10)
-			require.Equal(t, 91, resp.Edges[0].Node.(*User).ID)
-			require.Equal(t, 100, resp.Edges[len(resp.Edges)-1].Node.(*User).ID)
-			require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-			require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+			require.Len(t, conn.Edges, 10)
+			require.Equal(t, 91, conn.Edges[0].Node.(*User).ID)
+			require.Equal(t, 100, conn.Edges[len(conn.Edges)-1].Node.(*User).ID)
+			require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+			require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
 		})
 		t.Run("Wrong", func(t *testing.T) {
 			p := relay.New(
@@ -281,11 +281,11 @@ func TestGenericTypeAny(t *testing.T) {
 				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
 				relay.EnsureLimits[any](10, 10),
 			)
-			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
+			conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 				First: lo.ToPtr(10),
 			})
 			require.ErrorContains(t, err, "db.Statement.Model is nil and T is not a struct or struct pointer")
-			require.Nil(t, resp)
+			require.Nil(t, conn)
 		})
 	}
 
@@ -299,7 +299,7 @@ func TestGenericTypeAny(t *testing.T) {
 				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
 				relay.EnsureLimits[any](10, 10),
 			)
-			resp, err := p.Paginate(
+			conn, err := p.Paginate(
 				relay.WithSkip(context.Background(), relay.Skip{
 					TotalCount: true,
 				}),
@@ -308,7 +308,7 @@ func TestGenericTypeAny(t *testing.T) {
 				},
 			)
 			require.ErrorContains(t, err, "db.Statement.Model is nil and T is not a struct or struct pointer")
-			require.Nil(t, resp)
+			require.Nil(t, conn)
 		})
 	}
 
@@ -327,13 +327,13 @@ func TestTotalCountZero(t *testing.T) {
 			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
 			relay.EnsureLimits[*User](10, 10),
 		)
-		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
-		require.Equal(t, lo.ToPtr(0), resp.TotalCount)
-		require.Nil(t, resp.PageInfo.StartCursor)
-		require.Nil(t, resp.PageInfo.EndCursor)
+		require.Equal(t, lo.ToPtr(0), conn.TotalCount)
+		require.Nil(t, conn.PageInfo.StartCursor)
+		require.Nil(t, conn.PageInfo.EndCursor)
 	}
 
 	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
@@ -357,47 +357,47 @@ func TestCursorMiddleware(t *testing.T) {
 			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
 			relay.EnsureLimits[*User](10, 10),
 		)
-		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
-		require.Len(t, resp.Edges, 10)
-		require.Equal(t, 1, resp.Edges[0].Node.ID)
-		require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+		require.Len(t, conn.Edges, 10)
+		require.Equal(t, 1, conn.Edges[0].Node.ID)
+		require.Equal(t, 10, conn.Edges[len(conn.Edges)-1].Node.ID)
+		require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+		require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
 
 		// next page
-		resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(5),
-			After: resp.PageInfo.EndCursor,
+			After: conn.PageInfo.EndCursor,
 		})
 		require.NoError(t, err)
-		require.Len(t, resp.Edges, 5)
-		require.Equal(t, 11, resp.Edges[0].Node.ID)
-		require.Equal(t, 15, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+		require.Len(t, conn.Edges, 5)
+		require.Equal(t, 11, conn.Edges[0].Node.ID)
+		require.Equal(t, 15, conn.Edges[len(conn.Edges)-1].Node.ID)
+		require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+		require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
 
 		// prev page
-		resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			Last:   lo.ToPtr(6),
-			Before: resp.PageInfo.StartCursor,
+			Before: conn.PageInfo.StartCursor,
 		})
 		require.NoError(t, err)
-		require.Len(t, resp.Edges, 6)
-		require.Equal(t, 5, resp.Edges[0].Node.ID)
-		require.Equal(t, 10, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+		require.Len(t, conn.Edges, 6)
+		require.Equal(t, 5, conn.Edges[0].Node.ID)
+		require.Equal(t, 10, conn.Edges[len(conn.Edges)-1].Node.ID)
+		require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+		require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
 
 		// invalid after cursor
-		resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(5),
 			After: lo.ToPtr("invalid%20x"),
 		})
 		require.ErrorContains(t, err, "invalid after cursor")
-		require.Nil(t, resp)
+		require.Nil(t, conn)
 	}
 
 	t.Run("Base64", func(t *testing.T) {
@@ -438,29 +438,29 @@ func TestCursorMiddleware(t *testing.T) {
 			p := relay.New(
 				func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
 					return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
-						resp, err := next(ctx, req)
+						rsp, err := next(ctx, req)
 						if err != nil {
 							return nil, err
 						}
 
-						for i := range resp.LazyEdges {
-							edge := resp.LazyEdges[i]
+						for i := range rsp.LazyEdges {
+							edge := rsp.LazyEdges[i]
 							edge.Cursor = func(ctx context.Context, node *User) (string, error) {
 								return "", errors.New("mock error")
 							}
 						}
 
-						return resp, nil
+						return rsp, nil
 					}
 				}(f(db)),
 				relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
 				relay.EnsureLimits[*User](10, 10),
 			)
-			resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
 			})
 			require.ErrorContains(t, err, "mock error")
-			require.Nil(t, resp)
+			require.Nil(t, conn)
 		}
 		t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
 		t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
@@ -486,29 +486,29 @@ func TestAppendCursorMiddleware(t *testing.T) {
 			relay.EnsureLimits[*User](10, 10),
 		)
 
-		resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
-		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-		require.Len(t, resp.Edges, 10)
-		require.Equal(t, 0+1, resp.Edges[0].Node.ID)
-		require.Equal(t, 9+1, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+		require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+		require.Len(t, conn.Edges, 10)
+		require.Equal(t, 0+1, conn.Edges[0].Node.ID)
+		require.Equal(t, 9+1, conn.Edges[len(conn.Edges)-1].Node.ID)
+		require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+		require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
 
 		// next page
-		resp, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
-			After: resp.PageInfo.EndCursor,
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			After: conn.PageInfo.EndCursor,
 			First: lo.ToPtr(10),
 		})
 		require.NoError(t, err)
-		require.Equal(t, lo.ToPtr(100), resp.TotalCount)
-		require.Len(t, resp.Edges, 10)
-		require.Equal(t, 10+1, resp.Edges[0].Node.ID)
-		require.Equal(t, 19+1, resp.Edges[len(resp.Edges)-1].Node.ID)
-		require.Equal(t, resp.Edges[0].Cursor, *(resp.PageInfo.StartCursor))
-		require.Equal(t, resp.Edges[len(resp.Edges)-1].Cursor, *(resp.PageInfo.EndCursor))
+		require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+		require.Len(t, conn.Edges, 10)
+		require.Equal(t, 10+1, conn.Edges[0].Node.ID)
+		require.Equal(t, 19+1, conn.Edges[len(conn.Edges)-1].Node.ID)
+		require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+		require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
 	}
 
 	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })

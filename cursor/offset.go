@@ -99,22 +99,22 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			}
 		}
 
-		resp := &relay.ApplyCursorsResponse[T]{
+		rsp := &relay.ApplyCursorsResponse[T]{
 			LazyEdges:  edges,
 			TotalCount: totalCount,
 		}
 
 		if totalCount != nil {
-			resp.HasAfterOrPrevious = after != nil && *after < *totalCount
-			resp.HasBeforeOrNext = before != nil && *before < *totalCount
+			rsp.HasAfterOrPrevious = after != nil && *after < *totalCount
+			rsp.HasBeforeOrNext = before != nil && *before < *totalCount
 		} else {
 			// If we don't have totalCount, it would be very costly to check whether after and before really exist,
 			// So it is usually not worth it. Normally, checking that it is not nil is sufficient.
-			resp.HasAfterOrPrevious = after != nil
-			resp.HasBeforeOrNext = before != nil
+			rsp.HasAfterOrPrevious = after != nil
+			rsp.HasBeforeOrNext = before != nil
 		}
 
-		return resp, nil
+		return rsp, nil
 	}
 }
 

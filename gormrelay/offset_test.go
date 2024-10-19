@@ -507,7 +507,7 @@ func TestOffsetCursor(t *testing.T) {
 				),
 				relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet),
 			)
-			resp, err := p.Paginate(context.Background(), tc.paginateRequest)
+			conn, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {
 				require.Error(t, err)
@@ -516,15 +516,15 @@ func TestOffsetCursor(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			require.Len(t, resp.Edges, tc.expectedEdgesLen)
+			require.Len(t, conn.Edges, tc.expectedEdgesLen)
 
 			if tc.expectedEdgesLen > 0 {
-				require.Equal(t, tc.expectedFirstKey, resp.Edges[0].Node.ID)
-				require.Equal(t, tc.expectedLastKey, resp.Edges[len(resp.Edges)-1].Node.ID)
+				require.Equal(t, tc.expectedFirstKey, conn.Edges[0].Node.ID)
+				require.Equal(t, tc.expectedLastKey, conn.Edges[len(conn.Edges)-1].Node.ID)
 			}
 
-			require.Equal(t, tc.expectedTotalCount, resp.TotalCount)
-			require.Equal(t, tc.expectedPageInfo, resp.PageInfo)
+			require.Equal(t, tc.expectedTotalCount, conn.TotalCount)
+			require.Equal(t, tc.expectedPageInfo, conn.PageInfo)
 		})
 	}
 }
@@ -539,7 +539,7 @@ func TestOffsetWithLastAndNilBeforeIfSkipTotalCount(t *testing.T) {
 		),
 		relay.EnsureLimits[*User](10, 10),
 	)
-	resp, err := p.Paginate(
+	conn, err := p.Paginate(
 		relay.WithSkip(context.Background(), relay.Skip{
 			TotalCount: true,
 		}),
@@ -548,5 +548,5 @@ func TestOffsetWithLastAndNilBeforeIfSkipTotalCount(t *testing.T) {
 		},
 	)
 	require.ErrorContains(t, err, "totalCount is required for fromEnd and nil before")
-	require.Nil(t, resp)
+	require.Nil(t, conn)
 }

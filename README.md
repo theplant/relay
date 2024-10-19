@@ -33,7 +33,7 @@ p := relay.New(
     ),
 )
 
-resp, err := p.Paginate(
+conn, err := p.Paginate(
     // relay.WithSkip(context.Background(), relay.Skip{
     //     Edges:      true,
     //     Nodes:      true,
@@ -75,7 +75,7 @@ p := relay.New(
     relay.EnsureLimits[any](100, 10),
     relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
 )
-resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
+conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
     First: lo.ToPtr(10), // query first 10 records
 })
 ```

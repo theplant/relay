@@ -106,7 +106,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		limit = *req.Last + 1
 	}
 
-	result, err := applyCursorsFunc(ctx, &ApplyCursorsRequest{
+	rsp, err := applyCursorsFunc(ctx, &ApplyCursorsRequest{
 		Before:   req.Before,
 		After:    req.After,
 		OrderBys: orderBys,
@@ -117,7 +117,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		return nil, err
 	}
 
-	lazyEdges := result.LazyEdges
+	lazyEdges := rsp.LazyEdges
 
 	processor := GetNodeProcessor[T](ctx)
 	if processor != nil {
@@ -132,7 +132,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		lazyEdges = lazyEdges[:*req.First]
 		hasNextPage = true
 	}
-	if req.Before != nil && result.HasBeforeOrNext {
+	if req.Before != nil && rsp.HasBeforeOrNext {
 		hasNextPage = true
 	}
 
@@ -140,11 +140,11 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		lazyEdges = lazyEdges[len(lazyEdges)-*req.Last:]
 		hasPreviousPage = true
 	}
-	if req.After != nil && result.HasAfterOrPrevious {
+	if req.After != nil && rsp.HasAfterOrPrevious {
 		hasPreviousPage = true
 	}
 
-	resp := &Connection[T]{}
+	conn := &Connection[T]{}
 
 	if !skip.Edges {
 		edges := make([]*Edge[T], len(lazyEdges))
@@ -155,7 +155,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 			}
 			edges[i] = &Edge[T]{Node: lazyEdge.Node, Cursor: cursor}
 		}
-		resp.Edges = edges
+		conn.Edges = edges
 	}
 
 	if !skip.Nodes {
@@ -163,11 +163,11 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		for i, lazyEdge := range lazyEdges {
 			nodes[i] = lazyEdge.Node
 		}
-		resp.Nodes = nodes
+		conn.Nodes = nodes
 	}
 
 	if !skip.TotalCount {
-		resp.TotalCount = result.TotalCount
+		conn.TotalCount = rsp.TotalCount
 	}
 
 	if !skip.PageInfo {
@@ -177,9 +177,9 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		}
 		if len(lazyEdges) > 0 {
 			var startCursor, endCursor string
-			if len(resp.Edges) > 0 {
-				startCursor = resp.Edges[0].Cursor
-				endCursor = resp.Edges[len(resp.Edges)-1].Cursor
+			if len(conn.Edges) > 0 {
+				startCursor = conn.Edges[0].Cursor
+				endCursor = conn.Edges[len(conn.Edges)-1].Cursor
 			} else {
 				startCursor, err = lazyEdges[0].Cursor(ctx, lazyEdges[0].Node)
 				if err != nil {
@@ -198,10 +198,10 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 			pageInfo.StartCursor = &startCursor
 			pageInfo.EndCursor = &endCursor
 		}
-		resp.PageInfo = pageInfo
+		conn.PageInfo = pageInfo
 	}
 
-	return resp, nil
+	return conn, nil
 }
 
 type Pagination[T any] interface {
