@@ -28,8 +28,10 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 			return nil, err
 		}
 
+		skip := relay.GetSkip(ctx)
+
 		var totalCount *int
-		if !relay.ShouldSkipTotalCount(ctx) {
+		if !skip.TotalCount {
 			count, err := finder.Count(ctx)
 			if err != nil {
 				return nil, err
@@ -37,36 +39,41 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 			totalCount = &count
 		}
 
+		if skip.Edges && skip.Nodes && skip.PageInfo {
+			return &relay.ApplyCursorsResponse[T]{
+				TotalCount: totalCount,
+			}, nil
+		}
+
 		cursorEncoder := func(_ context.Context, node T) (string, error) {
 			return EncodeKeysetCursor(node, keys)
 		}
 
-		var edges []relay.LazyEdge[T]
+		var edges []*relay.LazyEdge[T]
 		if req.Limit <= 0 || (totalCount != nil && *totalCount <= 0) {
-			edges = make([]relay.LazyEdge[T], 0)
+			edges = make([]*relay.LazyEdge[T], 0)
 		} else {
 			nodes, err := finder.Find(ctx, after, before, req.OrderBys, req.Limit, req.FromEnd)
 			if err != nil {
 				return nil, err
 			}
-			edges = make([]relay.LazyEdge[T], len(nodes))
+			edges = make([]*relay.LazyEdge[T], len(nodes))
 			for i, node := range nodes {
-				edges[i] = relay.LazyEdge[T]{
+				edges[i] = &relay.LazyEdge[T]{
 					Node:   node,
 					Cursor: cursorEncoder,
 				}
 			}
 		}
 
-		resp := &relay.ApplyCursorsResponse[T]{
+		return &relay.ApplyCursorsResponse[T]{
 			LazyEdges:  edges,
 			TotalCount: totalCount,
 			// It would be very costly to check whether after and before really exist,
 			// So it is usually not worth it. Normally, checking that it is not nil is sufficient.
 			HasAfterOrPrevious: after != nil,
 			HasBeforeOrNext:    before != nil,
-		}
-		return resp, nil
+		}, nil
 	}
 }
 

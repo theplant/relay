@@ -18,7 +18,7 @@ func EnsureLimits[T any](maxLimit int, limitIfNotSet int) PaginationMiddleware[T
 		panic("maxLimit must be greater than or equal to limitIfNotSet")
 	}
 	return func(next Pagination[T]) Pagination[T] {
-		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
+		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 			if req.First == nil && req.Last == nil {
 				if req.After == nil && req.Before != nil {
 					req.Last = &limitIfNotSet
@@ -39,7 +39,7 @@ func EnsureLimits[T any](maxLimit int, limitIfNotSet int) PaginationMiddleware[T
 
 func EnsurePrimaryOrderBy[T any](primaryOrderBys ...OrderBy) PaginationMiddleware[T] {
 	return func(next Pagination[T]) Pagination[T] {
-		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
+		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 			req.OrderBys = AppendPrimaryOrderBy[T](req.OrderBys, primaryOrderBys...)
 			return next.Paginate(ctx, req)
 		})
@@ -74,7 +74,7 @@ func CursorMiddlewaresFromContext[T any](ctx context.Context) []CursorMiddleware
 
 func AppendCursorMiddleware[T any](cursorMiddlewares ...CursorMiddleware[T]) PaginationMiddleware[T] {
 	return func(next Pagination[T]) Pagination[T] {
-		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*PaginateResponse[T], error) {
+		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 			if len(cursorMiddlewares) > 0 {
 				cursorMiddlewares := append(CursorMiddlewaresFromContext[T](ctx), cursorMiddlewares...)
 				ctx = context.WithValue(ctx, ctxCursorMiddlewares{}, cursorMiddlewares)

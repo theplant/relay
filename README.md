@@ -17,13 +17,13 @@
 
 ```go
 p := relay.New(
-    func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+    cursor.Base64(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
         // Offset-based pagination
         // return gormrelay.NewOffsetAdapter[*User](db)(ctx, req)
 
         // Keyset-based pagination
         return gormrelay.NewKeysetAdapter[*User](db)(ctx, req)
-    },
+    }),
     // maxLimit / limitIfNotSet
     relay.EnsureLimits[*User](100, 10),
     // Append primary sorting fields, if any are unspecified
@@ -33,15 +33,13 @@ p := relay.New(
     ),
 )
 
-resp, err := p.Paginate(
-    // If you do not want to return edges
-    // relay.WithSkipEdges(context.Background()),
-
-    // If you do not want to return nodes
-    // relay.WithSkipNodes(context.Background()),
-
-    // If you want to skip the total count
-    relay.WithSkipTotalCount(context.Background()),
+conn, err := p.Paginate(
+    // relay.WithSkip(context.Background(), relay.Skip{
+    //     Edges:      true,
+    //     Nodes:      true,
+    //     PageInfo:   true,
+    //     TotalCount: true,
+    // }),
 
     // Query first 10 records
     &relay.PaginateRequest[*User]{
@@ -77,7 +75,7 @@ p := relay.New(
     relay.EnsureLimits[any](100, 10),
     relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
 )
-resp, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
+conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
     First: lo.ToPtr(10), // query first 10 records
 })
 ```

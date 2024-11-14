@@ -28,13 +28,26 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			return nil, err
 		}
 
+		var skipCount, skipFind bool
+		{
+			skip := relay.GetSkip(ctx)
+			skipCount = skip.TotalCount
+			skipFind = skip.Nodes && skip.Edges && skip.PageInfo
+		}
+
 		var totalCount *int
-		if !relay.ShouldSkipTotalCount(ctx) {
+		if !skipCount {
 			count, err := finder.Count(ctx)
 			if err != nil {
 				return nil, err
 			}
 			totalCount = &count
+		}
+
+		if skipFind {
+			return &relay.ApplyCursorsResponse[T]{
+				TotalCount: totalCount,
+			}, nil
 		}
 
 		if req.FromEnd && before == nil {
@@ -66,18 +79,18 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			}
 		}
 
-		var edges []relay.LazyEdge[T]
+		var edges []*relay.LazyEdge[T]
 		if limit <= 0 || (totalCount != nil && (skip >= *totalCount || *totalCount <= 0)) {
-			edges = make([]relay.LazyEdge[T], 0)
+			edges = make([]*relay.LazyEdge[T], 0)
 		} else {
 			nodes, err := finder.Find(ctx, req.OrderBys, skip, limit)
 			if err != nil {
 				return nil, err
 			}
-			edges = make([]relay.LazyEdge[T], len(nodes))
+			edges = make([]*relay.LazyEdge[T], len(nodes))
 			for i, node := range nodes {
 				i := i
-				edges[i] = relay.LazyEdge[T]{
+				edges[i] = &relay.LazyEdge[T]{
 					Node: node,
 					Cursor: func(_ context.Context, _ T) (string, error) {
 						return EncodeOffsetCursor(skip + i), nil
@@ -86,22 +99,22 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			}
 		}
 
-		resp := &relay.ApplyCursorsResponse[T]{
+		rsp := &relay.ApplyCursorsResponse[T]{
 			LazyEdges:  edges,
 			TotalCount: totalCount,
 		}
 
 		if totalCount != nil {
-			resp.HasAfterOrPrevious = after != nil && *after < *totalCount
-			resp.HasBeforeOrNext = before != nil && *before < *totalCount
+			rsp.HasAfterOrPrevious = after != nil && *after < *totalCount
+			rsp.HasBeforeOrNext = before != nil && *before < *totalCount
 		} else {
 			// If we don't have totalCount, it would be very costly to check whether after and before really exist,
 			// So it is usually not worth it. Normally, checking that it is not nil is sufficient.
-			resp.HasAfterOrPrevious = after != nil
-			resp.HasBeforeOrNext = before != nil
+			rsp.HasAfterOrPrevious = after != nil
+			rsp.HasBeforeOrNext = before != nil
 		}
 
-		return resp, nil
+		return rsp, nil
 	}
 }
 

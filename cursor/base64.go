@@ -27,14 +27,13 @@ func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 			req.Before = lo.ToPtr(string(cursor))
 		}
 
-		resp, err := next(ctx, req)
+		rsp, err := next(ctx, req)
 		if err != nil {
 			return nil, err
 		}
 
 		// Encrypt the cursor
-		for i := range resp.LazyEdges {
-			edge := &resp.LazyEdges[i]
+		for _, edge := range rsp.LazyEdges {
 			originalCursor := edge.Cursor
 			edge.Cursor = func(ctx context.Context, node T) (string, error) {
 				cursor, err := originalCursor(ctx, node)
@@ -45,6 +44,6 @@ func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 			}
 		}
 
-		return resp, nil
+		return rsp, nil
 	}
 }
