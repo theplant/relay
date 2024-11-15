@@ -35,7 +35,7 @@ type PageInfo struct {
 type Connection[T any] struct {
 	Edges      []*Edge[T] `json:"edges,omitempty"`
 	Nodes      []T        `json:"nodes,omitempty"`
-	PageInfo   *PageInfo  `json:"pageInfo"`
+	PageInfo   *PageInfo  `json:"pageInfo,omitempty"`
 	TotalCount *int       `json:"totalCount,omitempty"`
 }
 
@@ -87,7 +87,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		dups := lo.FindDuplicatesBy(orderBys, func(item OrderBy) string {
 			return item.Field
 		})
-		if (len(dups)) > 0 {
+		if len(dups) > 0 {
 			return nil, errors.Errorf("duplicated order by fields %v", lo.Map(dups, func(item OrderBy, _ int) string {
 				return item.Field
 			}))
