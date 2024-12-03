@@ -83,3 +83,21 @@ func AppendCursorMiddleware[T any](cursorMiddlewares ...CursorMiddleware[T]) Pag
 		})
 	}
 }
+
+func chainCursorMiddlewares[T any](mws []CursorMiddleware[T]) CursorMiddleware[T] {
+	return func(next ApplyCursorsFunc[T]) ApplyCursorsFunc[T] {
+		for i := len(mws); i > 0; i-- {
+			next = mws[i-1](next)
+		}
+		return next
+	}
+}
+
+func chainPaginationMiddlewares[T any](mws []PaginationMiddleware[T]) PaginationMiddleware[T] {
+	return func(next Pagination[T]) Pagination[T] {
+		for i := len(mws); i > 0; i-- {
+			next = mws[i-1](next)
+		}
+		return next
+	}
+}
