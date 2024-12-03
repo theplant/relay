@@ -220,15 +220,8 @@ func New[T any](applyCursorsFunc ApplyCursorsFunc[T], middlewares ...PaginationM
 	}
 
 	var p Pagination[T] = PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
-		applyCursorsFunc := applyCursorsFunc
 		cursorMiddlewares := CursorMiddlewaresFromContext[T](ctx)
-		for _, cursorMiddleware := range cursorMiddlewares {
-			applyCursorsFunc = cursorMiddleware(applyCursorsFunc)
-		}
-		return paginate(ctx, req, applyCursorsFunc)
+		return paginate(ctx, req, chainCursorMiddlewares(cursorMiddlewares)(applyCursorsFunc))
 	})
-	for _, middleware := range middlewares {
-		p = middleware(p)
-	}
-	return p
+	return chainPaginationMiddlewares(middlewares)(p)
 }
