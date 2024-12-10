@@ -21,6 +21,21 @@ func mustEncodeKeysetCursor[T any](node T, keys []string) string {
 
 func TestScopeKeyset(t *testing.T) {
 	{
+		db.ToSQL(func(tx *gorm.DB) *gorm.DB {
+			tx = tx.Model(&User{}).Scopes(scopeKeyset(
+				&map[string]interface{}{"Age": 85},
+				nil,
+				[]relay.OrderBy{
+					{Field: "Age", Desc: false},
+				},
+				-1,
+				false,
+			)).Find(&User{})
+			require.ErrorContains(t, tx.Error, "limit must be greater than 0")
+			return tx
+		})
+	}
+	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
 				&map[string]interface{}{"Age": 85},
@@ -137,10 +152,12 @@ func TestKeysetCursor(t *testing.T) {
 		),
 	}
 
+	const withoutEnsureLimits = -404
+
 	testCases := []struct {
 		name               string
-		limitIfNotSet      int
-		maxLimit           int
+		defaultLimit       int // -404 indicates without EnsureLimits
+		maxLimit           int // -404 indicates without EnsureLimits
 		applyCursorsFunc   relay.ApplyCursorsFunc[*User]
 		paginateRequest    *relay.PaginateRequest[*User]
 		expectedEdgesLen   int
@@ -151,7 +168,7 @@ func TestKeysetCursor(t *testing.T) {
 	}{
 		{
 			name:             "Invalid: Both First and Last",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -161,9 +178,30 @@ func TestKeysetCursor(t *testing.T) {
 			expectedError: "first and last cannot be used together",
 		},
 		{
-			name:             "Invalid: Negative First",
-			limitIfNotSet:    10,
+			name:             "Negative First",
+			defaultLimit:     10,
 			maxLimit:         20,
+			applyCursorsFunc: applyCursorsFunc,
+			paginateRequest: &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(-5),
+			},
+			expectedEdgesLen:   10,
+			expectedTotalCount: lo.ToPtr(100),
+			expectedPageInfo: &relay.PageInfo{
+				HasNextPage:     true,
+				HasPreviousPage: false,
+				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
+				)),
+				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
+					&User{ID: 9 + 1, Name: "name9", Age: 91}, primaryOrderByKeys,
+				)),
+			},
+		},
+		{
+			name:             "Invalid: Negative First without EnsureLimits",
+			defaultLimit:     withoutEnsureLimits,
+			maxLimit:         withoutEnsureLimits,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(-5),
@@ -171,9 +209,30 @@ func TestKeysetCursor(t *testing.T) {
 			expectedError: "first must be a non-negative integer",
 		},
 		{
-			name:             "Invalid: Negative Last",
-			limitIfNotSet:    10,
+			name:             "Negative Last",
+			defaultLimit:     10,
 			maxLimit:         20,
+			applyCursorsFunc: applyCursorsFunc,
+			paginateRequest: &relay.PaginateRequest[*User]{
+				Last: lo.ToPtr(-5),
+			},
+			expectedEdgesLen:   10,
+			expectedTotalCount: lo.ToPtr(100),
+			expectedPageInfo: &relay.PageInfo{
+				HasNextPage:     false,
+				HasPreviousPage: true,
+				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
+					&User{ID: 90 + 1, Name: "name90", Age: 10}, primaryOrderByKeys,
+				)),
+				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
+					&User{ID: 99 + 1, Name: "name99", Age: 1}, primaryOrderByKeys,
+				)),
+			},
+		},
+		{
+			name:             "Invalid: Negative Last without EnsureLimits",
+			defaultLimit:     withoutEnsureLimits,
+			maxLimit:         withoutEnsureLimits,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Last: lo.ToPtr(-5),
@@ -181,52 +240,74 @@ func TestKeysetCursor(t *testing.T) {
 			expectedError: "last must be a non-negative integer",
 		},
 		{
-			name:             "Invalid: No limitIfNotSet",
-			limitIfNotSet:    0, // Assuming 0 indicates not set
+			name:             "Invalid defaultLimit",
+			defaultLimit:     -1,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest:  &relay.PaginateRequest[*User]{},
-			expectedPanic:    "limitIfNotSet must be greater than 0",
+			expectedPanic:    "defaultLimit cannot be negative",
 		},
 		{
-			name:             "Invalid: maxLimit < limitIfNotSet",
-			limitIfNotSet:    10,
+			name:             "Invalid: maxLimit < defaultLimit",
+			defaultLimit:     10,
 			maxLimit:         8,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest:  &relay.PaginateRequest[*User]{},
-			expectedPanic:    "maxLimit must be greater than or equal to limitIfNotSet",
+			expectedPanic:    "maxLimit must be greater than or equal to defaultLimit",
 		},
 		{
 			name:             "Invalid: No applyCursorsFunc",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: nil, // No ApplyCursorsFunc provided
 			paginateRequest:  &relay.PaginateRequest[*User]{},
 			expectedPanic:    "applyCursorsFunc must be set",
 		},
 		{
-			name:             "Invalid: first > maxLimit",
-			limitIfNotSet:    10,
+			name:             "first > maxLimit",
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(21),
 			},
-			expectedError: "first must be less than or equal to max limit",
+			expectedEdgesLen:   20,
+			expectedTotalCount: lo.ToPtr(100),
+			expectedPageInfo: &relay.PageInfo{
+				HasNextPage:     true,
+				HasPreviousPage: false,
+				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
+					&User{ID: 0 + 1, Name: "name0", Age: 100}, primaryOrderByKeys,
+				)),
+				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
+					&User{ID: 19 + 1, Name: "name19", Age: 81}, primaryOrderByKeys,
+				)),
+			},
 		},
 		{
-			name:             "Invalid: last > maxLimit",
-			limitIfNotSet:    10,
+			name:             "last > maxLimit",
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Last: lo.ToPtr(21),
 			},
-			expectedError: "last must be less than or equal to max limit",
+			expectedEdgesLen:   20,
+			expectedTotalCount: lo.ToPtr(100),
+			expectedPageInfo: &relay.PageInfo{
+				HasNextPage:     false,
+				HasPreviousPage: true,
+				StartCursor: lo.ToPtr(mustEncodeKeysetCursor(
+					&User{ID: 80 + 1, Name: "name80", Age: 20}, primaryOrderByKeys,
+				)),
+				EndCursor: lo.ToPtr(mustEncodeKeysetCursor(
+					&User{ID: 99 + 1, Name: "name99", Age: 1}, primaryOrderByKeys,
+				)),
+			},
 		},
 		{
 			name:             "Invalid: after == before",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -241,7 +322,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:               "Limit if not set",
-			limitIfNotSet:      10,
+			defaultLimit:       10,
 			maxLimit:           20,
 			applyCursorsFunc:   applyCursorsFunc,
 			paginateRequest:    &relay.PaginateRequest[*User]{},
@@ -259,8 +340,16 @@ func TestKeysetCursor(t *testing.T) {
 			},
 		},
 		{
+			name:             "Invalid: Limit if not set without EnsureLimits",
+			defaultLimit:     withoutEnsureLimits,
+			maxLimit:         withoutEnsureLimits,
+			applyCursorsFunc: applyCursorsFunc,
+			paginateRequest:  &relay.PaginateRequest[*User]{},
+			expectedError:    "first or last must be set",
+		},
+		{
 			name:             "First 2 after cursor 0",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -284,7 +373,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "First 2 without after cursor",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -305,7 +394,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "Last 2 before cursor 18",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -329,7 +418,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "Last 10 without before cursor",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -350,7 +439,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "After cursor 0, Before cursor 8, First 5",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -377,7 +466,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "After cursor 0, Before cursor 4, First 8",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -404,7 +493,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "After cursor 0, Before cursor 8, Last 5",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -431,7 +520,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "After cursor 0, Before cursor 4, Last 8",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -458,7 +547,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "After cursor 99",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -477,7 +566,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "Before cursor 0",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -496,7 +585,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "First 200",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         300,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -517,7 +606,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "Last 200",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         300,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -538,7 +627,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "First 0",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -554,8 +643,25 @@ func TestKeysetCursor(t *testing.T) {
 			},
 		},
 		{
+			name:             "First 0 without EnsureLimits",
+			defaultLimit:     withoutEnsureLimits,
+			maxLimit:         withoutEnsureLimits,
+			applyCursorsFunc: applyCursorsFunc,
+			paginateRequest: &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(0),
+			},
+			expectedEdgesLen:   0,
+			expectedTotalCount: lo.ToPtr(100),
+			expectedPageInfo: &relay.PageInfo{
+				HasNextPage:     true,
+				HasPreviousPage: false,
+				StartCursor:     nil,
+				EndCursor:       nil,
+			},
+		},
+		{
 			name:             "Last 0",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -571,8 +677,25 @@ func TestKeysetCursor(t *testing.T) {
 			},
 		},
 		{
+			name:             "Last 0 without EnsureLimits",
+			defaultLimit:     withoutEnsureLimits,
+			maxLimit:         withoutEnsureLimits,
+			applyCursorsFunc: applyCursorsFunc,
+			paginateRequest: &relay.PaginateRequest[*User]{
+				Last: lo.ToPtr(0),
+			},
+			expectedEdgesLen:   0,
+			expectedTotalCount: lo.ToPtr(100),
+			expectedPageInfo: &relay.PageInfo{
+				HasNextPage:     false,
+				HasPreviousPage: true,
+				StartCursor:     nil,
+				EndCursor:       nil,
+			},
+		},
+		{
 			name:             "After cursor 95, First 10",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -596,7 +719,7 @@ func TestKeysetCursor(t *testing.T) {
 		},
 		{
 			name:             "Before cursor 4, Last 10",
-			limitIfNotSet:    10,
+			defaultLimit:     10,
 			maxLimit:         20,
 			applyCursorsFunc: applyCursorsFunc,
 			paginateRequest: &relay.PaginateRequest[*User]{
@@ -623,20 +746,21 @@ func TestKeysetCursor(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			newPagination := func() relay.Pagination[*User] {
+				mws := otherMiddlewares
+				if tc.defaultLimit != withoutEnsureLimits {
+					mws = append(mws, relay.EnsureLimits[*User](tc.defaultLimit, tc.maxLimit))
+				}
+				return relay.New(tc.applyCursorsFunc, mws...)
+			}
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					relay.New(
-						tc.applyCursorsFunc,
-						append(otherMiddlewares, relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet))...,
-					)
+					_ = newPagination()
 				})
 				return
 			}
 
-			p := relay.New(
-				tc.applyCursorsFunc,
-				append(otherMiddlewares, relay.EnsureLimits[*User](tc.maxLimit, tc.limitIfNotSet))...,
-			)
+			p := newPagination()
 			conn, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {

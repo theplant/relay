@@ -23,11 +23,11 @@ func GetSkip(ctx context.Context) Skip {
 
 type ctxKeyNodeProcessor struct{}
 
-func WithNodeProcessor[T any](ctx context.Context, processor func(node T) T) context.Context {
+func WithNodeProcessor[T any](ctx context.Context, processor func(ctx context.Context, node T) (T, error)) context.Context {
 	return context.WithValue(ctx, ctxKeyNodeProcessor{}, processor)
 }
 
-func GetNodeProcessor[T any](ctx context.Context) func(node T) T {
-	processor, _ := ctx.Value(ctxKeyNodeProcessor{}).(func(node T) T)
+func GetNodeProcessor[T any](ctx context.Context) func(ctx context.Context, node T) (T, error) {
+	processor, _ := ctx.Value(ctxKeyNodeProcessor{}).(func(ctx context.Context, node T) (T, error))
 	return processor
 }

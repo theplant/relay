@@ -24,8 +24,8 @@ p := relay.New(
         // Keyset-based pagination
         return gormrelay.NewKeysetAdapter[*User](db)(ctx, req)
     }),
-    // maxLimit / limitIfNotSet
-    relay.EnsureLimits[*User](100, 10),
+    // defaultLimit / maxLimit
+    relay.EnsureLimits[*User](10, 100),
     // Append primary sorting fields, if any are unspecified
     relay.EnsurePrimaryOrderBy[*User](
         relay.OrderBy{Field: "ID", Desc: false},
