@@ -11,6 +11,7 @@ type PaginationMiddleware[T any] func(next Pagination[T]) Pagination[T]
 
 // EnsureLimits ensures that the limit is within the range 0 -> maxLimit and uses defaultLimit if limit is not set or is negative
 // This method introduced a breaking change in version 0.4.0, intentionally swapping the order of parameters to strongly indicate the breaking change.
+// https://github.com/theplant/relay/compare/genx?expand=1#diff-02f50901140d6057da6310a106670552aa766a093efbc2200fb34c099b762131R14
 func EnsureLimits[T any](defaultLimit, maxLimit int) PaginationMiddleware[T] {
 	if defaultLimit < 0 {
 		panic("defaultLimit cannot be negative")
