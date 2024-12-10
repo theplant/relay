@@ -73,7 +73,7 @@ p := relay.New(
         // Since this is a generic function (T: any), we must call db.Model(x)
         return gormrelay.NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
     },
-    relay.EnsureLimits[any](100, 10),
+    relay.EnsureLimits[any](10, 100),
     relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
 )
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
