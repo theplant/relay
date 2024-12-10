@@ -124,17 +124,32 @@ func TestSkip(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
 				Edges: true,
 			})
-			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
-				First: lo.ToPtr(10),
+			t.Run("First 10", func(t *testing.T) {
+				conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+					First: lo.ToPtr(10),
+				})
+				require.NoError(t, err)
+				require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+				require.NotNil(t, conn.PageInfo.StartCursor)
+				require.NotNil(t, conn.PageInfo.EndCursor)
+				require.Nil(t, conn.Edges)
+				require.Len(t, conn.Nodes, 10)
+				require.Equal(t, 1, conn.Nodes[0].ID)
+				require.Equal(t, 10, conn.Nodes[len(conn.Nodes)-1].ID)
 			})
-			require.NoError(t, err)
-			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
-			require.NotNil(t, conn.PageInfo.StartCursor)
-			require.NotNil(t, conn.PageInfo.EndCursor)
-			require.Nil(t, conn.Edges)
-			require.Len(t, conn.Nodes, 10)
-			require.Equal(t, 1, conn.Nodes[0].ID)
-			require.Equal(t, 10, conn.Nodes[len(conn.Nodes)-1].ID)
+			t.Run("First 1", func(t *testing.T) {
+				conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+					First: lo.ToPtr(1),
+				})
+				require.NoError(t, err)
+				require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+				require.NotNil(t, conn.PageInfo.StartCursor)
+				require.NotNil(t, conn.PageInfo.EndCursor)
+				require.Nil(t, conn.Edges)
+				require.Len(t, conn.Nodes, 1)
+				require.Equal(t, 1, conn.Nodes[0].ID)
+				require.Equal(t, 1, conn.Nodes[len(conn.Nodes)-1].ID)
+			})
 		})
 		t.Run("SkipNodes", func(t *testing.T) {
 			ctx := relay.WithSkip(context.Background(), relay.Skip{
@@ -513,4 +528,232 @@ func TestAppendCursorMiddleware(t *testing.T) {
 
 	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
 	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
+}
+
+func TestWithNodeProcessor(t *testing.T) {
+	resetDB(t)
+
+	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+		p := relay.New(
+			f(db),
+			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsureLimits[*User](10, 10),
+		)
+		t.Run("AddSuffixForName", func(t *testing.T) {
+			ctx := relay.WithNodeProcessor(context.Background(), func(ctx context.Context, node *User) (*User, error) {
+				node.Name = node.Name + "_suffix"
+				return node, nil
+			})
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+			})
+			require.NoError(t, err)
+			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+			require.Len(t, conn.Edges, 10)
+			require.Equal(t, 0+1, conn.Edges[0].Node.ID)
+			require.Equal(t, 9+1, conn.Edges[len(conn.Edges)-1].Node.ID)
+			require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+			require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
+			require.Equal(t, "name0_suffix", conn.Edges[0].Node.Name)
+			require.Equal(t, "name9_suffix", conn.Edges[len(conn.Edges)-1].Node.Name)
+		})
+		t.Run("MockError", func(t *testing.T) {
+			ctx := relay.WithNodeProcessor(context.Background(), func(ctx context.Context, node *User) (*User, error) {
+				return nil, errors.New("mock error")
+			})
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+			})
+			require.ErrorContains(t, err, "mock error")
+			require.Nil(t, conn)
+		})
+		t.Run("OtherType", func(t *testing.T) {
+			ctx := relay.WithNodeProcessor(context.Background(), func(ctx context.Context, node struct{}) (struct{}, error) {
+				return struct{}{}, errors.New("mock error")
+			}) // will be ignored
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+			})
+			require.NoError(t, err)
+			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+			require.Len(t, conn.Edges, 10)
+			require.Equal(t, 0+1, conn.Edges[0].Node.ID)
+			require.Equal(t, 9+1, conn.Edges[len(conn.Edges)-1].Node.ID)
+			require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+			require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
+		})
+	}
+
+	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
+	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
+}
+
+func TestOrderBys(t *testing.T) {
+	resetDB(t)
+
+	testCase := func(t *testing.T, cursorTest bool, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+		p := relay.New(
+			f(db),
+			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsureLimits[*User](10, 10),
+		)
+		ctx := context.Background()
+		t.Run("Normal", func(t *testing.T) {
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+				OrderBys: []relay.OrderBy{
+					{Field: "ID", Desc: true},
+				},
+			})
+			require.NoError(t, err)
+			require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+			require.Len(t, conn.Edges, 10)
+			require.Equal(t, 99+1, conn.Edges[0].Node.ID)
+			require.Equal(t, 90+1, conn.Edges[len(conn.Edges)-1].Node.ID)
+			require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+			require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
+		})
+		t.Run("UnexpectField", func(t *testing.T) {
+			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+				First: lo.ToPtr(10),
+				OrderBys: []relay.OrderBy{
+					{Field: "Unexpect", Desc: true},
+				},
+			})
+			require.ErrorContains(t, err, `missing field "Unexpect" in schema`)
+			require.Nil(t, conn)
+		})
+		if cursorTest {
+			t.Run("after id3 by id desc", func(t *testing.T) {
+				conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+					After: lo.ToPtr(mustEncodeKeysetCursor(
+						&User{ID: 2 + 1, Name: "name2", Age: 98}, []string{"ID"},
+					)),
+					First: lo.ToPtr(10),
+					OrderBys: []relay.OrderBy{
+						{Field: "ID", Desc: true},
+					},
+				})
+				require.NoError(t, err)
+				require.Equal(t, lo.ToPtr(100), conn.TotalCount)
+				require.Len(t, conn.Edges, 2)
+				require.Equal(t, 1+1, conn.Edges[0].Node.ID)
+				require.Equal(t, 0+1, conn.Edges[len(conn.Edges)-1].Node.ID)
+				require.Equal(t, conn.Edges[0].Cursor, *(conn.PageInfo.StartCursor))
+				require.Equal(t, conn.Edges[len(conn.Edges)-1].Cursor, *(conn.PageInfo.EndCursor))
+			})
+			t.Run("missing keys in cursor", func(t *testing.T) {
+				conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+					After: lo.ToPtr(mustEncodeKeysetCursor(
+						&User{ID: 2 + 1, Name: "name2", Age: 98}, []string{"ID"},
+					)),
+					First: lo.ToPtr(10),
+					OrderBys: []relay.OrderBy{
+						{Field: "ID", Desc: true},
+						{Field: "Name", Desc: true},
+					},
+				})
+				require.ErrorContains(t, err, "cursor has 1 keys, but 2 keys are expected")
+				require.Nil(t, conn)
+			})
+			t.Run("more keys in cursor", func(t *testing.T) {
+				conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+					After: lo.ToPtr(mustEncodeKeysetCursor(
+						&User{ID: 2 + 1, Name: "name2", Age: 98}, []string{"ID", "Name", "Age"},
+					)),
+					First: lo.ToPtr(10),
+					OrderBys: []relay.OrderBy{
+						{Field: "ID", Desc: true},
+						{Field: "Name", Desc: true},
+					},
+				})
+				require.ErrorContains(t, err, "cursor has 3 keys, but 2 keys are expected")
+				require.Nil(t, conn)
+			})
+			t.Run("wrong keys in cursor", func(t *testing.T) {
+				conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+					After: lo.ToPtr(mustEncodeKeysetCursor(
+						&User{ID: 2 + 1, Name: "name2", Age: 98}, []string{"ID", "Age"},
+					)),
+					First: lo.ToPtr(10),
+					OrderBys: []relay.OrderBy{
+						{Field: "ID", Desc: true},
+						{Field: "Name", Desc: true},
+					},
+				})
+				require.ErrorContains(t, err, `key "Name" not found in cursor`)
+				require.Nil(t, conn)
+			})
+			t.Run("wrong cursor keys and wrong fields", func(t *testing.T) {
+				conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
+					After: lo.ToPtr(mustEncodeKeysetCursor(
+						struct {
+							*User
+							NameX string
+						}{
+							User:  &User{ID: 2 + 1, Name: "name2", Age: 98},
+							NameX: "namex2",
+						}, []string{"ID", "NameX"},
+					)),
+					First: lo.ToPtr(10),
+					OrderBys: []relay.OrderBy{
+						{Field: "ID", Desc: true},
+						{Field: "NameX", Desc: true},
+					},
+				})
+				require.ErrorContains(t, err, `find: missing field "NameX" in schema`)
+				require.Nil(t, conn)
+			})
+		}
+	}
+
+	t.Run("keyset", func(t *testing.T) { testCase(t, true, NewKeysetAdapter) })
+	t.Run("offset", func(t *testing.T) { testCase(t, false, NewOffsetAdapter) })
+}
+
+func TestAppendPrimaryOrderBy(t *testing.T) {
+	primaryOrderBy := []relay.OrderBy{
+		{Field: "ID", Desc: true},
+		{Field: "CreatedAt", Desc: true},
+	}
+
+	require.Equal(t,
+		[]relay.OrderBy{
+			{Field: "Age", Desc: false},
+			{Field: "ID", Desc: true},
+			{Field: "CreatedAt", Desc: true},
+		},
+		relay.AppendPrimaryOrderBy([]relay.OrderBy{
+			{Field: "Age", Desc: false},
+		}, primaryOrderBy...),
+	)
+
+	require.Equal(t,
+		[]relay.OrderBy{
+			{Field: "ID", Desc: false},
+			{Field: "CreatedAt", Desc: true},
+		},
+		relay.AppendPrimaryOrderBy([]relay.OrderBy{
+			{Field: "ID", Desc: false},
+		}, primaryOrderBy...),
+	)
+
+	require.Equal(t,
+		[]relay.OrderBy{
+			{Field: "CreatedAt", Desc: false},
+			{Field: "ID", Desc: true},
+		},
+		relay.AppendPrimaryOrderBy([]relay.OrderBy{
+			{Field: "CreatedAt", Desc: false},
+		}, primaryOrderBy...),
+	)
+
+	require.Equal(t,
+		[]relay.OrderBy{
+			{Field: "CreatedAt", Desc: false},
+		},
+		relay.AppendPrimaryOrderBy([]relay.OrderBy{
+			{Field: "CreatedAt", Desc: false},
+		}),
+	)
 }

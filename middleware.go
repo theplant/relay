@@ -3,34 +3,45 @@ package relay
 import (
 	"context"
 
-	"github.com/pkg/errors"
 	"github.com/samber/lo"
 )
 
 // PaginationMiddleware is a wrapper for Pagination (middleware pattern)
 type PaginationMiddleware[T any] func(next Pagination[T]) Pagination[T]
 
-func EnsureLimits[T any](maxLimit int, limitIfNotSet int) PaginationMiddleware[T] {
-	if limitIfNotSet <= 0 {
-		panic("limitIfNotSet must be greater than 0")
+// EnsureLimits ensures that the limit is within the range 0 -> maxLimit and uses defaultLimit if limit is not set or is negative
+// This method introduced a breaking change in version 0.4.0, intentionally swapping the order of parameters to strongly indicate the breaking change.
+func EnsureLimits[T any](defaultLimit, maxLimit int) PaginationMiddleware[T] {
+	if defaultLimit < 0 {
+		panic("defaultLimit cannot be negative")
 	}
-	if maxLimit < limitIfNotSet {
-		panic("maxLimit must be greater than or equal to limitIfNotSet")
+	if maxLimit < defaultLimit {
+		panic("maxLimit must be greater than or equal to defaultLimit")
 	}
 	return func(next Pagination[T]) Pagination[T] {
 		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
-			if req.First == nil && req.Last == nil {
-				if req.After == nil && req.Before != nil {
-					req.Last = &limitIfNotSet
-				} else {
-					req.First = &limitIfNotSet
+			if req.First != nil {
+				if *req.First > maxLimit {
+					req.First = &maxLimit
+				}
+				if *req.First < 0 {
+					req.First = &defaultLimit
 				}
 			}
-			if req.First != nil && *req.First > maxLimit {
-				return nil, errors.New("first must be less than or equal to max limit")
+			if req.Last != nil {
+				if *req.Last > maxLimit {
+					req.Last = &maxLimit
+				}
+				if *req.Last < 0 {
+					req.Last = &defaultLimit
+				}
 			}
-			if req.Last != nil && *req.Last > maxLimit {
-				return nil, errors.New("last must be less than or equal to max limit")
+			if req.First == nil && req.Last == nil {
+				if req.After == nil && req.Before != nil {
+					req.Last = &defaultLimit
+				} else {
+					req.First = &defaultLimit
+				}
 			}
 			return next.Paginate(ctx, req)
 		})
@@ -40,13 +51,13 @@ func EnsureLimits[T any](maxLimit int, limitIfNotSet int) PaginationMiddleware[T
 func EnsurePrimaryOrderBy[T any](primaryOrderBys ...OrderBy) PaginationMiddleware[T] {
 	return func(next Pagination[T]) Pagination[T] {
 		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
-			req.OrderBys = AppendPrimaryOrderBy[T](req.OrderBys, primaryOrderBys...)
+			req.OrderBys = AppendPrimaryOrderBy(req.OrderBys, primaryOrderBys...)
 			return next.Paginate(ctx, req)
 		})
 	}
 }
 
-func AppendPrimaryOrderBy[T any](orderBys []OrderBy, primaryOrderBys ...OrderBy) []OrderBy {
+func AppendPrimaryOrderBy(orderBys []OrderBy, primaryOrderBys ...OrderBy) []OrderBy {
 	if len(primaryOrderBys) == 0 {
 		return orderBys
 	}

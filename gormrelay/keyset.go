@@ -144,6 +144,8 @@ func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit 
 
 		if limit > 0 {
 			exprs = append(exprs, clause.Limit{Limit: &limit})
+		} else {
+			db.AddError(errors.New("limit must be greater than 0"))
 		}
 
 		return db.Clauses(exprs...)

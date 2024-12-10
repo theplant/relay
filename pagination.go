@@ -65,10 +65,6 @@ type ApplyCursorsFunc[T any] func(ctx context.Context, req *ApplyCursorsRequest)
 // https://relay.dev/graphql/connections.htm#sec-Pagination-algorithm
 // https://relay.dev/graphql/connections.htm#sec-undefined.PageInfo.Fields
 func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsFunc ApplyCursorsFunc[T]) (*Connection[T], error) {
-	if applyCursorsFunc == nil {
-		panic("applyCursorsFunc must be set")
-	}
-
 	if req.First == nil && req.Last == nil {
 		return nil, errors.New("first or last must be set")
 	}
@@ -122,7 +118,11 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 	processor := GetNodeProcessor[T](ctx)
 	if processor != nil {
 		for _, lazyEdge := range lazyEdges {
-			lazyEdge.Node = processor(lazyEdge.Node)
+			node, err := processor(ctx, lazyEdge.Node)
+			if err != nil {
+				return nil, err
+			}
+			lazyEdge.Node = node
 		}
 	}
 
