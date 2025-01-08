@@ -54,7 +54,7 @@ conn, err := p.Paginate(
 If you need to encrypt cursors, you can use `cursor.Base64` or `cursor.GCM` wrappers:
 
 ```go
-// Encrypt cursors with Base64
+// Encode cursors with Base64
 cursor.Base64(gormrelay.NewOffsetAdapter[*User](db))
 
 // Encrypt cursors with GCM(AES)
