@@ -124,7 +124,7 @@ func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any) (clause.Exp
 				return nil, err
 			}
 			if expr != nil {
-				exprs = append(exprs, clause.Not(expr))
+				exprs = append(exprs, ClauseNot(expr))
 			}
 
 		default:

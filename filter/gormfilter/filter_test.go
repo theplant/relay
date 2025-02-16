@@ -312,8 +312,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				// TODO: 这里为什么不是 OR ？
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 OR "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(30), "%son"},
 			},
 		}
