@@ -77,7 +77,7 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 	}
 }
 
-const KeysetTagKey = "relay"
+const KeysetTagKey = "~~~keyset~~~"
 
 // use strcut field name as key and force emit empty
 var jsoniterForKeyset = jsoniter.Config{

@@ -27,7 +27,7 @@ func Scope(filter any) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
-const FilterTagKey = "relay"
+const FilterTagKey = "~~~filter~~~"
 
 // use strcut field name as key and force emit empty
 var jsoniterForFilter = jsoniter.Config{
