@@ -87,7 +87,7 @@ func TestScope(t *testing.T) {
 		var result []*User
 		err = db.Scopes(
 			gormfilter.Scope(&UserFilter{
-				Age: &filter.Int{Equals: lo.ToPtr(18)},
+				Age: &filter.Int{Eq: lo.ToPtr(18)},
 			}),
 		).Find(&result).Error
 		require.NoError(t, err)
@@ -113,7 +113,7 @@ func TestScope(t *testing.T) {
 				name: "simple equals",
 				filter: &UserFilter{
 					Name: &filter.String{
-						Equals: lo.ToPtr("John"),
+						Eq: lo.ToPtr("John"),
 					},
 				},
 				wantSQL:  `SELECT * FROM "users" WHERE "users"."name" = $1 AND "users"."deleted_at" IS NULL`,
@@ -182,7 +182,7 @@ func TestScope(t *testing.T) {
 				name: "with pre-existing where clause",
 				filter: &UserFilter{
 					Name: &filter.String{
-						Equals: lo.ToPtr("john"),
+						Eq: lo.ToPtr("john"),
 					},
 					Description: &filter.String{
 						IsNull: lo.ToPtr(true),

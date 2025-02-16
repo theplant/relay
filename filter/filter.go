@@ -3,8 +3,8 @@ package filter
 import "time"
 
 type String struct {
-	Equals     *string  `json:"equals"`
-	Not        *string  `json:"not"`
+	Eq         *string  `json:"eq"`
+	Neq        *string  `json:"neq"`
 	In         []string `json:"in"`
 	NotIn      []string `json:"notIn"`
 	Lt         *string  `json:"lt"`
@@ -21,8 +21,8 @@ type String struct {
 type ID String
 
 type Float struct {
-	Equals *float64  `json:"equals"`
-	Not    *float64  `json:"not"`
+	Eq     *float64  `json:"eq"`
+	Neq    *float64  `json:"neq"`
 	In     []float64 `json:"in"`
 	NotIn  []float64 `json:"notIn"`
 	Lt     *float64  `json:"lt"`
@@ -33,8 +33,8 @@ type Float struct {
 }
 
 type Int struct {
-	Equals *int  `json:"equals"`
-	Not    *int  `json:"not"`
+	Eq     *int  `json:"eq"`
+	Neq    *int  `json:"neq"`
 	In     []int `json:"in"`
 	NotIn  []int `json:"notIn"`
 	Lt     *int  `json:"lt"`
@@ -45,14 +45,14 @@ type Int struct {
 }
 
 type Boolean struct {
-	Equals *bool `json:"equals"`
-	Not    *bool `json:"not"`
+	Eq     *bool `json:"eq"`
+	Neq    *bool `json:"neq"`
 	IsNull *bool `json:"isNull"`
 }
 
 type Time struct {
-	Equals *time.Time   `json:"equals"`
-	Not    *time.Time   `json:"not"`
+	Eq     *time.Time   `json:"eq"`
+	Neq    *time.Time   `json:"neq"`
 	In     []*time.Time `json:"in"`
 	NotIn  []*time.Time `json:"notIn"`
 	Lt     *time.Time   `json:"lt"`

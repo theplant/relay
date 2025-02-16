@@ -176,9 +176,9 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 		var expr clause.Expression
 
 		switch op {
-		case "Equals", "Not":
+		case "Eq", "Neq":
 			value = foldValue(value, fold)
-			if op == "Equals" {
+			if op == "Eq" {
 				expr = clause.Eq{Column: column, Value: value}
 			} else {
 				expr = clause.Neq{Column: column, Value: value}
