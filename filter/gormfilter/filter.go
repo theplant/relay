@@ -173,8 +173,6 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 			continue
 		}
 
-		// TODO: value handle field.DataType
-
 		var expr clause.Expression
 
 		switch op {
