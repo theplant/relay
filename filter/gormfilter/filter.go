@@ -1,4 +1,4 @@
-package gormrelay
+package gormfilter
 
 import (
 	"cmp"
@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-func ScopeFilter(filter any) func(db *gorm.DB) *gorm.DB {
+func Scope(filter any) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if db == nil {
 			return nil

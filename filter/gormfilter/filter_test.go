@@ -1,4 +1,4 @@
-package gormrelay_test
+package gormfilter_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/theplant/relay/filter"
-	"github.com/theplant/relay/gormrelay"
+	"github.com/theplant/relay/filter/gormfilter"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -163,7 +163,7 @@ func TestScopeFilter(t *testing.T) {
 			if tt.before != nil {
 				q = tt.before(q)
 			}
-			stmt := q.Scopes(gormrelay.ScopeFilter(tt.filter)).Session(&gorm.Session{DryRun: true})
+			stmt := q.Scopes(gormfilter.Scope(tt.filter)).Session(&gorm.Session{DryRun: true})
 			stmt = stmt.Find(&[]User{})
 
 			if tt.wantErrMsg != "" {
