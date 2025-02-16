@@ -110,6 +110,12 @@ func TestScope(t *testing.T) {
 			wantErrMsg string
 		}{
 			{
+				name:     "empty filter",
+				filter:   &UserFilter{},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."deleted_at" IS NULL`,
+				wantVars: nil,
+			},
+			{
 				name: "simple equals",
 				filter: &UserFilter{
 					Name: &filter.String{
@@ -179,6 +185,29 @@ func TestScope(t *testing.T) {
 				wantVars: []any{"j%", float64(30), "2024-01-01T00:00:00Z"},
 			},
 			{
+				name: "complex filter with AND",
+				filter: &UserFilter{
+					And: []*UserFilter{
+						{
+							Name: &filter.String{
+								StartsWith: lo.ToPtr("j"),
+								Fold:       true,
+							},
+						},
+						{
+							Age: &filter.Int{
+								Gt: lo.ToPtr(30),
+							},
+						},
+					},
+					CreatedAt: &filter.Time{
+						Gt: lo.ToPtr(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE ((LOWER("users"."name") LIKE $1 AND "users"."age" > $2) AND "users"."created_at" > $3) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"j%", float64(30), "2024-01-01T00:00:00Z"},
+			},
+			{
 				name: "with pre-existing where clause",
 				filter: &UserFilter{
 					Name: &filter.String{
@@ -193,6 +222,80 @@ func TestScope(t *testing.T) {
 				},
 				wantSQL:  `SELECT * FROM "users" WHERE (age > $1 OR age < $2) AND ("users"."description" IS NULL AND "users"."name" = $3) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{100, 200, "john"},
+			},
+			{
+				name: "not condition",
+				filter: &UserFilter{
+					Not: &UserFilter{
+						Name: &filter.String{
+							Eq:   lo.ToPtr("joHn"),
+							Fold: true,
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") <> $1 AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"john"},
+			},
+			{
+				name: "not equal condition",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Neq: lo.ToPtr(20),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."age" <> $1 AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(20)},
+			},
+			{
+				name: "in with case insensitive",
+				filter: &UserFilter{
+					Name: &filter.String{
+						In:   []string{"jOhn", "jaNe"},
+						Fold: true,
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") IN ($1,$2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"john", "jane"},
+			},
+			{
+				name: "not in condition",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						NotIn: []int{18, 20, 25},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."age" NOT IN ($1,$2,$3) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(18), float64(20), float64(25)},
+			},
+			{
+				name: "less than condition",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Lt: lo.ToPtr(30),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."age" < $1 AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(30)},
+			},
+			{
+				name: "less than or equal condition",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Lte: lo.ToPtr(25),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."age" <= $1 AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(25)},
+			},
+			{
+				name: "ends with condition",
+				filter: &UserFilter{
+					Name: &filter.String{
+						EndsWith: lo.ToPtr("son"),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."name" LIKE $1 AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"%son"},
 			},
 		}
 

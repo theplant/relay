@@ -241,7 +241,7 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 			}
 
 		default:
-			return nil, errors.Errorf("unknown operator %s for field %q", op, fieldName)
+			return nil, errors.Errorf("unknown operator %q for field %q", op, fieldName)
 		}
 
 		if expr != nil {
