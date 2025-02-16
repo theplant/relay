@@ -176,12 +176,21 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 		var expr clause.Expression
 
 		switch op {
-		case "Eq", "Neq":
+		case "Eq", "Neq", "Lt", "Lte", "Gt", "Gte":
 			value = foldValue(value, fold)
-			if op == "Eq" {
+			switch op {
+			case "Eq":
 				expr = clause.Eq{Column: column, Value: value}
-			} else {
+			case "Neq":
 				expr = clause.Neq{Column: column, Value: value}
+			case "Lt":
+				expr = clause.Lt{Column: column, Value: value}
+			case "Lte":
+				expr = clause.Lte{Column: column, Value: value}
+			case "Gt":
+				expr = clause.Gt{Column: column, Value: value}
+			case "Gte":
+				expr = clause.Gte{Column: column, Value: value}
 			}
 
 		case "In", "NotIn":
@@ -197,17 +206,15 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 				expr = clause.Not(expr)
 			}
 
-		case "Lt", "Lte", "Gt", "Gte":
-			value = foldValue(value, fold)
-			switch op {
-			case "Lt":
-				expr = clause.Lt{Column: column, Value: value}
-			case "Lte":
-				expr = clause.Lte{Column: column, Value: value}
-			case "Gt":
-				expr = clause.Gt{Column: column, Value: value}
-			case "Gte":
-				expr = clause.Gte{Column: column, Value: value}
+		case "IsNull":
+			isNull, ok := value.(bool)
+			if !ok {
+				return nil, errors.Errorf("invalid IS NULL value for field %q", fieldName)
+			}
+			if isNull {
+				expr = clause.Eq{Column: column, Value: nil}
+			} else {
+				expr = clause.Neq{Column: column, Value: nil}
 			}
 
 		case "Contains", "StartsWith", "EndsWith":
@@ -229,19 +236,8 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 			}
 			expr = clause.Like{Column: column, Value: pattern}
 
-		case "IsNull":
-			isNull, ok := value.(bool)
-			if !ok {
-				return nil, errors.Errorf("invalid IS NULL value for field %q", fieldName)
-			}
-			if isNull {
-				expr = clause.Eq{Column: column, Value: nil}
-			} else {
-				expr = clause.Neq{Column: column, Value: nil}
-			}
-
 		default:
-			return nil, errors.Errorf("unknown operator %q for field %q", op, fieldName)
+			return nil, errors.Errorf("unknown operator %s for field %q", op, fieldName)
 		}
 
 		if expr != nil {
