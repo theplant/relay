@@ -293,9 +293,28 @@ func TestScope(t *testing.T) {
 					Name: &filter.String{
 						EndsWith: lo.ToPtr("son"),
 					},
+					Age: &filter.Int{
+						Lt: lo.ToPtr(30),
+					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."name" LIKE $1 AND "users"."deleted_at" IS NULL`,
-				wantVars: []any{"%son"},
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" < $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(30), "%son"},
+			},
+			{
+				name: "not ends with condition",
+				filter: &UserFilter{
+					Not: &UserFilter{
+						Name: &filter.String{
+							EndsWith: lo.ToPtr("son"),
+						},
+						Age: &filter.Int{
+							Lt: lo.ToPtr(30),
+						},
+					},
+				},
+				// TODO: 这里为什么不是 OR ？
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(30), "%son"},
 			},
 		}
 
