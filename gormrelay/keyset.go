@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-func createWhereExpr(s *schema.Schema, orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
+func buildKeysetExpr(s *schema.Schema, orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
 	ors := make([]clause.Expression, 0, len(orderBys))
 	eqs := make([]clause.Expression, 0, len(orderBys))
 	for i, orderBy := range orderBys {
@@ -104,7 +104,7 @@ func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit 
 		var exprs []clause.Expression
 
 		if after != nil {
-			expr, err := createWhereExpr(s, orderBys, *after, false)
+			expr, err := buildKeysetExpr(s, orderBys, *after, false)
 			if err != nil {
 				db.AddError(err)
 				return db
@@ -113,7 +113,7 @@ func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit 
 		}
 
 		if before != nil {
-			expr, err := createWhereExpr(s, orderBys, *before, true)
+			expr, err := buildKeysetExpr(s, orderBys, *before, true)
 			if err != nil {
 				db.AddError(err)
 				return db
