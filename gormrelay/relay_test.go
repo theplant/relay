@@ -1,23 +1,18 @@
 package gormrelay
 
 import (
-	"cmp"
 	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"github.com/theplant/relay"
 	"github.com/theplant/relay/cursor"
-	"gorm.io/driver/postgres"
+	"github.com/theplant/testenv"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -25,84 +20,16 @@ import (
 var db *gorm.DB
 
 func TestMain(m *testing.M) {
-	var err error
-	var cleanupDB func() error
-	db, cleanupDB, err = setupDatabase(context.Background(), "", "", "", "", "")
+	env, err := testenv.New().DBEnable(true).SetUp()
 	if err != nil {
 		panic(err)
 	}
-	defer cleanupDB()
+	defer env.TearDown()
 
+	db = env.DB
 	db.Logger = db.Logger.LogMode(logger.Info)
 
 	m.Run()
-}
-
-func setupDatabase(ctx context.Context, image, dbUser, dbPass, dbName, hostPort string) (_ *gorm.DB, _ func() error, xerr error) {
-	image = cmp.Or(image, "postgres:17.4-alpine3.21")
-	dbUser = cmp.Or(dbUser, "postgres")
-	dbPass = cmp.Or(dbPass, "postgres")
-	dbName = cmp.Or(dbName, "postgres")
-	req := testcontainers.ContainerRequest{
-		Image:        image,
-		ExposedPorts: []string{"5432/tcp"},
-		Env: map[string]string{
-			"POSTGRES_USER":     dbUser,
-			"POSTGRES_PASSWORD": dbPass,
-			"POSTGRES_DB":       dbName,
-		},
-		Cmd:        []string{"postgres", "-c", "fsync=off"},
-		WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
-	}
-	if hostPort != "" {
-		req.HostConfigModifier = func(hostConfig *container.HostConfig) {
-			hostConfig.PortBindings = map[nat.Port][]nat.PortBinding{
-				"5432/tcp": {
-					{
-						HostIP:   "0.0.0.0",
-						HostPort: hostPort,
-					},
-				},
-			}
-		}
-	}
-	container, err := testcontainers.GenericContainer(ctx,
-		testcontainers.GenericContainerRequest{
-			ContainerRequest: req,
-			Started:          true,
-		},
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("fail to start container: %w", err)
-	}
-	defer func() {
-		if xerr != nil {
-			container.Terminate(context.Background())
-		}
-	}()
-
-	endpoint, err := container.Endpoint(ctx, "")
-	if err != nil {
-		return nil, nil, fmt.Errorf("fail to get endpoint: %w", err)
-	}
-	dsn := fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=disable", dbUser, dbPass, endpoint, dbName)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return nil, nil, fmt.Errorf("no underlying sqlDB: %w", err)
-	}
-
-	return db, func() error {
-		return cmp.Or(
-			sqlDB.Close(),
-			container.Terminate(context.Background()),
-		)
-	}, nil
 }
 
 func resetDB(t *testing.T) {
