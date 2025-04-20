@@ -14,7 +14,6 @@ func TestJsoniterWithStructFieldNameAndEmitEmpty(t *testing.T) {
 		Name           string `json:"name,omitempty"`
 		Description    string `json:"description,omitempty"`
 		IgnoredByRelay func() `relay:"-"`
-		age            int
 	}
 	jsonCustomize := jsoniter.Config{
 		EscapeHTML:             true,
@@ -37,7 +36,6 @@ func TestEncodeKeysetCursor(t *testing.T) {
 		Description    string `json:"description,omitempty"`
 		IgnoredByJson  string `json:"-"`
 		IgnoredByRelay func() `json:"-" relay:"-"`
-		age            int
 	}
 	user := User{
 		Model: gorm.Model{ID: 1},
@@ -65,7 +63,7 @@ func TestEncodeKeysetCursor(t *testing.T) {
 	}
 	{
 		cursor, err := EncodeKeysetCursor(user, []string{"Name", "Description", "FieldNotExists"})
-		require.ErrorContains(t, err, `key "FieldNotExists" not found in node`)
+		require.ErrorContains(t, err, `required key "FieldNotExists" not found in node when encoding cursor`)
 		require.Empty(t, cursor)
 	}
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+
 	"github.com/theplant/relay"
 	"github.com/theplant/relay/cursor"
 )
@@ -170,7 +171,7 @@ func TestOffsetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr(cursor.EncodeOffsetCursor(-1)),
 			},
-			expectedError: "after < 0",
+			expectedError: "invalid pagination: after cursor must be non-negative",
 		},
 		{
 			name:             "Invalid: before < 0",
@@ -180,7 +181,7 @@ func TestOffsetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Before: lo.ToPtr(cursor.EncodeOffsetCursor(-1)),
 			},
-			expectedError: "before < 0",
+			expectedError: "invalid pagination: before cursor must be non-negative",
 		},
 		{
 			name:             "Invalid: after <= before",
@@ -191,7 +192,7 @@ func TestOffsetCursor(t *testing.T) {
 				After:  lo.ToPtr(cursor.EncodeOffsetCursor(1)),
 				Before: lo.ToPtr(cursor.EncodeOffsetCursor(1)),
 			},
-			expectedError: "after >= before",
+			expectedError: "invalid pagination: after cursor must be less than before cursor",
 		},
 		{
 			name:             "Invalid: invalid after",
@@ -201,7 +202,7 @@ func TestOffsetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				After: lo.ToPtr("invalid"),
 			},
-			expectedError: `decode offset cursor "invalid"`,
+			expectedError: `invalid offset cursor "invalid"`,
 		},
 		{
 			name:             "Invalid: invalid before",
@@ -211,7 +212,7 @@ func TestOffsetCursor(t *testing.T) {
 			paginateRequest: &relay.PaginateRequest[*User]{
 				Before: lo.ToPtr("invalid"),
 			},
-			expectedError: `decode offset cursor "invalid"`,
+			expectedError: `invalid offset cursor "invalid"`,
 		},
 		{
 			name:               "Limit if not set",
@@ -645,6 +646,6 @@ func TestOffsetWithLastAndNilBeforeIfSkipTotalCount(t *testing.T) {
 			Last: lo.ToPtr(10),
 		},
 	)
-	require.ErrorContains(t, err, "totalCount is required for fromEnd and nil before")
+	require.ErrorContains(t, err, "totalCount is required for pagination from end when before cursor is not provided")
 	require.Nil(t, conn)
 }

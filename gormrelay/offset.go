@@ -5,32 +5,42 @@ import (
 	"reflect"
 
 	"github.com/pkg/errors"
-	"github.com/theplant/relay"
-	"github.com/theplant/relay/cursor"
+	"github.com/samber/lo"
+	"golang.org/x/exp/maps"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/theplant/relay"
+	"github.com/theplant/relay/cursor"
 )
 
 type OffsetFinder[T any] struct {
-	db *gorm.DB
+	db   *gorm.DB
+	opts Options[T]
 }
 
-func NewOffsetFinder[T any](db *gorm.DB) *OffsetFinder[T] {
-	return &OffsetFinder[T]{
-		db: db,
+func NewOffsetFinder[T any](db *gorm.DB, opts ...Option[T]) *OffsetFinder[T] {
+	options := Options[T]{}
+	for _, opt := range opts {
+		opt(&options)
 	}
+	return &OffsetFinder[T]{db: db, opts: options}
 }
 
-func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]T, error) {
-	var nodes []T
-
+func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]cursor.Node[T], error) {
 	if limit == 0 {
-		return nodes, nil
+		return []cursor.Node[T]{}, nil
 	}
 
-	db := a.db
-	if db.Statement.Context != ctx {
-		db = db.WithContext(ctx)
+	db := a.db.WithContext(ctx)
+
+	basedOnModel, err := shouldBasedOnModel[T](db)
+	if err != nil {
+		return nil, err
+	}
+
+	if !basedOnModel {
+		db = applyModel[T](db)
 	}
 
 	if skip > 0 {
@@ -39,14 +49,12 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 
 	db = db.Limit(limit)
 
-	basedOnModel, err := shouldBasedOnModel[T](db)
-	if err != nil {
-		return nil, err
-	}
-
-	if !basedOnModel && db.Statement.Model == nil {
-		var t T
-		db = db.Model(t)
+	var computedColumns map[string]clause.Column
+	if a.opts.Computed != nil && len(a.opts.Computed.Columns) > 0 {
+		computedColumns = lo.MapEntries(a.opts.Computed.Columns, func(key string, column clause.Column) (string, clause.Column) {
+			column.Alias = key
+			return key, column
+		})
 	}
 
 	if len(orderBys) > 0 {
@@ -55,20 +63,49 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 			return nil, err
 		}
 
+		getColumn := func(fieldName string) (clause.Column, error) {
+			field, ok := s.FieldsByName[fieldName]
+			if !ok {
+				return clause.Column{}, errors.Errorf("missing field %q in schema for OrderBy", fieldName)
+			}
+			return clause.Column{Table: clause.CurrentTable, Name: field.DBName}, nil
+		}
+
 		orderByColumns := make([]clause.OrderByColumn, 0, len(orderBys))
 		for _, orderBy := range orderBys {
-			field, ok := s.FieldsByName[orderBy.Field]
-			if !ok {
-				return nil, errors.Errorf("missing field %q in schema", orderBy.Field)
+			column, ok := computedColumns[orderBy.Field]
+			if ok {
+				column = clause.Column{Name: column.Alias, Raw: true}
+			} else {
+				column, err = getColumn(orderBy.Field)
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			orderByColumns = append(orderByColumns, clause.OrderByColumn{
-				Column: clause.Column{Table: clause.CurrentTable, Name: field.DBName},
+				Column: column,
 				Desc:   orderBy.Desc,
 			})
 		}
 		db = db.Order(clause.OrderBy{Columns: orderByColumns})
 	}
+
+	if len(computedColumns) > 0 {
+		dest, toCursorNodes, err := a.opts.Computed.ForScan(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		err = db.Scopes(AppendSelect(maps.Values(computedColumns)...)).Scan(dest).Error
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan records with computed columns")
+		}
+
+		return toCursorNodes(), nil
+	}
+
+	var nodes []T
 
 	if basedOnModel {
 		modelType := reflect.TypeOf(db.Statement.Model)
@@ -77,47 +114,45 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 
 		err := db.Find(nodesVal.Addr().Interface()).Error
 		if err != nil {
-			return nil, errors.Wrap(err, "find")
+			return nil, errors.Wrap(err, "failed to find records based on model")
 		}
 
-		nodes := make([]T, nodesVal.Len())
+		nodes = make([]T, nodesVal.Len())
 		for i := 0; i < nodesVal.Len(); i++ {
 			nodes[i] = nodesVal.Index(i).Interface().(T)
 		}
-
-		return nodes, nil
+	} else {
+		if err := db.Find(&nodes).Error; err != nil {
+			return nil, errors.Wrap(err, "failed to find records with offset pagination")
+		}
 	}
 
-	if err := db.Find(&nodes).Error; err != nil {
-		return nil, errors.Wrap(err, "find")
-	}
-	return nodes, nil
+	return lo.Map(nodes, func(node T, _ int) cursor.Node[T] {
+		return &cursor.SelfNode[T]{Node: node}
+	}), nil
 }
 
 func (a *OffsetFinder[T]) Count(ctx context.Context) (int, error) {
-	db := a.db
+	db := a.db.WithContext(ctx)
 
 	basedOnModel, err := shouldBasedOnModel[T](db)
 	if err != nil {
 		return 0, err
 	}
 
-	if !basedOnModel && db.Statement.Context != ctx {
-		db = db.WithContext(ctx)
-	}
-
-	if db.Statement.Model == nil {
-		var t T
-		db = db.Model(t)
+	if !basedOnModel {
+		db = applyModel[T](db)
 	}
 
 	var totalCount int64
 	if err := db.Count(&totalCount).Error; err != nil {
-		return 0, errors.Wrap(err, "count")
+		return 0, errors.Wrap(err, "failed to count total records")
 	}
 	return int(totalCount), nil
 }
 
-func NewOffsetAdapter[T any](db *gorm.DB) relay.ApplyCursorsFunc[T] {
-	return cursor.NewOffsetAdapter(NewOffsetFinder[T](db))
+var _ cursor.OffsetFinder[any] = &OffsetFinder[any]{}
+
+func NewOffsetAdapter[T any](db *gorm.DB, opts ...Option[T]) relay.ApplyCursorsFunc[T] {
+	return cursor.NewOffsetAdapter(NewOffsetFinder(db, opts...))
 }
