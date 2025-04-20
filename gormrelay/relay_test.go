@@ -10,11 +10,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/theplant/relay"
-	"github.com/theplant/relay/cursor"
 	"github.com/theplant/testenv"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/theplant/relay"
+	"github.com/theplant/relay/cursor"
 )
 
 var db *gorm.DB
@@ -73,7 +74,7 @@ func TestUnexpectOrderBys(t *testing.T) {
 func TestContext(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		{
 			p := relay.New(
 				f(db),
@@ -114,7 +115,7 @@ func TestContext(t *testing.T) {
 func TestSkip(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
 			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
@@ -257,7 +258,7 @@ func TestSkip(t *testing.T) {
 func TestGenericTypeAny(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[any]) {
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[any]) relay.ApplyCursorsFunc[any]) {
 		t.Run("Correct", func(t *testing.T) {
 			p := relay.New(
 				func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[any], error) {
@@ -336,7 +337,7 @@ func TestTotalCountZero(t *testing.T) {
 	resetDB(t)
 	require.NoError(t, db.Exec("DELETE FROM users").Error)
 
-	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
 			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
@@ -366,7 +367,7 @@ func generateGCMKey(length int) ([]byte, error) {
 func TestCursorMiddleware(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
 			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
@@ -417,12 +418,12 @@ func TestCursorMiddleware(t *testing.T) {
 
 	t.Run("Base64", func(t *testing.T) {
 		t.Run("keyset", func(t *testing.T) {
-			testCase(t, func(db *gorm.DB) relay.ApplyCursorsFunc[*User] {
+			testCase(t, func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User] {
 				return cursor.Base64[*User](NewKeysetAdapter[*User](db))
 			})
 		})
 		t.Run("keyset", func(t *testing.T) {
-			testCase(t, func(db *gorm.DB) relay.ApplyCursorsFunc[*User] {
+			testCase(t, func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User] {
 				return cursor.Base64[*User](NewOffsetAdapter[*User](db))
 			})
 		})
@@ -436,20 +437,20 @@ func TestCursorMiddleware(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("keyset", func(t *testing.T) {
-			testCase(t, func(db *gorm.DB) relay.ApplyCursorsFunc[*User] {
+			testCase(t, func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User] {
 				return cursor.GCM[*User](gcm)(NewKeysetAdapter[*User](db))
 			})
 		})
 
 		t.Run("offset", func(t *testing.T) {
-			testCase(t, func(db *gorm.DB) relay.ApplyCursorsFunc[*User] {
+			testCase(t, func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User] {
 				return cursor.GCM[*User](gcm)(NewOffsetAdapter[*User](db))
 			})
 		})
 	})
 
 	t.Run("MockError", func(t *testing.T) {
-		testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+		testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 			p := relay.New(
 				func(next relay.ApplyCursorsFunc[*User]) relay.ApplyCursorsFunc[*User] {
 					return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
@@ -460,7 +461,7 @@ func TestCursorMiddleware(t *testing.T) {
 
 						for i := range rsp.LazyEdges {
 							edge := rsp.LazyEdges[i]
-							edge.Cursor = func(ctx context.Context, node *User) (string, error) {
+							edge.Cursor = func(ctx context.Context) (string, error) {
 								return "", errors.New("mock error")
 							}
 						}
@@ -493,7 +494,7 @@ func TestAppendCursorMiddleware(t *testing.T) {
 
 	gcmMiddleware := cursor.GCM[*User](gcm)
 
-	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
 			relay.AppendCursorMiddleware(gcmMiddleware),
@@ -533,7 +534,7 @@ func TestAppendCursorMiddleware(t *testing.T) {
 func TestWithNodeProcessor(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
 			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
@@ -591,7 +592,7 @@ func TestWithNodeProcessor(t *testing.T) {
 func TestOrderBys(t *testing.T) {
 	resetDB(t)
 
-	testCase := func(t *testing.T, cursorTest bool, f func(db *gorm.DB) relay.ApplyCursorsFunc[*User]) {
+	testCase := func(t *testing.T, cursorTest bool, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
 			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
@@ -653,7 +654,7 @@ func TestOrderBys(t *testing.T) {
 						{Field: "Name", Desc: true},
 					},
 				})
-				require.ErrorContains(t, err, "cursor has 1 keys, but 2 keys are expected")
+				require.ErrorContains(t, err, "invalid cursor: has 1 keys, but 2 keys are expected")
 				require.Nil(t, conn)
 			})
 			t.Run("more keys in cursor", func(t *testing.T) {
@@ -667,7 +668,7 @@ func TestOrderBys(t *testing.T) {
 						{Field: "Name", Desc: true},
 					},
 				})
-				require.ErrorContains(t, err, "cursor has 3 keys, but 2 keys are expected")
+				require.ErrorContains(t, err, "invalid cursor: has 3 keys, but 2 keys are expected")
 				require.Nil(t, conn)
 			})
 			t.Run("wrong keys in cursor", func(t *testing.T) {
@@ -681,7 +682,7 @@ func TestOrderBys(t *testing.T) {
 						{Field: "Name", Desc: true},
 					},
 				})
-				require.ErrorContains(t, err, `key "Name" not found in cursor`)
+				require.ErrorContains(t, err, `required key "Name" not found in cursor`)
 				require.Nil(t, conn)
 			})
 			t.Run("wrong cursor keys and wrong fields", func(t *testing.T) {
@@ -701,7 +702,7 @@ func TestOrderBys(t *testing.T) {
 						{Field: "NameX", Desc: true},
 					},
 				})
-				require.ErrorContains(t, err, `find: missing field "NameX" in schema`)
+				require.ErrorContains(t, err, `failed to find records with keyset pagination: missing field "NameX" in schema`)
 				require.Nil(t, conn)
 			})
 		}
@@ -756,4 +757,260 @@ func TestAppendPrimaryOrderBy(t *testing.T) {
 			{Field: "CreatedAt", Desc: false},
 		}),
 	)
+}
+
+func TestWithComputed(t *testing.T) {
+	resetDB(t)
+
+	require.NoError(t, db.Exec("UPDATE users SET name = 'molon' WHERE id = 30").Error)
+	require.NoError(t, db.Exec("UPDATE users SET name = 'sam' WHERE id = 50").Error)
+
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
+		p := relay.New(
+			f(
+				db,
+				WithComputed(&Computed[*User]{
+					Columns: ComputedColumns(map[string]string{
+						"Priority": "(CASE WHEN users.name = 'molon' THEN 1 WHEN users.name = 'sam' THEN 2 ELSE 3 END)",
+					}),
+					ForScan: func(ctx context.Context) (dest any, toCursorNodes func() []cursor.Node[*User], err error) {
+						type ComputedUser struct {
+							*User
+							Priority int
+						}
+						nodes := []*ComputedUser{}
+						return &nodes, func() []cursor.Node[*User] {
+							return lo.Map(nodes, func(u *ComputedUser, _ int) cursor.Node[*User] {
+								return &cursor.NodeWrapper[*User]{
+									Object: u,
+									Unwrap: func() *User {
+										return u.User
+									},
+								}
+							})
+						}, nil
+					},
+				}),
+			),
+			relay.EnsureLimits[*User](10, 50),
+		)
+
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(3),
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: false},
+				{Field: "ID", Desc: false},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(conn.Edges))
+		require.Equal(t, "molon", conn.Edges[0].Node.Name)
+		require.Equal(t, "sam", conn.Edges[1].Node.Name)
+		require.Equal(t, "name0", conn.Edges[2].Node.Name)
+
+		// Test pagination using cursor to fetch the next page
+		nextConn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(3),
+			After: conn.PageInfo.EndCursor,
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: false},
+				{Field: "ID", Desc: false},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(nextConn.Edges))
+		// Users with Priority=3 sorted by ID in ascending order
+		require.Equal(t, "name1", nextConn.Edges[0].Node.Name)
+		require.Equal(t, "name2", nextConn.Edges[1].Node.Name)
+		require.Equal(t, "name3", nextConn.Edges[2].Node.Name)
+
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(3),
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: true},
+				{Field: "ID", Desc: false},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(conn.Edges))
+		require.Equal(t, "name0", conn.Edges[0].Node.Name)
+		require.Equal(t, "name1", conn.Edges[1].Node.Name)
+		require.Equal(t, "name2", conn.Edges[2].Node.Name)
+
+		// Test cursor-based pagination with descending Priority order
+		nextConn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(3),
+			After: conn.PageInfo.EndCursor,
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: true},
+				{Field: "ID", Desc: false},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(nextConn.Edges))
+		require.Equal(t, "name3", nextConn.Edges[0].Node.Name)
+		require.Equal(t, "name4", nextConn.Edges[1].Node.Name)
+		require.Equal(t, "name5", nextConn.Edges[2].Node.Name)
+
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(3),
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: false},
+				{Field: "ID", Desc: true},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(conn.Edges))
+		require.Equal(t, "molon", conn.Edges[0].Node.Name)
+		require.Equal(t, "sam", conn.Edges[1].Node.Name)
+		require.Equal(t, "name99", conn.Edges[2].Node.Name)
+
+		// Test cursor pagination with mixed sort order (Priority ASC, ID DESC)
+		nextConn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(3),
+			After: conn.PageInfo.EndCursor,
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: false},
+				{Field: "ID", Desc: true},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(nextConn.Edges))
+		require.Equal(t, "name98", nextConn.Edges[0].Node.Name)
+		require.Equal(t, "name97", nextConn.Edges[1].Node.Name)
+		require.Equal(t, "name96", nextConn.Edges[2].Node.Name)
+
+		// Test pagination starting from middle of first page to verify cursor precision
+		middleConn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(3),
+			After: &conn.Edges[0].Cursor,
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: false},
+				{Field: "ID", Desc: true},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(middleConn.Edges))
+		require.Equal(t, "sam", middleConn.Edges[0].Node.Name)
+		require.Equal(t, "name99", middleConn.Edges[1].Node.Name)
+		require.Equal(t, "name98", middleConn.Edges[2].Node.Name)
+	}
+
+	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
+	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
+}
+
+// Shop represents a store with an in-memory Priority that doesn't exist in DB
+type Shop struct {
+	ID       int    `gorm:"primarykey;not null;" json:"id"`
+	Name     string `gorm:"not null;" json:"name"`
+	Category int    `gorm:"index;not null;" json:"category"`
+	Priority int    `gorm:"-" json:"priority"` // Not stored in DB, populated from computed column
+}
+
+func TestWithComputedShop(t *testing.T) {
+	// Create Shop table and seed data
+	require.NoError(t, db.Exec("DROP TABLE IF EXISTS shops").Error)
+	require.NoError(t, db.AutoMigrate(&Shop{}))
+
+	// Create test shops
+	shops := []*Shop{}
+	for i := 0; i < 100; i++ {
+		shops = append(shops, &Shop{
+			Name:     fmt.Sprintf("shop%d", i),
+			Category: i % 3, // Three categories: 0, 1, 2
+		})
+	}
+
+	// Update some shops to specific categories for testing
+	shops[30].Name = "premium"
+	shops[50].Name = "featured"
+
+	err := db.Session(&gorm.Session{Logger: logger.Discard}).Create(shops).Error
+	require.NoError(t, err)
+
+	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*Shop]) relay.ApplyCursorsFunc[*Shop]) {
+		p := relay.New(
+			f(
+				db,
+				WithComputed(&Computed[*Shop]{
+					Columns: ComputedColumns(map[string]string{
+						// Define computed Priority column based on shop name
+						"Priority": "(CASE WHEN shops.name = 'premium' THEN 1 WHEN shops.name = 'featured' THEN 2 ELSE 3 END)",
+					}),
+					ForScan: func(ctx context.Context) (dest any, toCursorNodes func() []cursor.Node[*Shop], err error) {
+						type ComputedShop struct {
+							*Shop
+							Priority int
+						}
+						nodes := []*ComputedShop{}
+						return &nodes, func() []cursor.Node[*Shop] {
+							return lo.Map(nodes, func(s *ComputedShop, _ int) cursor.Node[*Shop] {
+								s.Shop.Priority = s.Priority
+								return &cursor.SelfNode[*Shop]{Node: s.Shop}
+							})
+						}, nil
+					},
+				}),
+			),
+			relay.EnsureLimits[*Shop](10, 50),
+		)
+
+		// Test pagination with Priority ascending order
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*Shop]{
+			First: lo.ToPtr(3),
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: false},
+				{Field: "ID", Desc: false},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(conn.Edges))
+		require.Equal(t, "premium", conn.Edges[0].Node.Name)
+		require.Equal(t, "featured", conn.Edges[1].Node.Name)
+		require.Equal(t, "shop0", conn.Edges[2].Node.Name)
+
+		// Verify Priority field is populated in returned shops
+		require.Equal(t, 1, conn.Edges[0].Node.Priority)
+		require.Equal(t, 2, conn.Edges[1].Node.Priority)
+		require.Equal(t, 3, conn.Edges[2].Node.Priority)
+
+		// Test pagination using cursor to fetch the next page
+		nextConn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*Shop]{
+			First: lo.ToPtr(3),
+			After: conn.PageInfo.EndCursor,
+			OrderBys: []relay.OrderBy{
+				{Field: "Priority", Desc: false},
+				{Field: "ID", Desc: false},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(nextConn.Edges))
+		// Shops with Priority=3 sorted by ID in ascending order
+		require.Equal(t, "shop1", nextConn.Edges[0].Node.Name)
+		require.Equal(t, "shop2", nextConn.Edges[1].Node.Name)
+		require.Equal(t, "shop3", nextConn.Edges[2].Node.Name)
+		require.Equal(t, 3, nextConn.Edges[0].Node.Priority)
+		require.Equal(t, 3, nextConn.Edges[1].Node.Priority)
+		require.Equal(t, 3, nextConn.Edges[2].Node.Priority)
+
+		// no priority order by
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*Shop]{
+			First: lo.ToPtr(3),
+			OrderBys: []relay.OrderBy{
+				{Field: "ID", Desc: false},
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, len(conn.Edges))
+		require.Equal(t, "shop0", conn.Edges[0].Node.Name)
+		require.Equal(t, "shop1", conn.Edges[1].Node.Name)
+		require.Equal(t, "shop2", conn.Edges[2].Node.Name)
+		require.Equal(t, 3, conn.Edges[0].Node.Priority)
+		require.Equal(t, 3, conn.Edges[1].Node.Priority)
+		require.Equal(t, 3, conn.Edges[2].Node.Priority)
+	}
+
+	t.Run("keyset", func(t *testing.T) { testCase(t, NewKeysetAdapter) })
+	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 }

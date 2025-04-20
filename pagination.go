@@ -49,7 +49,7 @@ type ApplyCursorsRequest struct {
 
 type LazyEdge[T any] struct {
 	Node   T
-	Cursor func(ctx context.Context, node T) (string, error)
+	Cursor func(ctx context.Context) (string, error)
 }
 
 type ApplyCursorsResponse[T any] struct {
@@ -149,7 +149,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 	if !skip.Edges {
 		edges := make([]*Edge[T], len(lazyEdges))
 		for i, lazyEdge := range lazyEdges {
-			cursor, err := lazyEdge.Cursor(ctx, lazyEdge.Node)
+			cursor, err := lazyEdge.Cursor(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -181,7 +181,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 				startCursor = conn.Edges[0].Cursor
 				endCursor = conn.Edges[len(conn.Edges)-1].Cursor
 			} else {
-				startCursor, err = lazyEdges[0].Cursor(ctx, lazyEdges[0].Node)
+				startCursor, err = lazyEdges[0].Cursor(ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -189,7 +189,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 				if endIndex == 0 {
 					endCursor = startCursor
 				} else {
-					endCursor, err = lazyEdges[endIndex].Cursor(ctx, lazyEdges[endIndex].Node)
+					endCursor, err = lazyEdges[endIndex].Cursor(ctx)
 					if err != nil {
 						return nil, err
 					}

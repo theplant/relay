@@ -6,9 +6,11 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+
 	"github.com/theplant/relay"
 	"github.com/theplant/relay/cursor"
-	"gorm.io/gorm"
 )
 
 func mustEncodeKeysetCursor[T any](node T, keys []string) string {
@@ -23,6 +25,7 @@ func TestScopeKeyset(t *testing.T) {
 	{
 		db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
+				nil,
 				&map[string]interface{}{"Age": 85},
 				nil,
 				[]relay.OrderBy{
@@ -38,6 +41,7 @@ func TestScopeKeyset(t *testing.T) {
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
+				nil,
 				&map[string]interface{}{"Age": 85},
 				nil,
 				[]relay.OrderBy{
@@ -55,6 +59,7 @@ func TestScopeKeyset(t *testing.T) {
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			// with table alias
 			tx = tx.Table("company_users AS u").Model(&User{}).Scopes(scopeKeyset(
+				nil,
 				&map[string]interface{}{"Age": 85},
 				nil,
 				[]relay.OrderBy{
@@ -71,6 +76,7 @@ func TestScopeKeyset(t *testing.T) {
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
+				nil,
 				&map[string]interface{}{"Age": 85},
 				&map[string]interface{}{"Age": 88},
 				[]relay.OrderBy{
@@ -87,6 +93,7 @@ func TestScopeKeyset(t *testing.T) {
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
+				nil,
 				&map[string]interface{}{"Age": 85, "Name": "name15"},
 				&map[string]interface{}{"Age": 88, "Name": "name12"},
 				[]relay.OrderBy{
@@ -104,6 +111,7 @@ func TestScopeKeyset(t *testing.T) {
 	{
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
+				nil,
 				&map[string]interface{}{"Age": 85, "Name": "name15"},
 				&map[string]interface{}{"Age": 88, "Name": "name12"},
 				[]relay.OrderBy{
@@ -123,6 +131,7 @@ func TestScopeKeyset(t *testing.T) {
 			// with extra where
 			tx = tx.Model(&User{}).Where("name LIKE ?", "name%").
 				Scopes(scopeKeyset(
+					nil,
 					&map[string]interface{}{"Age": 85, "Name": "name15"},
 					&map[string]interface{}{"Age": 88, "Name": "name12"},
 					[]relay.OrderBy{
@@ -136,6 +145,51 @@ func TestScopeKeyset(t *testing.T) {
 			return tx
 		})
 		require.Equal(t, `SELECT * FROM "users" WHERE name LIKE 'name%' AND (("users"."age" > 85 OR ("users"."age" = 85 AND "users"."name" < 'name15')) AND ("users"."age" < 88 OR ("users"."age" = 88 AND "users"."name" > 'name12'))) ORDER BY "users"."age","users"."name" DESC LIMIT 10`, sql)
+	}
+	{
+		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
+			tx = tx.Model(&User{}).Select("*", "true AS love").
+				Scopes(scopeKeyset(
+					map[string]clause.Column{
+						"Priority": {
+							Raw: true,
+							Name: `(CASE 
+WHEN users.name = 'molon' THEN 1 
+WHEN users.name = 'sam' THEN 2 
+ELSE 0 
+END)`,
+						},
+					},
+					&map[string]interface{}{
+						"Priority": 1,
+						"Age":      50,
+					},
+					nil,
+					[]relay.OrderBy{
+						{Field: "Priority", Desc: true},
+						{Field: "Age", Desc: false},
+					},
+					10,
+					false,
+				)).Find(&User{})
+			require.NoError(t, tx.Error)
+			return tx
+		})
+
+		expectedSQL := `SELECT *,true AS love,(CASE 
+WHEN users.name = 'molon' THEN 1 
+WHEN users.name = 'sam' THEN 2 
+ELSE 0 
+END) AS Priority FROM "users" WHERE ((CASE 
+WHEN users.name = 'molon' THEN 1 
+WHEN users.name = 'sam' THEN 2 
+ELSE 0 
+END) < 1 OR ((CASE 
+WHEN users.name = 'molon' THEN 1 
+WHEN users.name = 'sam' THEN 2 
+ELSE 0 
+END) = 1 AND "users"."age" > 50)) ORDER BY Priority DESC,"users"."age" LIMIT 10`
+		require.Equal(t, expectedSQL, sql)
 	}
 }
 
@@ -318,7 +372,7 @@ func TestKeysetCursor(t *testing.T) {
 					&User{ID: 9 + 1, Name: "name9", Age: 91}, primaryOrderByKeys,
 				)),
 			},
-			expectedError: "after == before",
+			expectedError: "invalid pagination: after and before cursors are identical",
 		},
 		{
 			name:               "Limit if not set",
@@ -784,7 +838,7 @@ func TestKeysetEmptyOrderBys(t *testing.T) {
 	).Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		First: lo.ToPtr(10),
 	})
-	require.ErrorContains(t, err, "no keys to encode cursor, orderBys must be set for keyset")
+	require.ErrorContains(t, err, "keyset pagination requires orderBys to be set")
 	require.Nil(t, conn)
 }
 
@@ -814,20 +868,20 @@ func TestKeysetInvalidCursor(t *testing.T) {
 		After: lo.ToPtr(`{"FieldNotExists":1}`),
 		First: lo.ToPtr(10),
 	})
-	require.ErrorContains(t, err, `key "ID" not found in cursor`)
+	require.ErrorContains(t, err, `required key "ID" not found in cursor`)
 	require.Nil(t, conn)
 
 	conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 		After: lo.ToPtr(`{"ID":1,"Name":"name0"}`),
 		First: lo.ToPtr(10),
 	})
-	require.ErrorContains(t, err, `cursor has 2 keys, but 1 keys are expected`)
+	require.ErrorContains(t, err, `invalid cursor: has 2 keys, but 1 keys are expected`)
 	require.Nil(t, conn)
 
 	conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 		Before: lo.ToPtr(`invalid`),
 		First:  lo.ToPtr(10),
 	})
-	require.ErrorContains(t, err, `unmarshal cursor`)
+	require.ErrorContains(t, err, `failed to parse cursor JSON`)
 	require.Nil(t, conn)
 }

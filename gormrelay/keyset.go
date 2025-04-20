@@ -6,14 +6,15 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
-	"github.com/theplant/relay"
-	"github.com/theplant/relay/cursor"
+	"golang.org/x/exp/maps"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"gorm.io/gorm/schema"
+
+	"github.com/theplant/relay"
+	"github.com/theplant/relay/cursor"
 )
 
-func createWhereExpr(s *schema.Schema, orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
+func createWhereExpr(getColumn func(fieldName string) (clause.Column, error), orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
 	ors := make([]clause.Expression, 0, len(orderBys))
 	eqs := make([]clause.Expression, 0, len(orderBys))
 	for i, orderBy := range orderBys {
@@ -22,17 +23,15 @@ func createWhereExpr(s *schema.Schema, orderBys []relay.OrderBy, keyset map[stri
 			return nil, errors.Errorf("missing field %q in keyset", orderBy.Field)
 		}
 
-		field, ok := s.FieldsByName[orderBy.Field]
-		if !ok {
-			return nil, errors.Errorf("missing field %q in schema", orderBy.Field)
+		column, err := getColumn(orderBy.Field)
+		if err != nil {
+			return nil, err
 		}
 
 		desc := orderBy.Desc
 		if reverse {
 			desc = !desc
 		}
-
-		column := clause.Column{Table: clause.CurrentTable, Name: field.DBName}
 
 		var expr clause.Expression
 		if desc {
@@ -88,46 +87,67 @@ func createWhereExpr(s *schema.Schema, orderBys []relay.OrderBy, keyset map[stri
 //		clause.Limit{Limit: &limit},
 //
 // )
-func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) func(db *gorm.DB) *gorm.DB {
+func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if db.Statement.Model == nil {
-			db.AddError(errors.New("model is nil"))
+			_ = db.AddError(errors.New("model is nil"))
 			return db
 		}
 
 		s, err := parseSchema(db, db.Statement.Model)
 		if err != nil {
-			db.AddError(err)
+			_ = db.AddError(err)
 			return db
+		}
+
+		getColumn := func(fieldName string) (clause.Column, error) {
+			if column, ok := computedColumns[fieldName]; ok {
+				return column, nil
+			}
+			field, ok := s.FieldsByName[fieldName]
+			if !ok {
+				return clause.Column{}, errors.Errorf("missing field %q in schema", fieldName)
+			}
+			return clause.Column{Table: clause.CurrentTable, Name: field.DBName}, nil
 		}
 
 		var exprs []clause.Expression
 
 		if after != nil {
-			expr, err := createWhereExpr(s, orderBys, *after, false)
+			expr, err := createWhereExpr(getColumn, orderBys, *after, false)
 			if err != nil {
-				db.AddError(err)
+				_ = db.AddError(err)
 				return db
 			}
 			exprs = append(exprs, expr)
 		}
 
 		if before != nil {
-			expr, err := createWhereExpr(s, orderBys, *before, true)
+			expr, err := createWhereExpr(getColumn, orderBys, *before, true)
 			if err != nil {
-				db.AddError(err)
+				_ = db.AddError(err)
 				return db
 			}
 			exprs = append(exprs, expr)
 		}
 
+		computedColumns = lo.MapEntries(computedColumns, func(key string, column clause.Column) (string, clause.Column) {
+			column.Alias = key
+			return key, column
+		})
+
 		if len(orderBys) > 0 {
 			orderByColumns := make([]clause.OrderByColumn, 0, len(orderBys))
 			for _, orderBy := range orderBys {
-				field, ok := s.FieldsByName[orderBy.Field]
-				if !ok {
-					db.AddError(errors.Errorf("missing field %q in schema", orderBy.Field))
-					return db
+				column, ok := computedColumns[orderBy.Field]
+				if ok {
+					column = clause.Column{Name: column.Alias, Raw: true}
+				} else {
+					column, err = getColumn(orderBy.Field)
+					if err != nil {
+						_ = db.AddError(err)
+						return db
+					}
 				}
 
 				desc := orderBy.Desc
@@ -135,7 +155,7 @@ func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit 
 					desc = !desc
 				}
 				orderByColumns = append(orderByColumns, clause.OrderByColumn{
-					Column: clause.Column{Table: clause.CurrentTable, Name: field.DBName},
+					Column: column,
 					Desc:   desc,
 				})
 			}
@@ -145,22 +165,60 @@ func scopeKeyset(after, before *map[string]any, orderBys []relay.OrderBy, limit 
 		if limit > 0 {
 			exprs = append(exprs, clause.Limit{Limit: &limit})
 		} else {
-			db.AddError(errors.New("limit must be greater than 0"))
+			_ = db.AddError(errors.New("limit must be greater than 0"))
 		}
-
+		if len(computedColumns) > 0 {
+			db = db.Scopes(AppendSelect(maps.Values(computedColumns)...))
+		}
 		return db.Clauses(exprs...)
 	}
 }
 
-func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]T, error) {
-	var nodes []T
-	if limit == 0 {
-		return nodes, nil
+type KeysetFinder[T any] struct {
+	db   *gorm.DB
+	opts Options[T]
+}
+
+func NewKeysetFinder[T any](db *gorm.DB, opts ...Option[T]) *KeysetFinder[T] {
+	options := Options[T]{}
+	for _, opt := range opts {
+		opt(&options)
 	}
+	return &KeysetFinder[T]{db: db, opts: options}
+}
+
+func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]cursor.Node[T], error) {
+	if limit == 0 {
+		return []cursor.Node[T]{}, nil
+	}
+
+	db := a.db.WithContext(ctx)
 
 	basedOnModel, err := shouldBasedOnModel[T](db)
 	if err != nil {
 		return nil, err
+	}
+
+	if !basedOnModel {
+		db = applyModel[T](db)
+	}
+
+	if a.opts.Computed != nil && len(a.opts.Computed.Columns) > 0 {
+		dest, toCursorNodes, err := a.opts.Computed.ForScan(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		err = db.Scopes(scopeKeyset(a.opts.Computed.Columns, after, before, orderBys, limit, fromEnd)).Scan(dest).Error
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scan records with computed columns")
+		}
+
+		nodes := toCursorNodes()
+		if fromEnd {
+			lo.Reverse(nodes)
+		}
+		return nodes, nil
 	}
 
 	if basedOnModel {
@@ -168,9 +226,9 @@ func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []
 		sliceType := reflect.SliceOf(modelType)
 		nodesVal := reflect.New(sliceType).Elem()
 
-		err := db.Scopes(scopeKeyset(after, before, orderBys, limit, fromEnd)).Find(nodesVal.Addr().Interface()).Error
+		err := db.Scopes(scopeKeyset(nil, after, before, orderBys, limit, fromEnd)).Find(nodesVal.Addr().Interface()).Error
 		if err != nil {
-			return nil, errors.Wrap(err, "find")
+			return nil, errors.Wrap(err, "failed to find records based on model")
 		}
 
 		nodes := make([]T, nodesVal.Len())
@@ -181,74 +239,45 @@ func findByKeyset[T any](db *gorm.DB, after, before *map[string]any, orderBys []
 		if fromEnd {
 			lo.Reverse(nodes)
 		}
-		return nodes, nil
+		return lo.Map(nodes, func(node T, _ int) cursor.Node[T] {
+			return &cursor.SelfNode[T]{Node: node}
+		}), nil
 	}
 
-	if db.Statement.Model == nil {
-		var t T
-		db = db.Model(t)
-	}
-
-	err = db.Scopes(scopeKeyset(after, before, orderBys, limit, fromEnd)).Find(&nodes).Error
+	var nodes []T
+	err = db.Scopes(scopeKeyset(nil, after, before, orderBys, limit, fromEnd)).Find(&nodes).Error
 	if err != nil {
-		return nil, errors.Wrap(err, "find")
+		return nil, errors.Wrap(err, "failed to find records with keyset pagination")
 	}
 	if fromEnd {
 		lo.Reverse(nodes)
 	}
-	return nodes, nil
-}
-
-type KeysetFinder[T any] struct {
-	db *gorm.DB
-}
-
-func NewKeysetFinder[T any](db *gorm.DB) *KeysetFinder[T] {
-	return &KeysetFinder[T]{db: db}
-}
-
-func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]T, error) {
-	if limit == 0 {
-		return []T{}, nil
-	}
-
-	db := a.db
-	if db.Statement.Context != ctx {
-		db = db.WithContext(ctx)
-	}
-
-	nodes, err := findByKeyset[T](db, after, before, orderBys, limit, fromEnd)
-	if err != nil {
-		return nil, err
-	}
-
-	return nodes, nil
+	return lo.Map(nodes, func(node T, _ int) cursor.Node[T] {
+		return &cursor.SelfNode[T]{Node: node}
+	}), nil
 }
 
 func (a *KeysetFinder[T]) Count(ctx context.Context) (int, error) {
-	db := a.db
+	db := a.db.WithContext(ctx)
 
 	basedOnModel, err := shouldBasedOnModel[T](db)
 	if err != nil {
 		return 0, err
 	}
 
-	if db.Statement.Context != ctx {
-		db = db.WithContext(ctx)
-	}
-
-	if !basedOnModel && db.Statement.Model == nil {
-		var t T
-		db = db.Model(t)
+	if !basedOnModel {
+		db = applyModel[T](db)
 	}
 
 	var totalCount int64
 	if err := db.Count(&totalCount).Error; err != nil {
-		return 0, errors.Wrap(err, "count")
+		return 0, errors.Wrap(err, "failed to count total records")
 	}
 	return int(totalCount), nil
 }
 
-func NewKeysetAdapter[T any](db *gorm.DB) relay.ApplyCursorsFunc[T] {
-	return cursor.NewKeysetAdapter(NewKeysetFinder[T](db))
+var _ cursor.KeysetFinder[any] = &KeysetFinder[any]{}
+
+func NewKeysetAdapter[T any](db *gorm.DB, opts ...Option[T]) relay.ApplyCursorsFunc[T] {
+	return cursor.NewKeysetAdapter(NewKeysetFinder(db, opts...))
 }
