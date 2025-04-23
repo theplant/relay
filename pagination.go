@@ -223,5 +223,9 @@ func New[T any](applyCursorsFunc ApplyCursorsFunc[T], middlewares ...PaginationM
 		cursorMiddlewares := CursorMiddlewaresFromContext[T](ctx)
 		return paginate(ctx, req, chainCursorMiddlewares(cursorMiddlewares)(applyCursorsFunc))
 	})
+	return WrapPagination(p, middlewares...)
+}
+
+func WrapPagination[T any](p Pagination[T], middlewares ...PaginationMiddleware[T]) Pagination[T] {
 	return chainPaginationMiddlewares(middlewares)(p)
 }

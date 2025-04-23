@@ -86,14 +86,22 @@ var jsoniterForKeyset = jsoniter.Config{
 	TagKey:                 KeysetTagKey,
 }.Froze()
 
+func JSONMarshal(v any) ([]byte, error) {
+	return jsoniterForKeyset.Marshal(v)
+}
+
+func JSONUnmarshal(data []byte, v any) error {
+	return jsoniterForKeyset.Unmarshal(data, v)
+}
+
 func EncodeKeysetCursor(node any, keys []string) (string, error) {
-	b, err := jsoniterForKeyset.Marshal(node)
+	b, err := JSONMarshal(node)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to marshal node to JSON")
 	}
 
 	m := make(map[string]any)
-	if err := jsoniterForKeyset.Unmarshal(b, &m); err != nil {
+	if err := JSONUnmarshal(b, &m); err != nil {
 		return "", errors.Wrap(err, "failed to unmarshal node JSON to map")
 	}
 
@@ -111,7 +119,7 @@ func EncodeKeysetCursor(node any, keys []string) (string, error) {
 		}
 	}
 
-	b, err = jsoniterForKeyset.Marshal(m)
+	b, err = JSONMarshal(m)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to marshal filtered cursor map to JSON")
 	}
@@ -120,7 +128,7 @@ func EncodeKeysetCursor(node any, keys []string) (string, error) {
 
 func DecodeKeysetCursor(cursor string, keys []string) (map[string]any, error) {
 	var m map[string]any
-	if err := jsoniterForKeyset.Unmarshal([]byte(cursor), &m); err != nil {
+	if err := JSONUnmarshal([]byte(cursor), &m); err != nil {
 		return nil, errors.Wrap(err, "failed to parse cursor JSON")
 	}
 

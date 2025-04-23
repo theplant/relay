@@ -50,10 +50,14 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 	db = db.Limit(limit)
 
 	var computedColumns map[string]clause.Column
-	if a.opts.Computed != nil && len(a.opts.Computed.Columns) > 0 {
-		computedColumns = lo.MapEntries(a.opts.Computed.Columns, func(key string, column clause.Column) (string, clause.Column) {
-			column.Alias = key
-			return key, column
+	if a.opts.Computed != nil {
+		if err := a.opts.Computed.Validate(); err != nil {
+			return nil, err
+		}
+
+		computedColumns = lo.MapEntries(a.opts.Computed.Columns, func(field string, column clause.Column) (string, clause.Column) {
+			column.Alias = ComputedFieldToColumnAlias(field)
+			return field, column
 		})
 	}
 
@@ -92,17 +96,21 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 	}
 
 	if len(computedColumns) > 0 {
-		dest, toCursorNodes, err := a.opts.Computed.ForScan(ctx)
+		dest, toCursorNodes, err := a.opts.Computed.ForScan(db)
 		if err != nil {
 			return nil, err
 		}
 
-		err = db.Scopes(AppendSelect(maps.Values(computedColumns)...)).Scan(dest).Error
+		computedResults, err := splitComputedScan(
+			computedColumns,
+			db.Scopes(AppendSelect(maps.Values(computedColumns)...)),
+			dest,
+		)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to scan records with computed columns")
+			return nil, err
 		}
 
-		return toCursorNodes(), nil
+		return toCursorNodes(computedResults), nil
 	}
 
 	var nodes []T
