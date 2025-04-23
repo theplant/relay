@@ -163,18 +163,18 @@ func SplitScan(db *gorm.DB, dest any, splitter map[string]func(columnType *sql.C
 		rows, err := NewRowsSplitter(sqlRows, splitter)
 		if err != nil {
 			rows.Close()
-			tx.AddError(err)
+			_ = tx.AddError(err)
 		} else {
 			if rows.Next() {
-				splitScanRows(tx, rows, dest)
+				_ = splitScanRows(tx, rows, dest)
 				if tx.Error == nil {
 					*splitDest = rows.SplitResults()
 				}
 			} else {
 				tx.RowsAffected = 0
-				tx.AddError(rows.Err())
+				_ = tx.AddError(rows.Err())
 			}
-			tx.AddError(rows.Close())
+			_ = tx.AddError(rows.Close())
 		}
 	}
 
@@ -189,7 +189,7 @@ func SplitScan(db *gorm.DB, dest any, splitter map[string]func(columnType *sql.C
 // but support gorm.Rows
 func splitScanRows(tx *gorm.DB, rows gorm.Rows, dest any) error {
 	if err := tx.Statement.Parse(dest); !errors.Is(err, schema.ErrUnsupportedDataType) {
-		tx.AddError(err)
+		_ = tx.AddError(err)
 	}
 	tx.Statement.Dest = dest
 	tx.Statement.ReflectValue = reflect.ValueOf(dest)
