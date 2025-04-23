@@ -180,7 +180,7 @@ END)`,
 WHEN users.name = 'molon' THEN 1 
 WHEN users.name = 'sam' THEN 2 
 ELSE 0 
-END) AS Priority FROM "users" WHERE ((CASE 
+END) AS _relay_computed_priority FROM "users" WHERE ((CASE 
 WHEN users.name = 'molon' THEN 1 
 WHEN users.name = 'sam' THEN 2 
 ELSE 0 
@@ -188,7 +188,7 @@ END) < 1 OR ((CASE
 WHEN users.name = 'molon' THEN 1 
 WHEN users.name = 'sam' THEN 2 
 ELSE 0 
-END) = 1 AND "users"."age" > 50)) ORDER BY Priority DESC,"users"."age" LIMIT 10`
+END) = 1 AND "users"."age" > 50)) ORDER BY _relay_computed_priority DESC,"users"."age" LIMIT 10`
 		require.Equal(t, expectedSQL, sql)
 	}
 }
