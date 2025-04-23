@@ -8,10 +8,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
-	"github.com/theplant/relay/cursor"
 	"github.com/tidwall/sjson"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/theplant/relay/cursor"
 )
 
 // Computed defines SQL expressions calculated at database level and attached to query results.

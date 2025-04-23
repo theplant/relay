@@ -6,10 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/theplant/relay/cursor"
-	"github.com/theplant/relay/gormrelay"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/theplant/relay/cursor"
+	"github.com/theplant/relay/gormrelay"
 )
 
 func TestWithComputedResult(t *testing.T) {
