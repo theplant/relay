@@ -131,9 +131,9 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 			exprs = append(exprs, expr)
 		}
 
-		computedColumns = lo.MapEntries(computedColumns, func(key string, column clause.Column) (string, clause.Column) {
-			column.Alias = key
-			return key, column
+		computedColumns = lo.MapEntries(computedColumns, func(field string, column clause.Column) (string, clause.Column) {
+			column.Alias = ComputedFieldToColumnAlias(field)
+			return field, column
 		})
 
 		if len(orderBys) > 0 {
@@ -203,18 +203,26 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 		db = applyModel[T](db)
 	}
 
-	if a.opts.Computed != nil && len(a.opts.Computed.Columns) > 0 {
-		dest, toCursorNodes, err := a.opts.Computed.ForScan(ctx)
+	if a.opts.Computed != nil {
+		if err := a.opts.Computed.Validate(); err != nil {
+			return nil, err
+		}
+
+		dest, toCursorNodes, err := a.opts.Computed.ForScan(db)
 		if err != nil {
 			return nil, err
 		}
 
-		err = db.Scopes(scopeKeyset(a.opts.Computed.Columns, after, before, orderBys, limit, fromEnd)).Scan(dest).Error
+		computedResults, err := splitComputedScan(
+			a.opts.Computed.Columns,
+			db.Scopes(scopeKeyset(a.opts.Computed.Columns, after, before, orderBys, limit, fromEnd)),
+			dest,
+		)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to scan records with computed columns")
+			return nil, err
 		}
 
-		nodes := toCursorNodes()
+		nodes := toCursorNodes(computedResults)
 		if fromEnd {
 			lo.Reverse(nodes)
 		}

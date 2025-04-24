@@ -13,7 +13,7 @@ func (n *SelfNode[T]) RelayNode() T {
 }
 
 func (n *SelfNode[T]) MarshalJSON() ([]byte, error) {
-	return jsoniterForKeyset.Marshal(n.Node)
+	return JSONMarshal(n.Node)
 }
 
 type NodeWrapper[T any] struct {
@@ -26,5 +26,5 @@ func (n *NodeWrapper[T]) RelayNode() T {
 }
 
 func (n *NodeWrapper[T]) MarshalJSON() ([]byte, error) {
-	return jsoniterForKeyset.Marshal(n.Object)
+	return JSONMarshal(n.Object)
 }

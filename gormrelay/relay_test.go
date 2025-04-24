@@ -771,25 +771,9 @@ func TestWithComputed(t *testing.T) {
 				db,
 				WithComputed(&Computed[*User]{
 					Columns: ComputedColumns(map[string]string{
-						"Priority": "(CASE WHEN users.name = 'molon' THEN 1 WHEN users.name = 'sam' THEN 2 ELSE 3 END)",
+						"GlobalPriority": "(CASE WHEN users.name = 'molon' THEN 1 WHEN users.name = 'sam' THEN 2 ELSE 3 END)",
 					}),
-					ForScan: func(ctx context.Context) (dest any, toCursorNodes func() []cursor.Node[*User], err error) {
-						type ComputedUser struct {
-							*User
-							Priority int
-						}
-						nodes := []*ComputedUser{}
-						return &nodes, func() []cursor.Node[*User] {
-							return lo.Map(nodes, func(u *ComputedUser, _ int) cursor.Node[*User] {
-								return &cursor.NodeWrapper[*User]{
-									Object: u,
-									Unwrap: func() *User {
-										return u.User
-									},
-								}
-							})
-						}, nil
-					},
+					ForScan: DefaultForScan[*User],
 				}),
 			),
 			relay.EnsureLimits[*User](10, 50),
@@ -798,7 +782,7 @@ func TestWithComputed(t *testing.T) {
 		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
 			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: false},
+				{Field: "GlobalPriority", Desc: false},
 				{Field: "ID", Desc: false},
 			},
 		})
@@ -813,7 +797,7 @@ func TestWithComputed(t *testing.T) {
 			First: lo.ToPtr(3),
 			After: conn.PageInfo.EndCursor,
 			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: false},
+				{Field: "GlobalPriority", Desc: false},
 				{Field: "ID", Desc: false},
 			},
 		})
@@ -827,7 +811,7 @@ func TestWithComputed(t *testing.T) {
 		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
 			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: true},
+				{Field: "GlobalPriority", Desc: true},
 				{Field: "ID", Desc: false},
 			},
 		})
@@ -842,7 +826,7 @@ func TestWithComputed(t *testing.T) {
 			First: lo.ToPtr(3),
 			After: conn.PageInfo.EndCursor,
 			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: true},
+				{Field: "GlobalPriority", Desc: true},
 				{Field: "ID", Desc: false},
 			},
 		})
@@ -855,7 +839,7 @@ func TestWithComputed(t *testing.T) {
 		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
 			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: false},
+				{Field: "GlobalPriority", Desc: false},
 				{Field: "ID", Desc: true},
 			},
 		})
@@ -870,7 +854,7 @@ func TestWithComputed(t *testing.T) {
 			First: lo.ToPtr(3),
 			After: conn.PageInfo.EndCursor,
 			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: false},
+				{Field: "GlobalPriority", Desc: false},
 				{Field: "ID", Desc: true},
 			},
 		})
@@ -885,7 +869,7 @@ func TestWithComputed(t *testing.T) {
 			First: lo.ToPtr(3),
 			After: &conn.Edges[0].Cursor,
 			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: false},
+				{Field: "GlobalPriority", Desc: false},
 				{Field: "ID", Desc: true},
 			},
 		})
@@ -938,16 +922,12 @@ func TestWithComputedShop(t *testing.T) {
 						// Define computed Priority column based on shop name
 						"Priority": "(CASE WHEN shops.name = 'premium' THEN 1 WHEN shops.name = 'featured' THEN 2 ELSE 3 END)",
 					}),
-					ForScan: func(ctx context.Context) (dest any, toCursorNodes func() []cursor.Node[*Shop], err error) {
-						type ComputedShop struct {
-							*Shop
-							Priority int
-						}
-						nodes := []*ComputedShop{}
-						return &nodes, func() []cursor.Node[*Shop] {
-							return lo.Map(nodes, func(s *ComputedShop, _ int) cursor.Node[*Shop] {
-								s.Shop.Priority = s.Priority
-								return &cursor.SelfNode[*Shop]{Node: s.Shop}
+					ForScan: func(_ *gorm.DB) (dest any, toCursorNodes func(computedResults []map[string]any) []cursor.Node[*Shop], err error) {
+						nodes := []*Shop{}
+						return &nodes, func(computedResults []map[string]any) []cursor.Node[*Shop] {
+							return lo.Map(nodes, func(s *Shop, i int) cursor.Node[*Shop] {
+								s.Priority = int(computedResults[i]["Priority"].(int32))
+								return &cursor.SelfNode[*Shop]{Node: s}
 							})
 						}, nil
 					},
