@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"reflect"
+	"sync"
 
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
@@ -15,9 +16,10 @@ import (
 // based on column name splitter
 type RowsSplitter struct {
 	gorm.Rows
-	splitter     map[string]func(columnType *sql.ColumnType) any
-	columns      []string
-	columnTypes  []*sql.ColumnType
+	splitter    map[string]func(columnType *sql.ColumnType) any
+	columnTypes []*sql.ColumnType
+
+	mu           sync.RWMutex
 	splitResults []map[string]any
 }
 
@@ -25,11 +27,6 @@ type RowsSplitter struct {
 func NewRowsSplitter(rows gorm.Rows, splitter map[string]func(columnType *sql.ColumnType) any) (*RowsSplitter, error) {
 	if rows == nil {
 		return nil, errors.New("rows cannot be nil")
-	}
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get columns from rows")
 	}
 
 	columnTypes, err := rows.ColumnTypes()
@@ -40,7 +37,6 @@ func NewRowsSplitter(rows gorm.Rows, splitter map[string]func(columnType *sql.Co
 	return &RowsSplitter{
 		Rows:         rows,
 		splitter:     splitter,
-		columns:      columns,
 		columnTypes:  columnTypes,
 		splitResults: []map[string]any{},
 	}, nil
@@ -50,7 +46,7 @@ func NewRowsSplitter(rows gorm.Rows, splitter map[string]func(columnType *sql.Co
 // into mapped destinations while preserving original scan behavior for others
 func (w *RowsSplitter) Scan(dest ...any) error {
 	// Create values to scan into, splitter specific columns to custom destinations
-	scanDest := make([]any, len(w.columns))
+	scanDest := make([]any, len(w.columnTypes))
 	splitValues := make([]any, 0, len(w.splitter))
 	splitColumns := make([]string, 0, len(w.splitter))
 
@@ -58,16 +54,16 @@ func (w *RowsSplitter) Scan(dest ...any) error {
 	destIndex := 0
 
 	// Assign scan destinations
-	for i, col := range w.columns {
-		if factory, exists := w.splitter[col]; exists {
-			columnType := w.columnTypes[i]
+	for i, columnType := range w.columnTypes {
+		colName := columnType.Name()
+		if factory, exists := w.splitter[colName]; exists {
 			v := factory(columnType)
 			if rt, ok := v.(reflect.Type); ok {
 				v = reflect.New(reflect.PointerTo(rt)).Interface()
 			}
 			scanDest[i] = v
 			splitValues = append(splitValues, v)
-			splitColumns = append(splitColumns, col)
+			splitColumns = append(splitColumns, colName)
 		} else if destIndex < len(dest) {
 			scanDest[i] = dest[destIndex]
 			destIndex++
@@ -86,7 +82,10 @@ func (w *RowsSplitter) Scan(dest ...any) error {
 
 	// Use scanIntoMap to handle possible NULL values
 	scanIntoMap(result, splitValues, splitColumns)
+
+	w.mu.Lock()
 	w.splitResults = append(w.splitResults, result)
+	w.mu.Unlock()
 
 	return nil
 }
@@ -109,15 +108,12 @@ func scanIntoMap(mapValue map[string]any, values []any, columns []string) {
 
 // Columns returns filtered column names based on splitter
 func (w *RowsSplitter) Columns() ([]string, error) {
-	if len(w.splitter) == 0 {
-		return w.columns, nil
-	}
+	result := make([]string, 0, len(w.columnTypes))
 
-	result := make([]string, 0, len(w.columns))
-
-	for _, col := range w.columns {
-		if _, exists := w.splitter[col]; !exists {
-			result = append(result, col)
+	for _, columnType := range w.columnTypes {
+		colName := columnType.Name()
+		if _, exists := w.splitter[colName]; !exists {
+			result = append(result, colName)
 		}
 	}
 
@@ -132,9 +128,10 @@ func (w *RowsSplitter) ColumnTypes() ([]*sql.ColumnType, error) {
 
 	result := make([]*sql.ColumnType, 0, len(w.columnTypes))
 
-	for i, col := range w.columns {
-		if _, exists := w.splitter[col]; !exists {
-			result = append(result, w.columnTypes[i])
+	for _, columnType := range w.columnTypes {
+		colName := columnType.Name()
+		if _, exists := w.splitter[colName]; !exists {
+			result = append(result, columnType)
 		}
 	}
 
@@ -143,6 +140,8 @@ func (w *RowsSplitter) ColumnTypes() ([]*sql.ColumnType, error) {
 
 // SplitResults returns the collected custom destinations after each scan
 func (w *RowsSplitter) SplitResults() []map[string]any {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	return w.splitResults
 }
 
