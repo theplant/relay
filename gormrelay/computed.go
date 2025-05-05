@@ -77,7 +77,7 @@ var ComputedColumns = func(columns map[string]string) map[string]clause.Column {
 
 // ComputedFieldToColumnAlias generates a standardized SQL alias for computed fields.
 var ComputedFieldToColumnAlias = func(field string) string {
-	return strings.ToLower("_relay_computed_" + lo.SnakeCase(field))
+	return "_relay_computed_" + lo.SnakeCase(field)
 }
 
 // withComputedResult combines an object with computed field values for JSON serialization.
