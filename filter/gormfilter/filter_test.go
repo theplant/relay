@@ -151,6 +151,26 @@ func TestScope(t *testing.T) {
 				wantVars: []any{float64(18), "%john%"},
 			},
 			{
+				name: "multiple conditions with OR",
+				filter: &UserFilter{
+					Or: []*UserFilter{
+						{
+							Name: &filter.String{
+								Contains: lo.ToPtr("joHn"),
+								Fold:     true,
+							},
+						},
+						{
+							Age: &filter.Int{
+								Gte: lo.ToPtr(18),
+							},
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE (LOWER("users"."name") LIKE $1 OR "users"."age" >= $2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"%john%", float64(18)},
+			},
+			{
 				name: "multiple conditions in one field filter",
 				filter: &UserFilter{
 					Description: &filter.String{
@@ -314,6 +334,28 @@ func TestScope(t *testing.T) {
 				},
 				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 OR "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(30), "%son"},
+			},
+			{
+				name: "in times",
+				filter: &UserFilter{
+					CreatedAt: &filter.Time{
+						In: []time.Time{
+							time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+							time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."created_at" IN ($1,$2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"},
+			},
+			{
+				name: "not in empty array",
+				filter: &UserFilter{
+					CreatedAt: &filter.Time{
+						NotIn: []time.Time{},
+					},
+				},
+				wantErrMsg: `empty NotIn values for field "CreatedAt"`,
 			},
 		}
 

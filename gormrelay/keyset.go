@@ -14,7 +14,7 @@ import (
 	"github.com/theplant/relay/cursor"
 )
 
-func createWhereExpr(getColumn func(fieldName string) (clause.Column, error), orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
+func buildWhereExpr(getColumn func(fieldName string) (clause.Column, error), orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
 	ors := make([]clause.Expression, 0, len(orderBys))
 	eqs := make([]clause.Expression, 0, len(orderBys))
 	for i, orderBy := range orderBys {
@@ -114,7 +114,7 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 		var exprs []clause.Expression
 
 		if after != nil {
-			expr, err := createWhereExpr(getColumn, orderBys, *after, false)
+			expr, err := buildWhereExpr(getColumn, orderBys, *after, false)
 			if err != nil {
 				_ = db.AddError(err)
 				return db
@@ -123,7 +123,7 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 		}
 
 		if before != nil {
-			expr, err := createWhereExpr(getColumn, orderBys, *before, true)
+			expr, err := buildWhereExpr(getColumn, orderBys, *before, true)
 			if err != nil {
 				_ = db.AddError(err)
 				return db

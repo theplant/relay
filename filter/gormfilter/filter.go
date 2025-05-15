@@ -117,7 +117,7 @@ func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any) (clause.Exp
 		case "Not":
 			filterData, ok := value.(map[string]any)
 			if !ok {
-				return nil, errors.New("invalid NOT filter format")
+				return nil, errors.Errorf("invalid NOT filter format")
 			}
 			expr, err := buildFilterExpr(stmt, filterData)
 			if err != nil {
@@ -142,7 +142,7 @@ func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any) (clause.Exp
 		}
 	}
 
-	return combineExprs(exprs...)
+	return clause.And(exprs...), nil
 }
 
 func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[string]any) (clause.Expression, error) {
@@ -196,8 +196,12 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 		case "In", "NotIn":
 			arr, ok := value.([]any)
 			if !ok {
-				return nil, errors.Errorf("invalid %s values for field %q", strings.ToUpper(op), fieldName)
+				return nil, errors.Errorf("invalid %s values for field %q", op, fieldName)
 			}
+			if len(arr) == 0 {
+				return nil, errors.Errorf("empty %s values for field %q", op, fieldName)
+			}
+
 			if fold {
 				arr = foldArray(arr)
 			}
@@ -220,7 +224,7 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 		case "Contains", "StartsWith", "EndsWith":
 			str, ok := value.(string)
 			if !ok {
-				return nil, errors.Errorf("invalid %s value for field %q", strings.ToUpper(op), fieldName)
+				return nil, errors.Errorf("invalid %s value for field %q", op, fieldName)
 			}
 			if fold {
 				str = strings.ToLower(str)
@@ -245,7 +249,7 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 		}
 	}
 
-	return combineExprs(exprs...)
+	return clause.And(exprs...), nil
 }
 
 // foldValue handles case folding for a single value, converting strings to lowercase if case-insensitive comparison is needed
@@ -267,16 +271,4 @@ func foldArray(arr []any) []any {
 		}
 	}
 	return result
-}
-
-// combineExprs combines multiple expressions into a single expression
-func combineExprs(exprs ...clause.Expression) (clause.Expression, error) {
-	switch len(exprs) {
-	case 0:
-		return nil, nil
-	case 1:
-		return exprs[0], nil
-	default:
-		return clause.And(exprs...), nil
-	}
 }

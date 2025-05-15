@@ -14,9 +14,7 @@ func AppendSelect(columns ...clause.Column) func(db *gorm.DB) *gorm.DB {
 		}
 		clauseSelect, ok := db.Statement.Clauses[SELECT]
 		if !ok {
-			clauseSelect = clause.Clause{
-				Name: SELECT,
-			}
+			clauseSelect = clause.Clause{Name: SELECT}
 		}
 		oldBuilder := clauseSelect.Builder
 		clauseSelect.Builder = func(c clause.Clause, builder clause.Builder) {

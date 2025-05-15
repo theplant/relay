@@ -51,13 +51,13 @@ type Boolean struct {
 }
 
 type Time struct {
-	Eq     *time.Time   `json:"eq"`
-	Neq    *time.Time   `json:"neq"`
-	Lt     *time.Time   `json:"lt"`
-	Lte    *time.Time   `json:"lte"`
-	Gt     *time.Time   `json:"gt"`
-	Gte    *time.Time   `json:"gte"`
-	In     []*time.Time `json:"in"`
-	NotIn  []*time.Time `json:"notIn"`
-	IsNull *bool        `json:"isNull"`
+	Eq     *time.Time  `json:"eq"`
+	Neq    *time.Time  `json:"neq"`
+	Lt     *time.Time  `json:"lt"`
+	Lte    *time.Time  `json:"lte"`
+	Gt     *time.Time  `json:"gt"`
+	Gte    *time.Time  `json:"gte"`
+	In     []time.Time `json:"in"`
+	NotIn  []time.Time `json:"notIn"`
+	IsNull *bool       `json:"isNull"`
 }
