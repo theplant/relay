@@ -5,17 +5,18 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+
 	"github.com/theplant/relay"
 )
 
 type OffsetFinder[T any] interface {
-	Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]T, error)
+	Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]Node[T], error)
 	Count(ctx context.Context) (int, error)
 }
 
-type OffsetFinderFunc[T any] func(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]T, error)
+type OffsetFinderFunc[T any] func(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]Node[T], error)
 
-func (f OffsetFinderFunc[T]) Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]T, error) {
+func (f OffsetFinderFunc[T]) Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]Node[T], error) {
 	return f(ctx, orderBys, skip, limit)
 }
 
@@ -52,7 +53,7 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 
 		if req.FromEnd && before == nil {
 			if totalCount == nil {
-				return nil, errors.New("totalCount is required for fromEnd and nil before")
+				return nil, errors.New("totalCount is required for pagination from end when before cursor is not provided")
 			}
 			before = totalCount
 		}
@@ -91,8 +92,8 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 			for i, node := range nodes {
 				i := i
 				edges[i] = &relay.LazyEdge[T]{
-					Node: node,
-					Cursor: func(_ context.Context, _ T) (string, error) {
+					Node: node.RelayNode(),
+					Cursor: func(_ context.Context) (string, error) {
 						return EncodeOffsetCursor(skip + i), nil
 					},
 				}
@@ -125,7 +126,7 @@ func EncodeOffsetCursor(offset int) string {
 func DecodeOffsetCursor(cursor string) (int, error) {
 	offset, err := strconv.Atoi(cursor)
 	if err != nil {
-		return 0, errors.Wrapf(err, "decode offset cursor %q", cursor)
+		return 0, errors.Wrapf(err, "invalid offset cursor %q: cannot convert to integer", cursor)
 	}
 	return offset, nil
 }
@@ -146,13 +147,13 @@ func decodeOffsetCursors(after, before *string) (afterOffset, beforeOffset *int,
 		beforeOffset = &offset
 	}
 	if afterOffset != nil && *afterOffset < 0 {
-		return nil, nil, errors.New("after < 0")
+		return nil, nil, errors.New("invalid pagination: after cursor must be non-negative")
 	}
 	if beforeOffset != nil && *beforeOffset < 0 {
-		return nil, nil, errors.New("before < 0")
+		return nil, nil, errors.New("invalid pagination: before cursor must be non-negative")
 	}
 	if afterOffset != nil && before != nil && *afterOffset >= *beforeOffset {
-		return nil, nil, errors.New("after >= before")
+		return nil, nil, errors.New("invalid pagination: after cursor must be less than before cursor")
 	}
 	return afterOffset, beforeOffset, nil
 }

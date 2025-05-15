@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+
 	"github.com/theplant/relay"
 )
 
@@ -35,8 +36,8 @@ func Base64[T any](next relay.ApplyCursorsFunc[T]) relay.ApplyCursorsFunc[T] {
 		// Encrypt the cursor
 		for _, edge := range rsp.LazyEdges {
 			originalCursor := edge.Cursor
-			edge.Cursor = func(ctx context.Context, node T) (string, error) {
-				cursor, err := originalCursor(ctx, node)
+			edge.Cursor = func(ctx context.Context) (string, error) {
+				cursor, err := originalCursor(ctx)
 				if err != nil {
 					return "", err
 				}
