@@ -10,6 +10,7 @@ require (
 	github.com/theplant/testenv v0.1.0
 	github.com/tidwall/sjson v1.2.5
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
+	gorm.io/driver/postgres v1.5.7
 	gorm.io/gorm v1.25.11
 )
 
@@ -79,5 +80,4 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/postgres v1.5.7 // indirect
 )
