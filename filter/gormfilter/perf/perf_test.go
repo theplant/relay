@@ -51,7 +51,7 @@ type QueryPlanResult struct {
 	ContainsJoin   bool
 	JoinTypes      []string
 	NodeTypes      []string
-	ExplainResults []map[string]interface{}
+	ExplainResults []map[string]any
 }
 
 // TestConfig holds performance test configuration parameters
@@ -201,7 +201,7 @@ func createTestData(t *testing.T, db *gorm.DB, config TestConfig) error {
 
 func executeExplainAnalyzeMultiple(_ *testing.T, db *gorm.DB, query string, runs int) (*QueryPlanResult, error) {
 	result := &QueryPlanResult{
-		ExplainResults: make([]map[string]interface{}, 0, runs),
+		ExplainResults: make([]map[string]any, 0, runs),
 	}
 
 	explainQuery := "EXPLAIN (ANALYZE, FORMAT JSON) " + query
@@ -212,7 +212,7 @@ func executeExplainAnalyzeMultiple(_ *testing.T, db *gorm.DB, query string, runs
 			return nil, fmt.Errorf("failed to execute explain analyze (run %d): %w", i+1, err)
 		}
 
-		var planData []map[string]interface{}
+		var planData []map[string]any
 		if err := json.Unmarshal([]byte(explainOutputStr), &planData); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal explain output (run %d): %w", i+1, err)
 		}
@@ -248,7 +248,7 @@ func executeExplainAnalyzeMultiple(_ *testing.T, db *gorm.DB, query string, runs
 	return result, nil
 }
 
-func extractTimes(plan map[string]interface{}) (float64, float64) {
+func extractTimes(plan map[string]any) (float64, float64) {
 	var planningTime, executionTime float64
 
 	if pt, ok := plan["Planning Time"].(float64); ok {
@@ -262,12 +262,12 @@ func extractTimes(plan map[string]interface{}) (float64, float64) {
 	return planningTime, executionTime
 }
 
-func analyzePlanNodeTypes(node map[string]interface{}) ([]string, []string) {
+func analyzePlanNodeTypes(node map[string]any) ([]string, []string) {
 	var nodeTypes []string
 	var joinTypes []string
 
 	// Extract Plan from the JSON structure if available
-	actualPlan, ok := node["Plan"].(map[string]interface{})
+	actualPlan, ok := node["Plan"].(map[string]any)
 	if !ok {
 		// If not a Plan wrapper, use the node directly
 		actualPlan = node
@@ -290,9 +290,9 @@ func analyzePlanNodeTypes(node map[string]interface{}) ([]string, []string) {
 		}
 	}
 
-	if plans, ok := actualPlan["Plans"].([]interface{}); ok {
+	if plans, ok := actualPlan["Plans"].([]any); ok {
 		for _, subPlan := range plans {
-			if subPlanMap, ok := subPlan.(map[string]interface{}); ok {
+			if subPlanMap, ok := subPlan.(map[string]any); ok {
 				subNodeTypes, subJoinTypes := analyzePlanNodeTypes(subPlanMap)
 				nodeTypes = append(nodeTypes, subNodeTypes...)
 				joinTypes = append(joinTypes, subJoinTypes...)
@@ -303,12 +303,12 @@ func analyzePlanNodeTypes(node map[string]interface{}) ([]string, []string) {
 	return nodeTypes, joinTypes
 }
 
-func extractPlanNodeMetrics(node map[string]interface{}) (float64, int64) {
+func extractPlanNodeMetrics(node map[string]any) (float64, int64) {
 	var totalCost float64
 	var maxRows int64
 
 	// Extract Plan from the JSON structure if available
-	actualPlan, ok := node["Plan"].(map[string]interface{})
+	actualPlan, ok := node["Plan"].(map[string]any)
 	if !ok {
 		// If not a Plan wrapper, use the node directly
 		actualPlan = node
@@ -322,9 +322,9 @@ func extractPlanNodeMetrics(node map[string]interface{}) (float64, int64) {
 		maxRows = int64(rowsValue)
 	}
 
-	if plans, ok := actualPlan["Plans"].([]interface{}); ok {
+	if plans, ok := actualPlan["Plans"].([]any); ok {
 		for _, subPlan := range plans {
-			if subPlanMap, ok := subPlan.(map[string]interface{}); ok {
+			if subPlanMap, ok := subPlan.(map[string]any); ok {
 				subCost, subRows := extractPlanNodeMetrics(subPlanMap)
 				totalCost += subCost
 				if subRows > maxRows {
