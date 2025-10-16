@@ -1,13 +1,17 @@
 package gormfilter_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"github.com/theplant/relay"
+	"github.com/theplant/relay/cursor"
 	"github.com/theplant/relay/filter"
 	"github.com/theplant/relay/filter/gormfilter"
+	"github.com/theplant/relay/gormrelay"
 	"github.com/theplant/testenv"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -624,5 +628,223 @@ func TestScope(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+func TestCombiningWithPagination(t *testing.T) {
+	err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+	require.NoError(t, err)
+	err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+	require.NoError(t, err)
+
+	countries := []*Country{
+		{ID: "us", Name: "United States", Code: "US"},
+		{ID: "uk", Name: "United Kingdom", Code: "UK"},
+		{ID: "jp", Name: "Japan", Code: "JP"},
+	}
+	err = db.Create(&countries).Error
+	require.NoError(t, err)
+
+	companies := []*Company{
+		{ID: "tech-corp-us", Name: "Tech Corp", CountryID: "us"},
+		{ID: "tech-solutions-uk", Name: "Tech Solutions", CountryID: "uk"},
+		{ID: "software-inc-us", Name: "Software Inc", CountryID: "us"},
+		{ID: "media-company-jp", Name: "Media Company", CountryID: "jp"},
+	}
+	err = db.Create(&companies).Error
+	require.NoError(t, err)
+
+	users := []*User{
+		{ID: "1", Name: "Alice", Age: 25, CompanyID: "tech-corp-us"},
+		{ID: "2", Name: "Bob", Age: 30, CompanyID: "tech-corp-us"},
+		{ID: "3", Name: "Charlie", Age: 22, CompanyID: "tech-solutions-uk"},
+		{ID: "4", Name: "David", Age: 35, CompanyID: "software-inc-us"},
+		{ID: "5", Name: "Eve", Age: 28, CompanyID: "tech-solutions-uk"},
+		{ID: "6", Name: "Frank", Age: 17, CompanyID: "media-company-jp"},
+		{ID: "7", Name: "Grace", Age: 40, CompanyID: "tech-corp-us"},
+		{ID: "8", Name: "Henry", Age: 19, CompanyID: "software-inc-us"},
+	}
+	err = db.Create(&users).Error
+	require.NoError(t, err)
+
+	t.Run("keyset pagination with filter", func(t *testing.T) {
+		p := relay.New(
+			cursor.Base64(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+				return gormrelay.NewKeysetAdapter[*User](
+					db.WithContext(ctx).Scopes(gormfilter.Scope(&UserFilter{
+						Age: &filter.Int{
+							Gte: lo.ToPtr(18),
+						},
+						Company: &CompanyFilter{
+							Name: &filter.String{
+								Contains: lo.ToPtr("Tech"),
+								Fold:     true,
+							},
+						},
+					})),
+				)(ctx, req)
+			}),
+			relay.EnsureLimits[*User](2, 100),
+			relay.EnsurePrimaryOrderBy[*User](
+				relay.OrderBy{Field: "ID", Desc: false},
+			),
+		)
+
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(2),
+		})
+		require.NoError(t, err)
+		require.Equal(t, 5, *conn.TotalCount)
+		require.Len(t, conn.Edges, 2)
+		require.Equal(t, "1", conn.Edges[0].Node.ID)
+		require.Equal(t, "Alice", conn.Edges[0].Node.Name)
+		require.Equal(t, 25, conn.Edges[0].Node.Age)
+		require.Equal(t, "2", conn.Edges[1].Node.ID)
+		require.Equal(t, "Bob", conn.Edges[1].Node.Name)
+		require.Equal(t, 30, conn.Edges[1].Node.Age)
+		require.True(t, conn.PageInfo.HasNextPage)
+		require.False(t, conn.PageInfo.HasPreviousPage)
+
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(2),
+			After: conn.PageInfo.EndCursor,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 5, *conn.TotalCount)
+		require.Len(t, conn.Edges, 2)
+		require.Equal(t, "3", conn.Edges[0].Node.ID)
+		require.Equal(t, "Charlie", conn.Edges[0].Node.Name)
+		require.Equal(t, "5", conn.Edges[1].Node.ID)
+		require.Equal(t, "Eve", conn.Edges[1].Node.Name)
+		require.True(t, conn.PageInfo.HasNextPage)
+		require.True(t, conn.PageInfo.HasPreviousPage)
+	})
+
+	t.Run("offset pagination with filter", func(t *testing.T) {
+		p := relay.New(
+			cursor.Base64(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+				return gormrelay.NewOffsetAdapter[*User](
+					db.WithContext(ctx).Scopes(gormfilter.Scope(&UserFilter{
+						Age: &filter.Int{
+							Gte: lo.ToPtr(18),
+						},
+						Company: &CompanyFilter{
+							Name: &filter.String{
+								Contains: lo.ToPtr("Tech"),
+								Fold:     true,
+							},
+						},
+					})),
+				)(ctx, req)
+			}),
+			relay.EnsureLimits[*User](2, 100),
+			relay.EnsurePrimaryOrderBy[*User](
+				relay.OrderBy{Field: "ID", Desc: false},
+			),
+		)
+
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(2),
+		})
+		require.NoError(t, err)
+		require.Equal(t, 5, *conn.TotalCount)
+		require.Len(t, conn.Edges, 2)
+		require.Equal(t, "1", conn.Edges[0].Node.ID)
+		require.Equal(t, "2", conn.Edges[1].Node.ID)
+		require.True(t, conn.PageInfo.HasNextPage)
+		require.False(t, conn.PageInfo.HasPreviousPage)
+
+		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(2),
+			After: conn.PageInfo.EndCursor,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 5, *conn.TotalCount)
+		require.Len(t, conn.Edges, 2)
+		require.Equal(t, "3", conn.Edges[0].Node.ID)
+		require.Equal(t, "5", conn.Edges[1].Node.ID)
+		require.True(t, conn.PageInfo.HasNextPage)
+		require.True(t, conn.PageInfo.HasPreviousPage)
+	})
+
+	t.Run("nested relationship filter with pagination", func(t *testing.T) {
+		p := relay.New(
+			cursor.Base64(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+				return gormrelay.NewKeysetAdapter[*User](
+					db.WithContext(ctx).Scopes(gormfilter.Scope(&UserFilter{
+						Age: &filter.Int{
+							Gte: lo.ToPtr(20),
+						},
+						Company: &CompanyFilter{
+							Country: &CountryFilter{
+								Code: &filter.String{
+									Eq: lo.ToPtr("US"),
+								},
+							},
+						},
+					})),
+				)(ctx, req)
+			}),
+			relay.EnsureLimits[*User](10, 100),
+			relay.EnsurePrimaryOrderBy[*User](
+				relay.OrderBy{Field: "ID", Desc: false},
+			),
+		)
+
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(10),
+		})
+		require.NoError(t, err)
+		require.Equal(t, 4, *conn.TotalCount)
+		require.Len(t, conn.Edges, 4)
+		require.Equal(t, "1", conn.Edges[0].Node.ID)
+		require.Equal(t, "2", conn.Edges[1].Node.ID)
+		require.Equal(t, "4", conn.Edges[2].Node.ID)
+		require.Equal(t, "7", conn.Edges[3].Node.ID)
+		require.False(t, conn.PageInfo.HasNextPage)
+		require.False(t, conn.PageInfo.HasPreviousPage)
+	})
+
+	t.Run("complex filter with OR and pagination", func(t *testing.T) {
+		p := relay.New(
+			cursor.Base64(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+				return gormrelay.NewKeysetAdapter[*User](
+					db.WithContext(ctx).Scopes(gormfilter.Scope(&UserFilter{
+						Or: []*UserFilter{
+							{
+								Age: &filter.Int{
+									Lt: lo.ToPtr(20),
+								},
+							},
+							{
+								Age: &filter.Int{
+									Gt: lo.ToPtr(35),
+								},
+							},
+						},
+					})),
+				)(ctx, req)
+			}),
+			relay.EnsureLimits[*User](10, 100),
+			relay.EnsurePrimaryOrderBy[*User](
+				relay.OrderBy{Field: "Age", Desc: false},
+				relay.OrderBy{Field: "ID", Desc: false},
+			),
+		)
+
+		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+			First: lo.ToPtr(10),
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, *conn.TotalCount)
+		require.Len(t, conn.Edges, 3)
+		require.Equal(t, "6", conn.Edges[0].Node.ID)
+		require.Equal(t, 17, conn.Edges[0].Node.Age)
+		require.Equal(t, "8", conn.Edges[1].Node.ID)
+		require.Equal(t, 19, conn.Edges[1].Node.Age)
+		require.Equal(t, "7", conn.Edges[2].Node.ID)
+		require.Equal(t, 40, conn.Edges[2].Node.Age)
+		require.False(t, conn.PageInfo.HasNextPage)
+		require.False(t, conn.PageInfo.HasPreviousPage)
 	})
 }

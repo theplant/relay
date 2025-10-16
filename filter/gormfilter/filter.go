@@ -1,3 +1,4 @@
+// Package gormfilter provides powerful and type-safe filtering capabilities for GORM queries.
 package gormfilter
 
 import (
@@ -21,12 +22,57 @@ type options struct {
 
 type Option func(*options)
 
+// WithDisableBelongsTo returns an option that disables filtering by belongs_to relationships.
+// This can be useful when you want to prevent complex subqueries or restrict filtering to direct fields only.
 func WithDisableBelongsTo() Option {
 	return func(o *options) {
 		o.disableBelongsTo = true
 	}
 }
 
+// Scope returns a GORM scope function that applies the given filter to the query.
+// The filter parameter should be a struct with fields matching the model's schema.
+// Fields use filter types from the filter package (filter.String, filter.Int, etc.).
+//
+// The filter struct can include:
+//   - Field filters using types from the filter package
+//   - Logical operators: And, Or, Not
+//   - Relationship filters (BelongsTo)
+//
+// Example:
+//
+//	type UserFilter struct {
+//	    Name    *filter.String     `json:"name"`
+//	    Age     *filter.Int        `json:"age"`
+//	    Company *CompanyFilter     `json:"company"`  // BelongsTo relationship
+//	    And     []*UserFilter      `json:"and"`
+//	    Or      []*UserFilter      `json:"or"`
+//	    Not     *UserFilter        `json:"not"`
+//	}
+//
+//	// Simple filter
+//	db.Scopes(gormfilter.Scope(&UserFilter{
+//	    Name: &filter.String{Contains: lo.ToPtr("john"), Fold: true},
+//	})).Find(&users)
+//
+//	// Complex filter with relationships
+//	db.Scopes(gormfilter.Scope(&UserFilter{
+//	    Age: &filter.Int{Gte: lo.ToPtr(18)},
+//	    Company: &CompanyFilter{
+//	        Name: &filter.String{Eq: lo.ToPtr("Tech Corp")},
+//	    },
+//	})).Find(&users)
+//
+//	// Logical combinations
+//	db.Scopes(gormfilter.Scope(&UserFilter{
+//	    Or: []*UserFilter{
+//	        {Age: &filter.Int{Lt: lo.ToPtr(25)}},
+//	        {Age: &filter.Int{Gt: lo.ToPtr(60)}},
+//	    },
+//	})).Find(&users)
+//
+// Options:
+//   - WithDisableBelongsTo: Disables filtering by belongs_to relationships
 func Scope(filter any, opts ...Option) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if db == nil {

@@ -6,9 +6,11 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// ClauseNot builds a NOT clause
-// This is a copy of gorm.io/gorm/clause.Not , but with clause.OrWithSpace
-// https://github.com/go-gorm/gorm/pull/7371
+// ClauseNot builds a NOT clause that correctly handles De Morgan's laws.
+// This implementation applies negation to expressions with proper OR/AND conversion.
+//
+// This is based on gorm.io/gorm/clause.Not but uses clause.OrWithSpace for proper negation.
+// See: https://github.com/go-gorm/gorm/pull/7371
 func ClauseNot(exprs ...clause.Expression) clause.Expression {
 	if len(exprs) == 0 {
 		return nil
@@ -21,6 +23,7 @@ func ClauseNot(exprs ...clause.Expression) clause.Expression {
 	return NotConditions{Exprs: exprs}
 }
 
+// NotConditions represents a NOT clause with support for proper negation of complex expressions.
 type NotConditions struct {
 	Exprs []clause.Expression
 }

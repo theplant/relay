@@ -1,7 +1,19 @@
+// Package filter provides type-safe filter types for building query conditions.
+// These types are used with gormfilter to create powerful and flexible database queries.
+//
+// Each filter type supports various operators appropriate to its data type:
+//   - String/ID: Eq, Neq, Lt, Lte, Gt, Gte, In, NotIn, Contains, StartsWith, EndsWith, IsNull, Fold
+//   - Int/Float: Eq, Neq, Lt, Lte, Gt, Gte, In, NotIn, IsNull
+//   - Boolean: Eq, Neq, IsNull
+//   - Time: Eq, Neq, Lt, Lte, Gt, Gte, In, NotIn, IsNull
+//
+// The Fold field in String filters enables case-insensitive comparison.
 package filter
 
 import "time"
 
+// String provides filtering operations for string fields.
+// All comparison operations can be case-insensitive when Fold is set to true.
 type String struct {
 	Eq         *string  `json:"eq"`
 	Neq        *string  `json:"neq"`
@@ -18,8 +30,10 @@ type String struct {
 	Fold       bool     `json:"fold"`
 }
 
+// ID is an alias for String, used for identifier fields.
 type ID String
 
+// Float provides filtering operations for float64 fields.
 type Float struct {
 	Eq     *float64  `json:"eq"`
 	Neq    *float64  `json:"neq"`
@@ -32,6 +46,7 @@ type Float struct {
 	IsNull *bool     `json:"isNull"`
 }
 
+// Int provides filtering operations for integer fields.
 type Int struct {
 	Eq     *int  `json:"eq"`
 	Neq    *int  `json:"neq"`
@@ -44,12 +59,14 @@ type Int struct {
 	IsNull *bool `json:"isNull"`
 }
 
+// Boolean provides filtering operations for boolean fields.
 type Boolean struct {
 	Eq     *bool `json:"eq"`
 	Neq    *bool `json:"neq"`
 	IsNull *bool `json:"isNull"`
 }
 
+// Time provides filtering operations for time.Time fields.
 type Time struct {
 	Eq     *time.Time  `json:"eq"`
 	Neq    *time.Time  `json:"neq"`
