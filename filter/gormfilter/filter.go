@@ -3,6 +3,7 @@ package gormfilter
 import (
 	"cmp"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -11,14 +12,33 @@ import (
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/gorm/schema"
 )
 
-func Scope(filter any) func(db *gorm.DB) *gorm.DB {
+type options struct {
+	disableBelongsTo bool
+}
+
+type Option func(*options)
+
+func WithDisableBelongsTo() Option {
+	return func(o *options) {
+		o.disableBelongsTo = true
+	}
+}
+
+func Scope(filter any, opts ...Option) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if db == nil {
 			return nil
 		}
-		fdb, err := addFilter(db, filter)
+
+		options := &options{}
+		for _, opt := range opts {
+			opt(options)
+		}
+
+		fdb, err := addFilter(db, filter, options)
 		if err != nil {
 			db.AddError(err)
 			return db
@@ -37,7 +57,7 @@ var jsoniterForFilter = jsoniter.Config{
 	TagKey:                 FilterTagKey,
 }.Froze()
 
-func addFilter(db *gorm.DB, filter any) (*gorm.DB, error) {
+func addFilter(db *gorm.DB, filter any, opts *options) (*gorm.DB, error) {
 	if db == nil {
 		return nil, errors.New("db is nil")
 	}
@@ -64,7 +84,7 @@ func addFilter(db *gorm.DB, filter any) (*gorm.DB, error) {
 		return nil, errors.Wrap(err, "unmarshal filter")
 	}
 
-	expr, err := buildFilterExpr(stmt, filterMap)
+	expr, err := buildFilterExpr(stmt, filterMap, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +94,7 @@ func addFilter(db *gorm.DB, filter any) (*gorm.DB, error) {
 	return db, nil
 }
 
-func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any) (clause.Expression, error) {
+func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any, opts *options) (clause.Expression, error) {
 	var exprs []clause.Expression
 
 	keys := lo.Keys(filterMap)
@@ -98,7 +118,7 @@ func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any) (clause.Exp
 				if !ok {
 					return nil, errors.Errorf("invalid filter in %s array", strings.ToUpper(key))
 				}
-				expr, err := buildFilterExpr(stmt, filterData)
+				expr, err := buildFilterExpr(stmt, filterData, opts)
 				if err != nil {
 					return nil, err
 				}
@@ -119,7 +139,7 @@ func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any) (clause.Exp
 			if !ok {
 				return nil, errors.Errorf("invalid NOT filter format")
 			}
-			expr, err := buildFilterExpr(stmt, filterData)
+			expr, err := buildFilterExpr(stmt, filterData, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -132,7 +152,7 @@ func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any) (clause.Exp
 			if !ok {
 				return nil, errors.Errorf("invalid filter format for field %s", key)
 			}
-			expr, err := buildFilterFieldExpr(stmt, key, filterData)
+			expr, err := buildFilterFieldExpr(stmt, key, filterData, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -145,7 +165,15 @@ func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any) (clause.Exp
 	return clause.And(exprs...), nil
 }
 
-func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[string]any) (clause.Expression, error) {
+func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[string]any, opts *options) (clause.Expression, error) {
+	// Check if this is a belongs_to relationship
+	if rel := stmt.Schema.Relationships.Relations[fieldName]; rel != nil && rel.Type == schema.BelongsTo {
+		if opts != nil && opts.disableBelongsTo {
+			return nil, errors.Errorf("belongs_to filter is disabled for field %q", fieldName)
+		}
+		return buildBelongsToFilterExpr(stmt, rel, filter, opts)
+	}
+
 	field, ok := stmt.Schema.FieldsByName[fieldName]
 	if !ok {
 		return nil, errors.Errorf("missing field %q in schema", fieldName)
@@ -271,4 +299,82 @@ func foldArray(arr []any) []any {
 		}
 	}
 	return result
+}
+
+func buildBelongsToFilterExpr(stmt *gorm.Statement, rel *schema.Relationship, filter map[string]any, opts *options) (clause.Expression, error) {
+	if len(rel.References) == 0 {
+		return nil, errors.Errorf("no references found for belongs_to relationship %q", rel.Name)
+	}
+
+	foreignKey := rel.References[0].ForeignKey
+	if foreignKey == nil {
+		return nil, errors.Errorf("foreign key not found for belongs_to relationship %q", rel.Name)
+	}
+
+	referencedKey := rel.References[0].PrimaryKey
+	if referencedKey == nil {
+		return nil, errors.Errorf("referenced key not found for belongs_to relationship %q", rel.Name)
+	}
+
+	modelType := rel.FieldSchema.ModelType
+	var relatedModelInstance any
+	if modelType.Kind() == reflect.Ptr {
+		relatedModelInstance = reflect.New(modelType.Elem()).Interface()
+	} else {
+		relatedModelInstance = reflect.New(modelType).Interface()
+	}
+
+	subQuery := stmt.DB.Session(&gorm.Session{NewDB: true}).Model(relatedModelInstance)
+
+	subQuery, err := addFilter(subQuery, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap the dialector to use ? placeholders for database-agnostic SQL generation
+	originalDialector := subQuery.Statement.DB.Dialector
+	subQuery.Statement.DB.Dialector = &questionMarkDialector{Dialector: originalDialector}
+
+	dryRunStmt := subQuery.
+		Clauses(clause.Select{Columns: []clause.Column{
+			{Table: clause.CurrentTable, Name: referencedKey.DBName},
+		}}).
+		Session(&gorm.Session{DryRun: true}).
+		Find(nil).Statement
+
+	return &BelongsToInExpr{
+		Expr: clause.Expr{
+			SQL:  dryRunStmt.SQL.String(),
+			Vars: dryRunStmt.Vars,
+		},
+		ForeignKeyColumn: clause.Column{Table: stmt.Table, Name: foreignKey.DBName},
+	}, nil
+}
+
+// questionMarkDialector wraps any dialector to always use ? placeholders
+type questionMarkDialector struct {
+	gorm.Dialector
+}
+
+func (d *questionMarkDialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v any) {
+	writer.WriteByte('?')
+}
+
+type BelongsToInExpr struct {
+	clause.Expr
+	ForeignKeyColumn clause.Column
+}
+
+func (in *BelongsToInExpr) Build(builder clause.Builder) {
+	builder.WriteQuoted(in.ForeignKeyColumn)
+	builder.WriteString(" IN (")
+	in.Expr.Build(builder)
+	builder.WriteByte(')')
+}
+
+func (in *BelongsToInExpr) NegationBuild(builder clause.Builder) {
+	builder.WriteQuoted(in.ForeignKeyColumn)
+	builder.WriteString(" NOT IN (")
+	in.Expr.Build(builder)
+	builder.WriteByte(')')
 }

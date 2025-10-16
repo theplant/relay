@@ -13,25 +13,48 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// type Company struct {
-// 	ID          string         `gorm:"primaryKey" json:"id"`
-// 	CreatedAt   time.Time      `gorm:"index;not null" json:"createdAt"`
-// 	UpdatedAt   time.Time      `gorm:"index;not null" json:"updatedAt"`
-// 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deletedAt"`
-// 	Name        string         `gorm:"not null" json:"name"`
-// 	Description *string        `json:"description"`
-// }
+type Country struct {
+	ID        string         `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time      `gorm:"index;not null" json:"createdAt"`
+	UpdatedAt time.Time      `gorm:"index;not null" json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deletedAt"`
+	Name      string         `gorm:"not null" json:"name"`
+	Code      string         `gorm:"not null" json:"code"`
+}
 
-// type CompanyFilter struct {
-// 	Not         *CompanyFilter   `json:"not"`
-// 	And         []*CompanyFilter `json:"and"`
-// 	Or          []*CompanyFilter `json:"or"`
-// 	ID          *filter.ID       `json:"id"`
-// 	CreatedAt   *filter.Time     `json:"createdAt"`
-// 	UpdatedAt   *filter.Time     `json:"updatedAt"`
-// 	Name        *filter.String   `json:"name"`
-// 	Description *filter.String   `json:"description"`
-// }
+type CountryFilter struct {
+	Not       *CountryFilter   `json:"not"`
+	And       []*CountryFilter `json:"and"`
+	Or        []*CountryFilter `json:"or"`
+	ID        *filter.ID       `json:"id"`
+	CreatedAt *filter.Time     `json:"createdAt"`
+	UpdatedAt *filter.Time     `json:"updatedAt"`
+	Name      *filter.String   `json:"name"`
+	Code      *filter.String   `json:"code"`
+}
+
+type Company struct {
+	ID          string         `gorm:"primaryKey" json:"id"`
+	CreatedAt   time.Time      `gorm:"index;not null" json:"createdAt"`
+	UpdatedAt   time.Time      `gorm:"index;not null" json:"updatedAt"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deletedAt"`
+	Name        string         `gorm:"not null" json:"name"`
+	Description *string        `json:"description"`
+	CountryID   string         `gorm:"not null" json:"countryId"`
+	Country     *Country       `json:"country"`
+}
+
+type CompanyFilter struct {
+	Not         *CompanyFilter   `json:"not"`
+	And         []*CompanyFilter `json:"and"`
+	Or          []*CompanyFilter `json:"or"`
+	ID          *filter.ID       `json:"id"`
+	CreatedAt   *filter.Time     `json:"createdAt"`
+	UpdatedAt   *filter.Time     `json:"updatedAt"`
+	Name        *filter.String   `json:"name"`
+	Description *filter.String   `json:"description"`
+	Country     *CountryFilter   `json:"country"`
+}
 
 type User struct {
 	ID          string         `gorm:"primaryKey" json:"id"`
@@ -41,6 +64,8 @@ type User struct {
 	Name        string         `gorm:"not null" json:"name"`
 	Description *string        `json:"description"`
 	Age         int            `gorm:"not null" json:"age"`
+	CompanyID   string         `gorm:"not null" json:"companyId"`
+	Company     *Company       `json:"company"`
 }
 
 type UserFilter struct {
@@ -53,6 +78,8 @@ type UserFilter struct {
 	Name        *filter.String `json:"name"`
 	Description *filter.String `json:"description"`
 	Age         *filter.Int    `json:"age"`
+	CompanyID   *filter.ID     `json:"companyId"`
+	Company     *CompanyFilter `json:"company"`
 }
 
 var db *gorm.DB
@@ -72,14 +99,22 @@ func TestMain(m *testing.M) {
 
 func TestScope(t *testing.T) {
 	t.Run("json number type conversion", func(t *testing.T) {
-		err := db.Migrator().DropTable(&User{})
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
 		require.NoError(t, err)
-		err = db.AutoMigrate(&User{})
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		country := &Country{ID: "country1", Name: "Test Country", Code: "TC"}
+		err = db.Create(country).Error
+		require.NoError(t, err)
+
+		company := &Company{ID: "company1", Name: "Test Company", CountryID: "country1"}
+		err = db.Create(company).Error
 		require.NoError(t, err)
 
 		users := []*User{
-			{ID: "1", Name: "user1", Age: 18},
-			{ID: "2", Name: "user2", Age: 20},
+			{ID: "1", Name: "user1", Age: 18, CompanyID: "company1"},
+			{ID: "2", Name: "user2", Age: 20, CompanyID: "company1"},
 		}
 		err = db.Create(&users).Error
 		require.NoError(t, err)
@@ -96,9 +131,9 @@ func TestScope(t *testing.T) {
 	})
 
 	t.Run("sql", func(t *testing.T) {
-		err := db.Migrator().DropTable(&User{})
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
 		require.NoError(t, err)
-		err = db.AutoMigrate(&User{})
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
 		require.NoError(t, err)
 
 		tests := []struct {
@@ -357,6 +392,137 @@ func TestScope(t *testing.T) {
 				},
 				wantErrMsg: `empty NotIn values for field "CreatedAt"`,
 			},
+			{
+				name: "belongs_to filter with name equals",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							Eq: lo.ToPtr("company1"),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"company1"},
+			},
+			{
+				name: "belongs_to filter with name contains",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							Contains: lo.ToPtr("tech"),
+							Fold:     true,
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE LOWER("companies"."name") LIKE $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"%tech%"},
+			},
+			{
+				name: "belongs_to filter with multiple conditions",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							StartsWith: lo.ToPtr("Tech"),
+						},
+						Description: &filter.String{
+							IsNull: lo.ToPtr(false),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."description" IS NOT NULL AND "companies"."name" LIKE $1) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"Tech%"},
+			},
+			{
+				name: "filter by company_id",
+				filter: &UserFilter{
+					CompanyID: &filter.ID{
+						Eq: lo.ToPtr("company1"),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" = $1 AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"company1"},
+			},
+			{
+				name: "filter by company_id with multiple values",
+				filter: &UserFilter{
+					CompanyID: &filter.ID{
+						In: []string{"company1", "company2"},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN ($1,$2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"company1", "company2"},
+			},
+			{
+				name: "belongs_to filter combined with user filter",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Gte: lo.ToPtr(25),
+					},
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							Eq: lo.ToPtr("company1"),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $2 AND "companies"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(25), "company1"},
+			},
+			{
+				name: "two level nested belongs_to filter",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Country: &CountryFilter{
+							Code: &filter.String{
+								Eq: lo.ToPtr("US"),
+							},
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE "countries"."code" = $1 AND "countries"."deleted_at" IS NULL) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"US"},
+			},
+			{
+				name: "two level nested belongs_to filter with multiple conditions",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Gte: lo.ToPtr(21),
+					},
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							Contains: lo.ToPtr("Tech"),
+						},
+						Country: &CountryFilter{
+							Name: &filter.String{
+								Eq: lo.ToPtr("United States"),
+							},
+							Code: &filter.String{
+								Eq: lo.ToPtr("US"),
+							},
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE ("countries"."code" = $2 AND "countries"."name" = $3) AND "countries"."deleted_at" IS NULL) AND "companies"."name" LIKE $4) AND "companies"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(21), "US", "United States", "%Tech%"},
+			},
+			{
+				name: "two level nested with case insensitive",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							StartsWith: lo.ToPtr("tech"),
+							Fold:       true,
+						},
+						Country: &CountryFilter{
+							Name: &filter.String{
+								Contains: lo.ToPtr("america"),
+								Fold:     true,
+							},
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE LOWER("countries"."name") LIKE $1 AND "countries"."deleted_at" IS NULL) AND LOWER("companies"."name") LIKE $2) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"%america%", "tech%"},
+			},
 		}
 
 		for _, tt := range tests {
@@ -380,6 +546,82 @@ func TestScope(t *testing.T) {
 
 				require.Equal(t, tt.wantSQL, sql)
 				require.Equal(t, tt.wantVars, vars)
+			})
+		}
+	})
+
+	t.Run("disable belongs_to filter option", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		tests := []struct {
+			name       string
+			filter     *UserFilter
+			wantSQL    string
+			wantVars   []any
+			wantErrMsg string
+		}{
+			{
+				name: "normal filter should work when belongs_to is disabled",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Gte: lo.ToPtr(18),
+					},
+					Name: &filter.String{
+						Contains: lo.ToPtr("user"),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(18), "%user%"},
+			},
+			{
+				name: "belongs_to filter should be disabled",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							Eq: lo.ToPtr("company1"),
+						},
+					},
+				},
+				wantErrMsg: `belongs_to filter is disabled for field "Company"`,
+			},
+			{
+				name: "two level nested should be disabled",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Country: &CountryFilter{
+							Code: &filter.String{
+								Eq: lo.ToPtr("US"),
+							},
+						},
+					},
+				},
+				wantErrMsg: `belongs_to filter is disabled for field "Company"`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				stmt := db.Model(&User{}).
+					Scopes(gormfilter.Scope(tt.filter, gormfilter.WithDisableBelongsTo())).
+					Session(&gorm.Session{DryRun: true}).
+					Find(&[]User{})
+
+				if tt.wantErrMsg != "" {
+					require.ErrorContains(t, stmt.Error, tt.wantErrMsg)
+					return
+				}
+
+				require.NoError(t, stmt.Error)
+
+				if tt.wantSQL != "" {
+					sql := stmt.Statement.SQL.String()
+					vars := stmt.Statement.Vars
+					require.Equal(t, tt.wantSQL, sql)
+					require.Equal(t, tt.wantVars, vars)
+				}
 			})
 		}
 	})
