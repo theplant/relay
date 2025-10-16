@@ -142,7 +142,7 @@ func TestQueryPerformance(t *testing.T) {
 	t.Log("\nEXPLAIN ANALYZE " + exactLeftJoinQuery)
 
 	t.Log("\n-----------------------------------------------------")
-	t.Log(fmt.Sprintf("AUTOMATED PERFORMANCE COMPARISON (Running each query %d times)", config.Runs))
+	t.Logf("AUTOMATED PERFORMANCE COMPARISON (Running each query %d times)", config.Runs)
 	t.Log("-----------------------------------------------------")
 
 	// Execute queries and analyze results
