@@ -62,7 +62,7 @@ func (c *Computed[T]) Validate() error {
 
 // WithComputed adds computed fields to a query.
 func WithComputed[T any](computed *Computed[T]) Option[T] {
-	return func(opts *Options[T]) {
+	return func(opts *options[T]) {
 		opts.Computed = computed
 	}
 }

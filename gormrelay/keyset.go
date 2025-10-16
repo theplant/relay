@@ -176,15 +176,15 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 
 type KeysetFinder[T any] struct {
 	db   *gorm.DB
-	opts Options[T]
+	opts options[T]
 }
 
 func NewKeysetFinder[T any](db *gorm.DB, opts ...Option[T]) *KeysetFinder[T] {
-	options := Options[T]{}
+	o := options[T]{}
 	for _, opt := range opts {
-		opt(&options)
+		opt(&o)
 	}
-	return &KeysetFinder[T]{db: db, opts: options}
+	return &KeysetFinder[T]{db: db, opts: o}
 }
 
 func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]cursor.Node[T], error) {
