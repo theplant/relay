@@ -86,7 +86,7 @@ func Scope(filter any, opts ...Option) func(db *gorm.DB) *gorm.DB {
 
 		fdb, err := addFilter(db, filter, options)
 		if err != nil {
-			db.AddError(err)
+			_ = db.AddError(err)
 			return db
 		}
 		return fdb
@@ -403,7 +403,7 @@ type questionMarkDialector struct {
 }
 
 func (d *questionMarkDialector) BindVarTo(writer clause.Writer, stmt *gorm.Statement, v any) {
-	writer.WriteByte('?')
+	_ = writer.WriteByte('?')
 }
 
 type BelongsToInExpr struct {
@@ -413,14 +413,14 @@ type BelongsToInExpr struct {
 
 func (in *BelongsToInExpr) Build(builder clause.Builder) {
 	builder.WriteQuoted(in.ForeignKeyColumn)
-	builder.WriteString(" IN (")
+	_, _ = builder.WriteString(" IN (")
 	in.Expr.Build(builder)
-	builder.WriteByte(')')
+	_ = builder.WriteByte(')')
 }
 
 func (in *BelongsToInExpr) NegationBuild(builder clause.Builder) {
 	builder.WriteQuoted(in.ForeignKeyColumn)
-	builder.WriteString(" NOT IN (")
+	_, _ = builder.WriteString(" NOT IN (")
 	in.Expr.Build(builder)
-	builder.WriteByte(')')
+	_ = builder.WriteByte(')')
 }

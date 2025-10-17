@@ -7,14 +7,15 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"github.com/theplant/testenv"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+
 	"github.com/theplant/relay"
 	"github.com/theplant/relay/cursor"
 	"github.com/theplant/relay/filter"
 	"github.com/theplant/relay/filter/gormfilter"
 	"github.com/theplant/relay/gormrelay"
-	"github.com/theplant/testenv"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 type Country struct {
