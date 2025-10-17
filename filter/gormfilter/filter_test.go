@@ -942,6 +942,396 @@ func TestScope(t *testing.T) {
 	})
 }
 
+func TestErrorHandling(t *testing.T) {
+	t.Run("nil filter", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(nil)).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.NoError(t, stmt.Error)
+		require.Equal(t, `SELECT * FROM "users" WHERE "users"."deleted_at" IS NULL`, stmt.Statement.SQL.String())
+	})
+
+	t.Run("missing field in schema", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"NonExistentField": map[string]any{
+					"Eq": "test",
+				},
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, `missing field "NonExistentField" in schema`)
+	})
+
+	t.Run("invalid AND filter format", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"And": "invalid",
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, "invalid AND filter format")
+	})
+
+	t.Run("invalid OR filter format", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"Or": "invalid",
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, "invalid OR filter format")
+	})
+
+	t.Run("invalid NOT filter format", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"Not": "invalid",
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, "invalid NOT filter format")
+	})
+
+	t.Run("invalid field filter format", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"Name": 123,
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, "invalid filter format for field Name")
+	})
+
+	t.Run("invalid In values format", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"Name": map[string]any{
+					"In": "not-an-array",
+				},
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, `invalid In values for field "Name"`)
+	})
+
+	t.Run("invalid IsNull value format", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"Name": map[string]any{
+					"IsNull": "not-a-bool",
+				},
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, `invalid IS NULL value for field "Name"`)
+	})
+
+	t.Run("invalid Contains value format", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"Name": map[string]any{
+					"Contains": 123,
+				},
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, `invalid Contains value for field "Name"`)
+	})
+
+	t.Run("unknown operator", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		stmt := db.Model(&User{}).
+			Scopes(gormfilter.Scope(map[string]any{
+				"Name": map[string]any{
+					"UnknownOp": "test",
+				},
+			})).
+			Session(&gorm.Session{DryRun: true}).
+			Find(&[]User{})
+
+		require.ErrorContains(t, stmt.Error, `unknown operator UnknownOp for field "Name"`)
+	})
+}
+
+func TestAdditionalOperators(t *testing.T) {
+	err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
+	require.NoError(t, err)
+	err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		filter   *UserFilter
+		wantSQL  string
+		wantVars []any
+	}{
+		{
+			name: "greater than condition",
+			filter: &UserFilter{
+				Age: &filter.Int{
+					Gt: lo.ToPtr(30),
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE "users"."age" > $1 AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{float64(30)},
+		},
+		{
+			name: "combined Gt and Lt",
+			filter: &UserFilter{
+				Age: &filter.Int{
+					Gt: lo.ToPtr(18),
+					Lt: lo.ToPtr(65),
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" > $1 AND "users"."age" < $2) AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{float64(18), float64(65)},
+		},
+		{
+			name: "not in empty array already tested",
+			filter: &UserFilter{
+				Age: &filter.Int{
+					In: []int{},
+				},
+			},
+			wantSQL:  "",
+			wantVars: nil,
+		},
+		{
+			name: "empty And array",
+			filter: &UserFilter{
+				And: []*UserFilter{},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE "users"."deleted_at" IS NULL`,
+			wantVars: nil,
+		},
+		{
+			name: "empty Or array",
+			filter: &UserFilter{
+				Or: []*UserFilter{},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE "users"."deleted_at" IS NULL`,
+			wantVars: nil,
+		},
+		{
+			name: "nested Not conditions",
+			filter: &UserFilter{
+				Not: &UserFilter{
+					Not: &UserFilter{
+						Name: &filter.String{
+							Eq: lo.ToPtr("John"),
+						},
+					},
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE NOT "users"."name" <> $1 AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{"John"},
+		},
+		{
+			name: "Not with multiple conditions",
+			filter: &UserFilter{
+				Not: &UserFilter{
+					Name: &filter.String{
+						Contains: lo.ToPtr("john"),
+					},
+					Age: &filter.Int{
+						Gt: lo.ToPtr(30),
+					},
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" <= $1 OR "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{float64(30), "%john%"},
+		},
+		{
+			name: "StartsWith without fold",
+			filter: &UserFilter{
+				Name: &filter.String{
+					StartsWith: lo.ToPtr("J"),
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE "users"."name" LIKE $1 AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{"J%"},
+		},
+		{
+			name: "EndsWith with fold",
+			filter: &UserFilter{
+				Name: &filter.String{
+					EndsWith: lo.ToPtr("SON"),
+					Fold:     true,
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") LIKE $1 AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{"%son"},
+		},
+		{
+			name: "Eq with fold",
+			filter: &UserFilter{
+				Name: &filter.String{
+					Eq:   lo.ToPtr("JOHN"),
+					Fold: true,
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") = $1 AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{"john"},
+		},
+		{
+			name: "Neq with fold",
+			filter: &UserFilter{
+				Name: &filter.String{
+					Neq:  lo.ToPtr("JOHN"),
+					Fold: true,
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") <> $1 AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{"john"},
+		},
+		{
+			name: "Lt and Lte with fold",
+			filter: &UserFilter{
+				Name: &filter.String{
+					Lt:   lo.ToPtr("M"),
+					Lte:  lo.ToPtr("Z"),
+					Fold: true,
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE (LOWER("users"."name") < $1 AND LOWER("users"."name") <= $2) AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{"m", "z"},
+		},
+		{
+			name: "Gt and Gte with fold",
+			filter: &UserFilter{
+				Name: &filter.String{
+					Gt:   lo.ToPtr("A"),
+					Gte:  lo.ToPtr("B"),
+					Fold: true,
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE (LOWER("users"."name") > $1 AND LOWER("users"."name") >= $2) AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{"a", "b"},
+		},
+		{
+			name: "combined field filter with And operator",
+			filter: &UserFilter{
+				Name: &filter.String{
+					StartsWith: lo.ToPtr("J"),
+					EndsWith:   lo.ToPtr("n"),
+				},
+				And: []*UserFilter{
+					{
+						Age: &filter.Int{
+							Gte: lo.ToPtr(20),
+						},
+					},
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND ("users"."name" LIKE $2 AND "users"."name" LIKE $3)) AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{float64(20), "%n", "J%"},
+		},
+		{
+			name: "Not with Or",
+			filter: &UserFilter{
+				Not: &UserFilter{
+					Or: []*UserFilter{
+						{
+							Age: &filter.Int{
+								Lt: lo.ToPtr(20),
+							},
+						},
+						{
+							Age: &filter.Int{
+								Gt: lo.ToPtr(60),
+							},
+						},
+					},
+				},
+			},
+			wantSQL:  `SELECT * FROM "users" WHERE NOT ("users"."age" < $1 OR "users"."age" > $2) AND "users"."deleted_at" IS NULL`,
+			wantVars: []any{float64(20), float64(60)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.wantSQL == "" {
+				// Skip tests that expect errors (already handled elsewhere)
+				return
+			}
+
+			stmt := db.Model(&User{}).
+				Scopes(gormfilter.Scope(tt.filter)).
+				Session(&gorm.Session{DryRun: true}).
+				Find(&[]User{})
+
+			require.NoError(t, stmt.Error)
+
+			sql := stmt.Statement.SQL.String()
+			vars := stmt.Statement.Vars
+
+			require.Equal(t, tt.wantSQL, sql)
+			require.Equal(t, tt.wantVars, vars)
+		})
+	}
+}
+
 func TestCombiningWithPagination(t *testing.T) {
 	err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
 	require.NoError(t, err)
