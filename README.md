@@ -101,7 +101,7 @@ p := relay.New(
             Columns: gormrelay.ComputedColumns(map[string]string{
                 "Priority": "CASE WHEN status = 'premium' THEN 1 WHEN status = 'vip' THEN 2 ELSE 3 END",
             }),
-            ForScan: gormrelay.DefaultForScan[*User],
+            SetupScanner: gormrelay.NewScanner[*User],
         }),
     ),
     relay.EnsureLimits[*User](10, 100),
@@ -132,17 +132,17 @@ gormrelay.ComputedColumns(map[string]string{
 })
 ```
 
-**DefaultForScan**
+**NewScanner**
 
-Standard scan function that handles result scanning and wrapping:
+Standard scanner function that handles result scanning and wrapping. This is the recommended implementation for most use cases:
 
 ```go
-gormrelay.DefaultForScan[*User]
+gormrelay.NewScanner[*User]
 ```
 
-**Custom ForScan**
+**Custom SetupScanner**
 
-For custom types or complex scenarios, implement your own ForScan function:
+For custom types or complex scenarios, implement your own SetupScanner function:
 
 ```go
 type Shop struct {
@@ -155,14 +155,17 @@ gormrelay.WithComputed(&gormrelay.Computed[*Shop]{
     Columns: gormrelay.ComputedColumns(map[string]string{
         "Priority": "CASE WHEN name = 'premium' THEN 1 ELSE 2 END",
     }),
-    ForScan: func(db *gorm.DB) (dest any, toCursorNodes func([]map[string]any) []cursor.Node[*Shop], err error) {
+    SetupScanner: func(db *gorm.DB) (*gormrelay.Scanner[*Shop], error) {
         shops := []*Shop{}
-        return &shops, func(computedResults []map[string]any) []cursor.Node[*Shop] {
-            return lo.Map(shops, func(s *Shop, i int) cursor.Node[*Shop] {
-                // Populate computed field
-                s.Priority = int(computedResults[i]["Priority"].(int32))
-                return &cursor.SelfNode[*Shop]{Node: s}
-            })
+        return &gormrelay.Scanner[*Shop]{
+            Destination: &shops,
+            Transform: func(computedResults []map[string]any) []cursor.Node[*Shop] {
+                return lo.Map(shops, func(s *Shop, i int) cursor.Node[*Shop] {
+                    // Populate computed field
+                    s.Priority = int(computedResults[i]["Priority"].(int32))
+                    return &cursor.SelfNode[*Shop]{Node: s}
+                })
+            },
         }, nil
     },
 })
@@ -179,7 +182,7 @@ p := relay.New(
                 "Score": "(points * 10 + bonus)",
                 "Rank":  "CASE WHEN score > 100 THEN 'A' WHEN score > 50 THEN 'B' ELSE 'C' END",
             }),
-            ForScan: gormrelay.DefaultForScan[*User],
+            SetupScanner: gormrelay.NewScanner[*User],
         }),
     ),
     relay.EnsureLimits[*User](10, 100),
