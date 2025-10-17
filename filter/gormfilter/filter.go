@@ -18,6 +18,7 @@ import (
 
 type options struct {
 	disableBelongsTo bool
+	disableHasOne    bool
 }
 
 type Option func(*options)
@@ -30,6 +31,22 @@ func WithDisableBelongsTo() Option {
 	}
 }
 
+// WithDisableHasOne returns an option that disables filtering by has_one relationships.
+// This can be useful when you want to prevent complex subqueries or restrict filtering to direct fields only.
+func WithDisableHasOne() Option {
+	return func(o *options) {
+		o.disableHasOne = true
+	}
+}
+
+// WithDisableRelationships returns an option that disables filtering by all relationship types.
+func WithDisableRelationships() Option {
+	return func(o *options) {
+		o.disableBelongsTo = true
+		o.disableHasOne = true
+	}
+}
+
 // Scope returns a GORM scope function that applies the given filter to the query.
 // The filter parameter should be a struct with fields matching the model's schema.
 // Fields use filter types from the filter package (filter.String, filter.Int, etc.).
@@ -37,7 +54,7 @@ func WithDisableBelongsTo() Option {
 // The filter struct can include:
 //   - Field filters using types from the filter package
 //   - Logical operators: And, Or, Not
-//   - Relationship filters (BelongsTo)
+//   - Relationship filters (BelongsTo, HasOne)
 //
 // Example:
 //
@@ -45,6 +62,7 @@ func WithDisableBelongsTo() Option {
 //	    Name    *filter.String     `json:"name"`
 //	    Age     *filter.Int        `json:"age"`
 //	    Company *CompanyFilter     `json:"company"`  // BelongsTo relationship
+//	    Profile *ProfileFilter     `json:"profile"`  // HasOne relationship
 //	    And     []*UserFilter      `json:"and"`
 //	    Or      []*UserFilter      `json:"or"`
 //	    Not     *UserFilter        `json:"not"`
@@ -73,6 +91,8 @@ func WithDisableBelongsTo() Option {
 //
 // Options:
 //   - WithDisableBelongsTo: Disables filtering by belongs_to relationships
+//   - WithDisableHasOne: Disables filtering by has_one relationships
+//   - WithDisableRelationships: Disables filtering by all relationship types
 func Scope(filter any, opts ...Option) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if db == nil {
@@ -212,12 +232,22 @@ func buildFilterExpr(stmt *gorm.Statement, filterMap map[string]any, opts *optio
 }
 
 func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[string]any, opts *options) (clause.Expression, error) {
-	// Check if this is a belongs_to relationship
-	if rel := stmt.Schema.Relationships.Relations[fieldName]; rel != nil && rel.Type == schema.BelongsTo {
-		if opts != nil && opts.disableBelongsTo {
-			return nil, errors.Errorf("belongs_to filter is disabled for field %q", fieldName)
+	// Check if this is a relationship
+	if rel := stmt.Schema.Relationships.Relations[fieldName]; rel != nil {
+		switch rel.Type {
+		case schema.BelongsTo:
+			if opts != nil && opts.disableBelongsTo {
+				return nil, errors.Errorf("belongs_to filter is disabled for field %q", fieldName)
+			}
+			return buildRelationshipFilterExpr(stmt, rel, filter, opts)
+		case schema.HasOne:
+			if opts != nil && opts.disableHasOne {
+				return nil, errors.Errorf("has_one filter is disabled for field %q", fieldName)
+			}
+			return buildRelationshipFilterExpr(stmt, rel, filter, opts)
+		default:
+			return nil, errors.Errorf("unsupported relationship type %q for field %q (only belongs_to and has_one are supported)", rel.Type, fieldName)
 		}
-		return buildBelongsToFilterExpr(stmt, rel, filter, opts)
 	}
 
 	field, ok := stmt.Schema.FieldsByName[fieldName]
@@ -347,19 +377,19 @@ func foldArray(arr []any) []any {
 	return result
 }
 
-func buildBelongsToFilterExpr(stmt *gorm.Statement, rel *schema.Relationship, filter map[string]any, opts *options) (clause.Expression, error) {
+func buildRelationshipFilterExpr(stmt *gorm.Statement, rel *schema.Relationship, filter map[string]any, opts *options) (clause.Expression, error) {
 	if len(rel.References) == 0 {
-		return nil, errors.Errorf("no references found for belongs_to relationship %q", rel.Name)
+		return nil, errors.Errorf("no references found for %s relationship %q", rel.Type, rel.Name)
 	}
 
 	foreignKey := rel.References[0].ForeignKey
 	if foreignKey == nil {
-		return nil, errors.Errorf("foreign key not found for belongs_to relationship %q", rel.Name)
+		return nil, errors.Errorf("foreign key not found for %s relationship %q", rel.Type, rel.Name)
 	}
 
 	referencedKey := rel.References[0].PrimaryKey
 	if referencedKey == nil {
-		return nil, errors.Errorf("referenced key not found for belongs_to relationship %q", rel.Name)
+		return nil, errors.Errorf("referenced key not found for %s relationship %q", rel.Type, rel.Name)
 	}
 
 	modelType := rel.FieldSchema.ModelType
@@ -381,19 +411,33 @@ func buildBelongsToFilterExpr(stmt *gorm.Statement, rel *schema.Relationship, fi
 	originalDialector := subQuery.Statement.DB.Dialector
 	subQuery.Statement.DB.Dialector = &questionMarkDialector{Dialector: originalDialector}
 
+	var localColumn, subQueryColumn clause.Column
+
+	switch rel.Type {
+	case schema.BelongsTo:
+		// BelongsTo: foreign key is in current table, primary key is in related table
+		// Query: current_table.foreign_key IN (SELECT related_table.primary_key WHERE ...)
+		localColumn = clause.Column{Table: stmt.Table, Name: foreignKey.DBName}
+		subQueryColumn = clause.Column{Table: clause.CurrentTable, Name: referencedKey.DBName}
+
+	case schema.HasOne:
+		// HasOne: primary key is in current table, foreign key is in related table
+		// Query: current_table.primary_key IN (SELECT related_table.foreign_key WHERE ...)
+		localColumn = clause.Column{Table: stmt.Table, Name: referencedKey.DBName}
+		subQueryColumn = clause.Column{Table: clause.CurrentTable, Name: foreignKey.DBName}
+	}
+
 	dryRunStmt := subQuery.
-		Clauses(clause.Select{Columns: []clause.Column{
-			{Table: clause.CurrentTable, Name: referencedKey.DBName},
-		}}).
+		Clauses(clause.Select{Columns: []clause.Column{subQueryColumn}}).
 		Session(&gorm.Session{DryRun: true}).
 		Find(nil).Statement
 
-	return &BelongsToInExpr{
+	return &RelationshipInExpr{
 		Expr: clause.Expr{
 			SQL:  dryRunStmt.SQL.String(),
 			Vars: dryRunStmt.Vars,
 		},
-		ForeignKeyColumn: clause.Column{Table: stmt.Table, Name: foreignKey.DBName},
+		LocalColumn: localColumn,
 	}, nil
 }
 
@@ -406,20 +450,21 @@ func (d *questionMarkDialector) BindVarTo(writer clause.Writer, stmt *gorm.State
 	_ = writer.WriteByte('?')
 }
 
-type BelongsToInExpr struct {
+// RelationshipInExpr represents an IN subquery expression for relationship filters (BelongsTo, HasOne)
+type RelationshipInExpr struct {
 	clause.Expr
-	ForeignKeyColumn clause.Column
+	LocalColumn clause.Column
 }
 
-func (in *BelongsToInExpr) Build(builder clause.Builder) {
-	builder.WriteQuoted(in.ForeignKeyColumn)
+func (in *RelationshipInExpr) Build(builder clause.Builder) {
+	builder.WriteQuoted(in.LocalColumn)
 	_, _ = builder.WriteString(" IN (")
 	in.Expr.Build(builder)
 	_ = builder.WriteByte(')')
 }
 
-func (in *BelongsToInExpr) NegationBuild(builder clause.Builder) {
-	builder.WriteQuoted(in.ForeignKeyColumn)
+func (in *RelationshipInExpr) NegationBuild(builder clause.Builder) {
+	builder.WriteQuoted(in.LocalColumn)
 	_, _ = builder.WriteString(" NOT IN (")
 	in.Expr.Build(builder)
 	_ = builder.WriteByte(')')
