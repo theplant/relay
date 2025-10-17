@@ -925,7 +925,7 @@ func TestWithComputedShop(t *testing.T) {
 					SetupScanner: func(_ *gorm.DB) (*Scanner[*Shop], error) {
 						nodes := []*Shop{}
 						return &Scanner[*Shop]{
-							Dest: &nodes,
+							Destination: &nodes,
 							Transform: func(computedResults []map[string]any) []cursor.Node[*Shop] {
 								return lo.Map(nodes, func(s *Shop, i int) cursor.Node[*Shop] {
 									s.Priority = int(computedResults[i]["Priority"].(int32))

@@ -186,8 +186,8 @@ func TestNewScanner(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check destination type when model matches generic type
-	userSlicePtr1, ok := scanner1.Dest.(*[]*User)
-	require.True(t, ok, "dest should be *[]*User")
+	userSlicePtr1, ok := scanner1.Destination.(*[]*User)
+	require.True(t, ok, "destination should be *[]*User")
 
 	// Populate user slice
 	*userSlicePtr1 = users
@@ -230,7 +230,7 @@ func TestNewScanner(t *testing.T) {
 	require.NoError(t, err)
 
 	// Populate result slice with compatible nodes
-	sliceValue := reflect.ValueOf(scanner2.Dest).Elem()
+	sliceValue := reflect.ValueOf(scanner2.Destination).Elem()
 	for _, user := range users {
 		u := &User{ID: user.ID, Name: user.Name}
 		sliceValue.Set(reflect.Append(sliceValue, reflect.ValueOf(u)))

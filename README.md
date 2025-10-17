@@ -158,7 +158,7 @@ gormrelay.WithComputed(&gormrelay.Computed[*Shop]{
     SetupScanner: func(db *gorm.DB) (*gormrelay.Scanner[*Shop], error) {
         shops := []*Shop{}
         return &gormrelay.Scanner[*Shop]{
-            Dest: &shops,
+            Destination: &shops,
             Transform: func(computedResults []map[string]any) []cursor.Node[*Shop] {
                 return lo.Map(shops, func(s *Shop, i int) cursor.Node[*Shop] {
                     // Populate computed field

@@ -216,7 +216,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 		computedResults, err := splitComputedScan(
 			a.opts.Computed.Columns,
 			db.Scopes(scopeKeyset(a.opts.Computed.Columns, after, before, orderBys, limit, fromEnd)),
-			scanner.Dest,
+			scanner.Destination,
 		)
 		if err != nil {
 			return nil, err

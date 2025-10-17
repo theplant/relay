@@ -17,8 +17,8 @@ import (
 
 // Scanner holds the configuration for scanning database results with computed fields.
 type Scanner[T any] struct {
-	// Dest is the destination for GORM to scan results into (e.g., &[]User{})
-	Dest any
+	// Destination is the target for GORM to scan results into (e.g., &[]User{})
+	Destination any
 
 	// Transform converts scanned results with their computed values into cursor nodes
 	Transform func(computedResults []map[string]any) []cursor.Node[T]
@@ -135,7 +135,7 @@ func NewScanner[T any](db *gorm.DB) (*Scanner[T], error) {
 	if modelType == genericType {
 		nodes := []T{}
 		return &Scanner[T]{
-			Dest: &nodes,
+			Destination: &nodes,
 			Transform: func(computedResults []map[string]any) []cursor.Node[T] {
 				return lo.Map(nodes, func(node T, i int) cursor.Node[T] {
 					return &cursor.NodeWrapper[T]{
@@ -151,7 +151,7 @@ func NewScanner[T any](db *gorm.DB) (*Scanner[T], error) {
 	nodesVal := reflect.New(sliceType).Elem()
 
 	return &Scanner[T]{
-		Dest: nodesVal.Addr().Interface(),
+		Destination: nodesVal.Addr().Interface(),
 		Transform: func(computedResults []map[string]any) []cursor.Node[T] {
 			result := make([]cursor.Node[T], nodesVal.Len())
 			for i := 0; i < nodesVal.Len(); i++ {

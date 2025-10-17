@@ -104,7 +104,7 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 		computedResults, err := splitComputedScan(
 			computedColumns,
 			db.Scopes(AppendSelect(maps.Values(computedColumns)...)),
-			scanner.Dest,
+			scanner.Destination,
 		)
 		if err != nil {
 			return nil, err
