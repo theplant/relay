@@ -208,7 +208,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 			return nil, err
 		}
 
-		dest, toCursorNodes, err := a.opts.Computed.ForScan(db)
+		scanner, err := a.opts.Computed.SetupScanner(db)
 		if err != nil {
 			return nil, err
 		}
@@ -216,13 +216,13 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 		computedResults, err := splitComputedScan(
 			a.opts.Computed.Columns,
 			db.Scopes(scopeKeyset(a.opts.Computed.Columns, after, before, orderBys, limit, fromEnd)),
-			dest,
+			scanner.Dest,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		nodes := toCursorNodes(computedResults)
+		nodes := scanner.Transform(computedResults)
 		if fromEnd {
 			lo.Reverse(nodes)
 		}

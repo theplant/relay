@@ -15,13 +15,22 @@ import (
 	"github.com/theplant/relay/cursor"
 )
 
+// Scanner holds the configuration for scanning database results with computed fields.
+type Scanner[T any] struct {
+	// Dest is the destination for GORM to scan results into (e.g., &[]User{})
+	Dest any
+
+	// Transform converts scanned results with their computed values into cursor nodes
+	Transform func(computedResults []map[string]any) []cursor.Node[T]
+}
+
 // Computed defines SQL expressions calculated at database level and attached to query results.
 type Computed[T any] struct {
 	// Maps field names to SQL expressions
 	Columns map[string]clause.Column
 
-	// Function for scanning rows and transforming results
-	ForScan func(db *gorm.DB) (dest any, toCursorNodes func(computedResults []map[string]any) []cursor.Node[T], err error)
+	// SetupScanner prepares a scanner for database operations with computed fields
+	SetupScanner func(db *gorm.DB) (*Scanner[T], error)
 }
 
 // Validate ensures the Computed configuration is valid.
@@ -36,8 +45,8 @@ func (c *Computed[T]) Validate() error {
 		}
 	}
 
-	if c.ForScan == nil {
-		return errors.New("ForScan function must not be nil")
+	if c.SetupScanner == nil {
+		return errors.New("SetupScanner function must not be nil")
 	}
 
 	aliasMap := make(map[string][]string)
@@ -111,12 +120,12 @@ func WithComputedResult(object any, computedResults map[string]any) *withCompute
 	}
 }
 
-// DefaultForScan creates a standard ForScan function for Computed.
-// This simplifies the creation of a ForScan function that wraps objects with
-// their computed values and makes them accessible in the resulting cursor.Node objects.
-func DefaultForScan[T any](db *gorm.DB) (dest any, toCursorNodes func(computedResults []map[string]any) []cursor.Node[T], err error) {
+// NewScanner creates a standard scanner for computed fields.
+// This is the recommended implementation for most use cases.
+// It wraps objects with their computed values and makes them accessible in the resulting cursor.Node objects.
+func NewScanner[T any](db *gorm.DB) (*Scanner[T], error) {
 	if db.Statement.Model == nil {
-		return nil, nil, errors.New("db.Statement.Model cannot be nil")
+		return nil, errors.New("db.Statement.Model cannot be nil")
 	}
 
 	modelType := reflect.TypeOf(db.Statement.Model)
@@ -125,29 +134,35 @@ func DefaultForScan[T any](db *gorm.DB) (dest any, toCursorNodes func(computedRe
 	// Only use []T when Model type exactly matches T
 	if modelType == genericType {
 		nodes := []T{}
-		return &nodes, func(computedResults []map[string]any) []cursor.Node[T] {
-			return lo.Map(nodes, func(node T, i int) cursor.Node[T] {
-				return &cursor.NodeWrapper[T]{
-					Object: WithComputedResult(node, computedResults[i]),
-					Unwrap: func() T { return node },
-				}
-			})
+		return &Scanner[T]{
+			Dest: &nodes,
+			Transform: func(computedResults []map[string]any) []cursor.Node[T] {
+				return lo.Map(nodes, func(node T, i int) cursor.Node[T] {
+					return &cursor.NodeWrapper[T]{
+						Object: WithComputedResult(node, computedResults[i]),
+						Unwrap: func() T { return node },
+					}
+				})
+			},
 		}, nil
 	}
 
 	sliceType := reflect.SliceOf(modelType)
 	nodesVal := reflect.New(sliceType).Elem()
 
-	return nodesVal.Addr().Interface(), func(computedResults []map[string]any) []cursor.Node[T] {
-		result := make([]cursor.Node[T], nodesVal.Len())
-		for i := 0; i < nodesVal.Len(); i++ {
-			node := nodesVal.Index(i).Interface().(T) // Direct type assertion - panic is expected if types are incompatible
-			result[i] = &cursor.NodeWrapper[T]{
-				Object: WithComputedResult(node, computedResults[i]),
-				Unwrap: func() T { return node },
+	return &Scanner[T]{
+		Dest: nodesVal.Addr().Interface(),
+		Transform: func(computedResults []map[string]any) []cursor.Node[T] {
+			result := make([]cursor.Node[T], nodesVal.Len())
+			for i := 0; i < nodesVal.Len(); i++ {
+				node := nodesVal.Index(i).Interface().(T)
+				result[i] = &cursor.NodeWrapper[T]{
+					Object: WithComputedResult(node, computedResults[i]),
+					Unwrap: func() T { return node },
+				}
 			}
-		}
-		return result
+			return result
+		},
 	}, nil
 }
 

@@ -773,7 +773,7 @@ func TestWithComputed(t *testing.T) {
 					Columns: ComputedColumns(map[string]string{
 						"GlobalPriority": "(CASE WHEN users.name = 'molon' THEN 1 WHEN users.name = 'sam' THEN 2 ELSE 3 END)",
 					}),
-					ForScan: DefaultForScan[*User],
+					SetupScanner: NewScanner[*User],
 				}),
 			),
 			relay.EnsureLimits[*User](10, 50),
@@ -922,13 +922,16 @@ func TestWithComputedShop(t *testing.T) {
 						// Define computed Priority column based on shop name
 						"Priority": "(CASE WHEN shops.name = 'premium' THEN 1 WHEN shops.name = 'featured' THEN 2 ELSE 3 END)",
 					}),
-					ForScan: func(_ *gorm.DB) (dest any, toCursorNodes func(computedResults []map[string]any) []cursor.Node[*Shop], err error) {
+					SetupScanner: func(_ *gorm.DB) (*Scanner[*Shop], error) {
 						nodes := []*Shop{}
-						return &nodes, func(computedResults []map[string]any) []cursor.Node[*Shop] {
-							return lo.Map(nodes, func(s *Shop, i int) cursor.Node[*Shop] {
-								s.Priority = int(computedResults[i]["Priority"].(int32))
-								return &cursor.SelfNode[*Shop]{Node: s}
-							})
+						return &Scanner[*Shop]{
+							Dest: &nodes,
+							Transform: func(computedResults []map[string]any) []cursor.Node[*Shop] {
+								return lo.Map(nodes, func(s *Shop, i int) cursor.Node[*Shop] {
+									s.Priority = int(computedResults[i]["Priority"].(int32))
+									return &cursor.SelfNode[*Shop]{Node: s}
+								})
+							},
 						}, nil
 					},
 				}),

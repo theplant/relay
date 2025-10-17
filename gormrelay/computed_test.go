@@ -75,13 +75,13 @@ func TestWithComputedResult(t *testing.T) {
 // TestComputedValidate verifies the validation logic of the Computed struct.
 // It tests various invalid configurations to ensure they are properly rejected:
 // - Empty Columns map
-// - Nil ForScan function
+// - Nil SetupScanner function
 // - Columns with pre-defined Alias (which should be set during query execution)
 // - Duplicate column aliases that would cause SQL errors
 func TestComputedValidate(t *testing.T) {
-	// Mock ForScan function for testing
-	mockForScan := func(db *gorm.DB) (dest any, toCursorNodes func(computedResults []map[string]any) []cursor.Node[*struct{}], err error) {
-		return nil, nil, nil
+	// Mock SetupScanner function for testing
+	mockSetupScanner := func(db *gorm.DB) (*gormrelay.Scanner[*struct{}], error) {
+		return nil, nil
 	}
 
 	tests := []struct {
@@ -96,29 +96,29 @@ func TestComputedValidate(t *testing.T) {
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true},
 				},
-				ForScan: mockForScan,
+				SetupScanner: mockSetupScanner,
 			},
 			expectError: false,
 		},
 		{
 			name: "empty columns",
 			computed: &gormrelay.Computed[*struct{}]{
-				Columns: map[string]clause.Column{},
-				ForScan: mockForScan,
+				Columns:      map[string]clause.Column{},
+				SetupScanner: mockSetupScanner,
 			},
 			expectError: true,
 			errorSubstr: "Columns must not be empty",
 		},
 		{
-			name: "nil ForScan",
+			name: "nil SetupScanner",
 			computed: &gormrelay.Computed[*struct{}]{
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true},
 				},
-				ForScan: nil,
+				SetupScanner: nil,
 			},
 			expectError: true,
-			errorSubstr: "ForScan function must not be nil",
+			errorSubstr: "SetupScanner function must not be nil",
 		},
 		{
 			name: "column with non-empty alias",
@@ -126,7 +126,7 @@ func TestComputedValidate(t *testing.T) {
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true, Alias: "already_set"},
 				},
-				ForScan: mockForScan,
+				SetupScanner: mockSetupScanner,
 			},
 			expectError: true,
 			errorSubstr: "should have empty Alias",
@@ -138,7 +138,7 @@ func TestComputedValidate(t *testing.T) {
 					"UserScore":  {Name: "(AVG(score))", Raw: true},
 					"user_score": {Name: "(SUM(score)/COUNT(*))", Raw: true},
 				},
-				ForScan: mockForScan,
+				SetupScanner: mockSetupScanner,
 			},
 			expectError: true,
 			errorSubstr: "duplicate computed field aliases",
@@ -159,9 +159,9 @@ func TestComputedValidate(t *testing.T) {
 	}
 }
 
-// TestDefaultForScan verifies the DefaultForScan function correctly creates a ForScan
-// function that combines entities with their computed results.
-func TestDefaultForScan(t *testing.T) {
+// TestNewScanner verifies the NewScanner function correctly creates a scanner
+// that combines entities with their computed results.
+func TestNewScanner(t *testing.T) {
 	type User struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
@@ -182,18 +182,18 @@ func TestDefaultForScan(t *testing.T) {
 	db := (&gorm.DB{Statement: &gorm.Statement{}}).Model(&User{})
 
 	// Test 1: Model type matches generic type
-	dest1, toCursorNodes1, err := gormrelay.DefaultForScan[*User](db)
+	scanner1, err := gormrelay.NewScanner[*User](db)
 	require.NoError(t, err)
 
 	// Check destination type when model matches generic type
-	userSlicePtr1, ok := dest1.(*[]*User)
+	userSlicePtr1, ok := scanner1.Dest.(*[]*User)
 	require.True(t, ok, "dest should be *[]*User")
 
 	// Populate user slice
 	*userSlicePtr1 = users
 
 	// Convert to cursor nodes
-	nodes1 := toCursorNodes1(computedResults)
+	nodes1 := scanner1.Transform(computedResults)
 	require.Len(t, nodes1, 2)
 
 	// Check first node
@@ -226,18 +226,18 @@ func TestDefaultForScan(t *testing.T) {
 	assert.Equal(t, "Bob", user2.Name)
 
 	// Test 2: Model type does NOT match generic type
-	dest2, toCursorNodes2, err := gormrelay.DefaultForScan[any](db)
+	scanner2, err := gormrelay.NewScanner[any](db)
 	require.NoError(t, err)
 
 	// Populate result slice with compatible nodes
-	sliceValue := reflect.ValueOf(dest2).Elem()
+	sliceValue := reflect.ValueOf(scanner2.Dest).Elem()
 	for _, user := range users {
 		u := &User{ID: user.ID, Name: user.Name}
 		sliceValue.Set(reflect.Append(sliceValue, reflect.ValueOf(u)))
 	}
 
 	// Convert to cursor nodes
-	nodes2 := toCursorNodes2(computedResults)
+	nodes2 := scanner2.Transform(computedResults)
 	require.Len(t, nodes2, 2)
 
 	// Verify nodes

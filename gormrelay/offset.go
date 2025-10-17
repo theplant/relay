@@ -96,7 +96,7 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 	}
 
 	if len(computedColumns) > 0 {
-		dest, toCursorNodes, err := a.opts.Computed.ForScan(db)
+		scanner, err := a.opts.Computed.SetupScanner(db)
 		if err != nil {
 			return nil, err
 		}
@@ -104,13 +104,13 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 		computedResults, err := splitComputedScan(
 			computedColumns,
 			db.Scopes(AppendSelect(maps.Values(computedColumns)...)),
-			dest,
+			scanner.Dest,
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		return toCursorNodes(computedResults), nil
+		return scanner.Transform(computedResults), nil
 	}
 
 	var nodes []T
