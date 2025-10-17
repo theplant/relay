@@ -47,6 +47,7 @@ type Company struct {
 	Description *string        `json:"description"`
 	CountryID   string         `gorm:"not null" json:"countryId"`
 	Country     *Country       `json:"country"`
+	Users       []*User        `json:"users"`
 }
 
 type CompanyFilter struct {
@@ -59,6 +60,7 @@ type CompanyFilter struct {
 	Name        *filter.String   `json:"name"`
 	Description *filter.String   `json:"description"`
 	Country     *CountryFilter   `json:"country"`
+	Users       *UserFilter      `json:"users"`
 }
 
 type User struct {
@@ -71,6 +73,18 @@ type User struct {
 	Age         int            `gorm:"not null" json:"age"`
 	CompanyID   string         `gorm:"not null" json:"companyId"`
 	Company     *Company       `json:"company"`
+	Profile     *Profile       `json:"profile"`
+}
+
+type Profile struct {
+	ID        string         `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time      `gorm:"index;not null" json:"createdAt"`
+	UpdatedAt time.Time      `gorm:"index;not null" json:"updatedAt"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deletedAt"`
+	Bio       string         `json:"bio"`
+	Avatar    *string        `json:"avatar"`
+	UserID    string         `gorm:"not null;uniqueIndex" json:"userId"`
+	User      *User          `json:"user"`
 }
 
 type UserFilter struct {
@@ -85,6 +99,19 @@ type UserFilter struct {
 	Age         *filter.Int    `json:"age"`
 	CompanyID   *filter.ID     `json:"companyId"`
 	Company     *CompanyFilter `json:"company"`
+	Profile     *ProfileFilter `json:"profile"`
+}
+
+type ProfileFilter struct {
+	Not       *ProfileFilter   `json:"not"`
+	And       []*ProfileFilter `json:"and"`
+	Or        []*ProfileFilter `json:"or"`
+	ID        *filter.ID       `json:"id"`
+	CreatedAt *filter.Time     `json:"createdAt"`
+	UpdatedAt *filter.Time     `json:"updatedAt"`
+	Bio       *filter.String   `json:"bio"`
+	Avatar    *filter.String   `json:"avatar"`
+	UserID    *filter.ID       `json:"userId"`
 }
 
 var db *gorm.DB
@@ -528,6 +555,92 @@ func TestScope(t *testing.T) {
 				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE LOWER("countries"."name") LIKE $1 AND "countries"."deleted_at" IS NULL) AND LOWER("companies"."name") LIKE $2) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%america%", "tech%"},
 			},
+			{
+				name: "has_one filter with bio equals",
+				filter: &UserFilter{
+					Profile: &ProfileFilter{
+						Bio: &filter.String{
+							Eq: lo.ToPtr("Software Engineer"),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" = $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"Software Engineer"},
+			},
+			{
+				name: "has_one filter with bio contains",
+				filter: &UserFilter{
+					Profile: &ProfileFilter{
+						Bio: &filter.String{
+							Contains: lo.ToPtr("engineer"),
+							Fold:     true,
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE LOWER("profiles"."bio") LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"%engineer%"},
+			},
+			{
+				name: "has_one filter with multiple conditions",
+				filter: &UserFilter{
+					Profile: &ProfileFilter{
+						Bio: &filter.String{
+							StartsWith: lo.ToPtr("Software"),
+						},
+						Avatar: &filter.String{
+							IsNull: lo.ToPtr(false),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE ("profiles"."avatar" IS NOT NULL AND "profiles"."bio" LIKE $1) AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"Software%"},
+			},
+			{
+				name: "has_one filter combined with user filter",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Gte: lo.ToPtr(25),
+					},
+					Profile: &ProfileFilter{
+						Bio: &filter.String{
+							Contains: lo.ToPtr("engineer"),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $2 AND "profiles"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(25), "%engineer%"},
+			},
+			{
+				name: "has_one and belongs_to combined",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							Eq: lo.ToPtr("Tech Corp"),
+						},
+					},
+					Profile: &ProfileFilter{
+						Bio: &filter.String{
+							Contains: lo.ToPtr("developer"),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $2 AND "profiles"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"Tech Corp", "%developer%"},
+			},
+			{
+				name: "not has_one filter",
+				filter: &UserFilter{
+					Not: &UserFilter{
+						Profile: &ProfileFilter{
+							Bio: &filter.String{
+								Contains: lo.ToPtr("manager"),
+							},
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" NOT IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"%manager%"},
+			},
 		}
 
 		for _, tt := range tests {
@@ -555,10 +668,46 @@ func TestScope(t *testing.T) {
 		}
 	})
 
-	t.Run("disable belongs_to filter option", func(t *testing.T) {
+	t.Run("unsupported relationship types", func(t *testing.T) {
 		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
 		require.NoError(t, err)
 		err = db.AutoMigrate(&Country{}, &Company{}, &User{})
+		require.NoError(t, err)
+
+		tests := []struct {
+			name       string
+			filter     *CompanyFilter
+			wantErrMsg string
+		}{
+			{
+				name: "has_many relationship should be rejected",
+				filter: &CompanyFilter{
+					Users: &UserFilter{
+						Age: &filter.Int{
+							Gte: lo.ToPtr(18),
+						},
+					},
+				},
+				wantErrMsg: `unsupported relationship type "has_many" for field "Users" (only belongs_to and has_one are supported)`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				stmt := db.Model(&Company{}).
+					Scopes(gormfilter.Scope(tt.filter)).
+					Session(&gorm.Session{DryRun: true}).
+					Find(&[]Company{})
+
+				require.ErrorContains(t, stmt.Error, tt.wantErrMsg)
+			})
+		}
+	})
+
+	t.Run("disable belongs_to filter option", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{}, &Profile{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{}, &Profile{})
 		require.NoError(t, err)
 
 		tests := []struct {
@@ -580,6 +729,18 @@ func TestScope(t *testing.T) {
 				},
 				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(18), "%user%"},
+			},
+			{
+				name: "has_one filter should still work when belongs_to is disabled",
+				filter: &UserFilter{
+					Profile: &ProfileFilter{
+						Bio: &filter.String{
+							Contains: lo.ToPtr("engineer"),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"%engineer%"},
 			},
 			{
 				name: "belongs_to filter should be disabled",
@@ -611,6 +772,155 @@ func TestScope(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				stmt := db.Model(&User{}).
 					Scopes(gormfilter.Scope(tt.filter, gormfilter.WithDisableBelongsTo())).
+					Session(&gorm.Session{DryRun: true}).
+					Find(&[]User{})
+
+				if tt.wantErrMsg != "" {
+					require.ErrorContains(t, stmt.Error, tt.wantErrMsg)
+					return
+				}
+
+				require.NoError(t, stmt.Error)
+
+				if tt.wantSQL != "" {
+					sql := stmt.Statement.SQL.String()
+					vars := stmt.Statement.Vars
+					require.Equal(t, tt.wantSQL, sql)
+					require.Equal(t, tt.wantVars, vars)
+				}
+			})
+		}
+	})
+
+	t.Run("disable has_one filter option", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{}, &Profile{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{}, &Profile{})
+		require.NoError(t, err)
+
+		tests := []struct {
+			name       string
+			filter     *UserFilter
+			wantSQL    string
+			wantVars   []any
+			wantErrMsg string
+		}{
+			{
+				name: "normal filter should work when has_one is disabled",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Gte: lo.ToPtr(18),
+					},
+					Name: &filter.String{
+						Contains: lo.ToPtr("user"),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(18), "%user%"},
+			},
+			{
+				name: "belongs_to filter should still work when has_one is disabled",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							Eq: lo.ToPtr("company1"),
+						},
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{"company1"},
+			},
+			{
+				name: "has_one filter should be disabled",
+				filter: &UserFilter{
+					Profile: &ProfileFilter{
+						Bio: &filter.String{
+							Contains: lo.ToPtr("engineer"),
+						},
+					},
+				},
+				wantErrMsg: `has_one filter is disabled for field "Profile"`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				stmt := db.Model(&User{}).
+					Scopes(gormfilter.Scope(tt.filter, gormfilter.WithDisableHasOne())).
+					Session(&gorm.Session{DryRun: true}).
+					Find(&[]User{})
+
+				if tt.wantErrMsg != "" {
+					require.ErrorContains(t, stmt.Error, tt.wantErrMsg)
+					return
+				}
+
+				require.NoError(t, stmt.Error)
+
+				if tt.wantSQL != "" {
+					sql := stmt.Statement.SQL.String()
+					vars := stmt.Statement.Vars
+					require.Equal(t, tt.wantSQL, sql)
+					require.Equal(t, tt.wantVars, vars)
+				}
+			})
+		}
+	})
+
+	t.Run("disable all relationships filter option", func(t *testing.T) {
+		err := db.Migrator().DropTable(&User{}, &Company{}, &Country{}, &Profile{})
+		require.NoError(t, err)
+		err = db.AutoMigrate(&Country{}, &Company{}, &User{}, &Profile{})
+		require.NoError(t, err)
+
+		tests := []struct {
+			name       string
+			filter     *UserFilter
+			wantSQL    string
+			wantVars   []any
+			wantErrMsg string
+		}{
+			{
+				name: "normal filter should work when all relationships are disabled",
+				filter: &UserFilter{
+					Age: &filter.Int{
+						Gte: lo.ToPtr(18),
+					},
+					Name: &filter.String{
+						Contains: lo.ToPtr("user"),
+					},
+				},
+				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantVars: []any{float64(18), "%user%"},
+			},
+			{
+				name: "belongs_to filter should be disabled",
+				filter: &UserFilter{
+					Company: &CompanyFilter{
+						Name: &filter.String{
+							Eq: lo.ToPtr("company1"),
+						},
+					},
+				},
+				wantErrMsg: `belongs_to filter is disabled for field "Company"`,
+			},
+			{
+				name: "has_one filter should be disabled",
+				filter: &UserFilter{
+					Profile: &ProfileFilter{
+						Bio: &filter.String{
+							Contains: lo.ToPtr("engineer"),
+						},
+					},
+				},
+				wantErrMsg: `has_one filter is disabled for field "Profile"`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				stmt := db.Model(&User{}).
+					Scopes(gormfilter.Scope(tt.filter, gormfilter.WithDisableRelationships())).
 					Session(&gorm.Session{DryRun: true}).
 					Find(&[]User{})
 
