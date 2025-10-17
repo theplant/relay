@@ -8,9 +8,9 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-func parseSchema(db *gorm.DB, v any) (*schema.Schema, error) {
+func parseSchema(db *gorm.DB, model any) (*schema.Schema, error) {
 	stmt := &gorm.Statement{DB: db}
-	if err := stmt.Parse(v); err != nil {
+	if err := stmt.Parse(model); err != nil {
 		return nil, errors.Wrap(err, "failed to parse schema for model")
 	}
 	return stmt.Schema, nil

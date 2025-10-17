@@ -16,15 +16,15 @@ import (
 
 type OffsetFinder[T any] struct {
 	db   *gorm.DB
-	opts Options[T]
+	opts options[T]
 }
 
 func NewOffsetFinder[T any](db *gorm.DB, opts ...Option[T]) *OffsetFinder[T] {
-	options := Options[T]{}
+	o := options[T]{}
 	for _, opt := range opts {
-		opt(&options)
+		opt(&o)
 	}
-	return &OffsetFinder[T]{db: db, opts: options}
+	return &OffsetFinder[T]{db: db, opts: o}
 }
 
 func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]cursor.Node[T], error) {

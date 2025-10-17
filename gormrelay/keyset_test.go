@@ -26,7 +26,7 @@ func TestScopeKeyset(t *testing.T) {
 		db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
 				nil,
-				&map[string]interface{}{"Age": 85},
+				&map[string]any{"Age": 85},
 				nil,
 				[]relay.OrderBy{
 					{Field: "Age", Desc: false},
@@ -42,7 +42,7 @@ func TestScopeKeyset(t *testing.T) {
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
 				nil,
-				&map[string]interface{}{"Age": 85},
+				&map[string]any{"Age": 85},
 				nil,
 				[]relay.OrderBy{
 					{Field: "Age", Desc: false},
@@ -60,7 +60,7 @@ func TestScopeKeyset(t *testing.T) {
 			// with table alias
 			tx = tx.Table("company_users AS u").Model(&User{}).Scopes(scopeKeyset(
 				nil,
-				&map[string]interface{}{"Age": 85},
+				&map[string]any{"Age": 85},
 				nil,
 				[]relay.OrderBy{
 					{Field: "Age", Desc: false},
@@ -77,8 +77,8 @@ func TestScopeKeyset(t *testing.T) {
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
 				nil,
-				&map[string]interface{}{"Age": 85},
-				&map[string]interface{}{"Age": 88},
+				&map[string]any{"Age": 85},
+				&map[string]any{"Age": 88},
 				[]relay.OrderBy{
 					{Field: "Age", Desc: false},
 				},
@@ -94,8 +94,8 @@ func TestScopeKeyset(t *testing.T) {
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
 				nil,
-				&map[string]interface{}{"Age": 85, "Name": "name15"},
-				&map[string]interface{}{"Age": 88, "Name": "name12"},
+				&map[string]any{"Age": 85, "Name": "name15"},
+				&map[string]any{"Age": 88, "Name": "name12"},
 				[]relay.OrderBy{
 					{Field: "Age", Desc: false},
 					{Field: "Name", Desc: true},
@@ -112,8 +112,8 @@ func TestScopeKeyset(t *testing.T) {
 		sql := db.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			tx = tx.Model(&User{}).Scopes(scopeKeyset(
 				nil,
-				&map[string]interface{}{"Age": 85, "Name": "name15"},
-				&map[string]interface{}{"Age": 88, "Name": "name12"},
+				&map[string]any{"Age": 85, "Name": "name15"},
+				&map[string]any{"Age": 88, "Name": "name12"},
 				[]relay.OrderBy{
 					{Field: "Age", Desc: false},
 					{Field: "Name", Desc: true},
@@ -132,8 +132,8 @@ func TestScopeKeyset(t *testing.T) {
 			tx = tx.Model(&User{}).Where("name LIKE ?", "name%").
 				Scopes(scopeKeyset(
 					nil,
-					&map[string]interface{}{"Age": 85, "Name": "name15"},
-					&map[string]interface{}{"Age": 88, "Name": "name12"},
+					&map[string]any{"Age": 85, "Name": "name15"},
+					&map[string]any{"Age": 88, "Name": "name12"},
 					[]relay.OrderBy{
 						{Field: "Age", Desc: false},
 						{Field: "Name", Desc: true},
@@ -160,7 +160,7 @@ ELSE 0
 END)`,
 						},
 					},
-					&map[string]interface{}{
+					&map[string]any{
 						"Priority": 1,
 						"Age":      50,
 					},

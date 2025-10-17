@@ -14,7 +14,7 @@ import (
 	"github.com/theplant/relay/cursor"
 )
 
-func createWhereExpr(getColumn func(fieldName string) (clause.Column, error), orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
+func buildWhereExpr(getColumn func(fieldName string) (clause.Column, error), orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
 	ors := make([]clause.Expression, 0, len(orderBys))
 	eqs := make([]clause.Expression, 0, len(orderBys))
 	for i, orderBy := range orderBys {
@@ -114,7 +114,7 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 		var exprs []clause.Expression
 
 		if after != nil {
-			expr, err := createWhereExpr(getColumn, orderBys, *after, false)
+			expr, err := buildWhereExpr(getColumn, orderBys, *after, false)
 			if err != nil {
 				_ = db.AddError(err)
 				return db
@@ -123,7 +123,7 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 		}
 
 		if before != nil {
-			expr, err := createWhereExpr(getColumn, orderBys, *before, true)
+			expr, err := buildWhereExpr(getColumn, orderBys, *before, true)
 			if err != nil {
 				_ = db.AddError(err)
 				return db
@@ -176,15 +176,15 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 
 type KeysetFinder[T any] struct {
 	db   *gorm.DB
-	opts Options[T]
+	opts options[T]
 }
 
 func NewKeysetFinder[T any](db *gorm.DB, opts ...Option[T]) *KeysetFinder[T] {
-	options := Options[T]{}
+	o := options[T]{}
 	for _, opt := range opts {
-		opt(&options)
+		opt(&o)
 	}
-	return &KeysetFinder[T]{db: db, opts: options}
+	return &KeysetFinder[T]{db: db, opts: o}
 }
 
 func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]cursor.Node[T], error) {

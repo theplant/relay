@@ -10,6 +10,8 @@
 - **Optional cursor encryption**: Supports encrypting cursors using `GCM(AES)` or `Base64` to ensure the security of pagination information.
 - **Flexible query strategies**: Optionally skip the `TotalCount` query to improve performance, especially in large datasets.
 - **Non-generic support**: Even without using Go generics, you can paginate using the `any` type for flexible use cases.
+- **Computed fields**: Add database-level calculated fields using SQL expressions for sorting and pagination.
+- **Powerful filtering**: Type-safe filtering with support for comparison operators, string matching, logical combinations, and relationship filtering.
 
 ## Usage
 
@@ -80,6 +82,332 @@ conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
     First: lo.ToPtr(10), // query first 10 records
 })
 ```
+
+## Computed Fields
+
+`relay` supports computed fields, allowing you to add SQL expressions calculated at the database level and use them for sorting and pagination.
+
+### Basic Usage
+
+```go
+import (
+    "github.com/theplant/relay/gormrelay"
+)
+
+p := relay.New(
+    gormrelay.NewKeysetAdapter[*User](
+        db,
+        gormrelay.WithComputed(&gormrelay.Computed[*User]{
+            Columns: gormrelay.ComputedColumns(map[string]string{
+                "Priority": "CASE WHEN status = 'premium' THEN 1 WHEN status = 'vip' THEN 2 ELSE 3 END",
+            }),
+            ForScan: gormrelay.DefaultForScan[*User],
+        }),
+    ),
+    relay.EnsureLimits[*User](10, 100),
+    relay.EnsurePrimaryOrderBy[*User](
+        relay.OrderBy{Field: "ID", Desc: false},
+    ),
+)
+
+// Use computed field in ordering
+conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+    First: lo.ToPtr(10),
+    OrderBys: []relay.OrderBy{
+        {Field: "Priority", Desc: false}, // Sort by computed field
+        {Field: "ID", Desc: false},
+    },
+})
+```
+
+### Key Components
+
+**ComputedColumns**
+
+Helper function to create computed column definitions from SQL expressions:
+
+```go
+gormrelay.ComputedColumns(map[string]string{
+    "FieldName": "SQL expression",
+})
+```
+
+**DefaultForScan**
+
+Standard scan function that handles result scanning and wrapping:
+
+```go
+gormrelay.DefaultForScan[*User]
+```
+
+**Custom ForScan**
+
+For custom types or complex scenarios, implement your own ForScan function:
+
+```go
+type Shop struct {
+    ID       int
+    Name     string
+    Priority int // Computed field, not stored in DB
+}
+
+gormrelay.WithComputed(&gormrelay.Computed[*Shop]{
+    Columns: gormrelay.ComputedColumns(map[string]string{
+        "Priority": "CASE WHEN name = 'premium' THEN 1 ELSE 2 END",
+    }),
+    ForScan: func(db *gorm.DB) (dest any, toCursorNodes func([]map[string]any) []cursor.Node[*Shop], err error) {
+        shops := []*Shop{}
+        return &shops, func(computedResults []map[string]any) []cursor.Node[*Shop] {
+            return lo.Map(shops, func(s *Shop, i int) cursor.Node[*Shop] {
+                // Populate computed field
+                s.Priority = int(computedResults[i]["Priority"].(int32))
+                return &cursor.SelfNode[*Shop]{Node: s}
+            })
+        }, nil
+    },
+})
+```
+
+### Complex Example
+
+```go
+p := relay.New(
+    gormrelay.NewKeysetAdapter[*User](
+        db,
+        gormrelay.WithComputed(&gormrelay.Computed[*User]{
+            Columns: gormrelay.ComputedColumns(map[string]string{
+                "Score": "(points * 10 + bonus)",
+                "Rank":  "CASE WHEN score > 100 THEN 'A' WHEN score > 50 THEN 'B' ELSE 'C' END",
+            }),
+            ForScan: gormrelay.DefaultForScan[*User],
+        }),
+    ),
+    relay.EnsureLimits[*User](10, 100),
+    relay.EnsurePrimaryOrderBy[*User](
+        relay.OrderBy{Field: "ID", Desc: false},
+    ),
+)
+
+// Multi-level sorting with computed fields
+conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+    First: lo.ToPtr(10),
+    OrderBys: []relay.OrderBy{
+        {Field: "Rank", Desc: false},
+        {Field: "Score", Desc: true},
+        {Field: "ID", Desc: false},
+    },
+})
+```
+
+### Notes
+
+- Computed fields are calculated by the database, ensuring consistency and performance
+- The computed values are automatically included in cursor serialization for pagination
+- Field names in `ComputedColumns` are converted to SQL aliases using `ComputedFieldToColumnAlias`
+- Both keyset and offset pagination support computed fields
+
+## Filter Support
+
+`relay` provides powerful type-safe filtering capabilities through the `filter` and `gormfilter` packages.
+
+### Basic Filtering
+
+```go
+import (
+    "github.com/theplant/relay/filter"
+    "github.com/theplant/relay/filter/gormfilter"
+)
+
+type UserFilter struct {
+    Name *filter.String `json:"name"`
+    Age  *filter.Int    `json:"age"`
+}
+
+db.Scopes(
+    gormfilter.Scope(&UserFilter{
+        Name: &filter.String{
+            Contains: lo.ToPtr("john"),
+            Fold:     true, // case-insensitive
+        },
+        Age: &filter.Int{
+            Gte: lo.ToPtr(18),
+        },
+    }),
+).Find(&users)
+```
+
+### Supported Operators
+
+The filter package provides the following types and operators:
+
+**String** (`filter.String` / `filter.ID`)
+
+- `Eq`, `Neq`: Equal / Not equal
+- `Lt`, `Lte`, `Gt`, `Gte`: Less than, Less than or equal, Greater than, Greater than or equal
+- `In`, `NotIn`: In / Not in array
+- `Contains`, `StartsWith`, `EndsWith`: String pattern matching
+- `Fold`: Case-insensitive comparison (works with all string operators)
+- `IsNull`: Null check
+
+**Numeric** (`filter.Int` / `filter.Float`)
+
+- `Eq`, `Neq`, `Lt`, `Lte`, `Gt`, `Gte`: Comparison operators
+- `In`, `NotIn`: In / Not in array
+- `IsNull`: Null check
+
+**Boolean** (`filter.Boolean`)
+
+- `Eq`, `Neq`: Equal / Not equal
+- `IsNull`: Null check
+
+**Time** (`filter.Time`)
+
+- `Eq`, `Neq`, `Lt`, `Lte`, `Gt`, `Gte`: Time comparison
+- `In`, `NotIn`: In / Not in array
+- `IsNull`: Null check
+
+### Logical Combinations
+
+Filters support `And`, `Or`, and `Not` logical operators:
+
+```go
+type UserFilter struct {
+    And  []*UserFilter `json:"and"`
+    Or   []*UserFilter `json:"or"`
+    Not  *UserFilter   `json:"not"`
+    Name *filter.String `json:"name"`
+    Age  *filter.Int    `json:"age"`
+}
+
+// Complex filter example
+db.Scopes(
+    gormfilter.Scope(&UserFilter{
+        Or: []*UserFilter{
+            {
+                Name: &filter.String{
+                    StartsWith: lo.ToPtr("J"),
+                    Fold:       true,
+                },
+            },
+            {
+                Age: &filter.Int{
+                    Gt: lo.ToPtr(30),
+                },
+            },
+        },
+    }),
+).Find(&users)
+```
+
+### Relationship Filtering
+
+The filter supports filtering by `BelongsTo` relationships with multi-level nesting:
+
+```go
+type CountryFilter struct {
+    Code *filter.String `json:"code"`
+    Name *filter.String `json:"name"`
+}
+
+type CompanyFilter struct {
+    Name    *filter.String   `json:"name"`
+    Country *CountryFilter   `json:"country"`  // BelongsTo relationship
+}
+
+type UserFilter struct {
+    Age     *filter.Int      `json:"age"`
+    Company *CompanyFilter   `json:"company"`  // BelongsTo relationship
+}
+
+// Filter users by company's country
+db.Scopes(
+    gormfilter.Scope(&UserFilter{
+        Age: &filter.Int{
+            Gte: lo.ToPtr(21),
+        },
+        Company: &CompanyFilter{
+            Name: &filter.String{
+                Contains: lo.ToPtr("Tech"),
+            },
+            Country: &CountryFilter{
+                Code: &filter.String{
+                    Eq: lo.ToPtr("US"),
+                },
+                Name: &filter.String{
+                    Eq: lo.ToPtr("United States"),
+                },
+            },
+        },
+    }),
+).Find(&users)
+```
+
+### Combining with Pagination
+
+Filter and pagination can work together seamlessly:
+
+```go
+import (
+    "github.com/theplant/relay"
+    "github.com/theplant/relay/cursor"
+    "github.com/theplant/relay/filter"
+    "github.com/theplant/relay/filter/gormfilter"
+    "github.com/theplant/relay/gormrelay"
+)
+
+type UserFilter struct {
+    Name    *filter.String   `json:"name"`
+    Age     *filter.Int      `json:"age"`
+    Company *CompanyFilter   `json:"company"`
+}
+
+// Create paginator with filter
+p := relay.New(
+    cursor.Base64(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
+        return gormrelay.NewKeysetAdapter[*User](
+            db.WithContext(ctx).Scopes(gormfilter.Scope(&UserFilter{
+                Age: &filter.Int{
+                    Gte: lo.ToPtr(18),
+                },
+                Company: &CompanyFilter{
+                    Name: &filter.String{
+                        Contains: lo.ToPtr("Tech"),
+                        Fold:     true,
+                    },
+                },
+            })),
+        )(ctx, req)
+    }),
+    relay.EnsureLimits[*User](10, 100),
+    relay.EnsurePrimaryOrderBy[*User](
+        relay.OrderBy{Field: "ID", Desc: false},
+    ),
+)
+
+conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
+    First: lo.ToPtr(10),
+})
+```
+
+### Filter Options
+
+**Disable BelongsTo Filtering:**
+
+```go
+db.Scopes(
+    gormfilter.Scope(userFilter, gormfilter.WithDisableBelongsTo()),
+).Find(&users)
+```
+
+### Performance Considerations
+
+Relationship filters use `IN` subqueries, which are generally efficient for most use cases. Performance depends on:
+
+- Database indexes on foreign keys
+- Size of result sets
+- Query complexity
+
+For detailed performance analysis comparing `IN` subqueries with `JOIN` approaches, see `filter/gormfilter/perf/perf_test.go`.
 
 ## Reference
 
