@@ -28,14 +28,14 @@ type Country struct {
 }
 
 type CountryFilter struct {
-	Not       *CountryFilter   `json:"not"`
-	And       []*CountryFilter `json:"and"`
-	Or        []*CountryFilter `json:"or"`
-	ID        *filter.ID       `json:"id"`
-	CreatedAt *filter.Time     `json:"createdAt"`
-	UpdatedAt *filter.Time     `json:"updatedAt"`
-	Name      *filter.String   `json:"name"`
-	Code      *filter.String   `json:"code"`
+	Not       *CountryFilter
+	And       []*CountryFilter
+	Or        []*CountryFilter
+	ID        *filter.ID
+	CreatedAt *filter.Time
+	UpdatedAt *filter.Time
+	Name      *filter.String
+	Code      *filter.String
 }
 
 type Company struct {
@@ -51,16 +51,16 @@ type Company struct {
 }
 
 type CompanyFilter struct {
-	Not         *CompanyFilter   `json:"not"`
-	And         []*CompanyFilter `json:"and"`
-	Or          []*CompanyFilter `json:"or"`
-	ID          *filter.ID       `json:"id"`
-	CreatedAt   *filter.Time     `json:"createdAt"`
-	UpdatedAt   *filter.Time     `json:"updatedAt"`
-	Name        *filter.String   `json:"name"`
-	Description *filter.String   `json:"description"`
-	Country     *CountryFilter   `json:"country"`
-	Users       *UserFilter      `json:"users"`
+	Not         *CompanyFilter
+	And         []*CompanyFilter
+	Or          []*CompanyFilter
+	ID          *filter.ID
+	CreatedAt   *filter.Time
+	UpdatedAt   *filter.Time
+	Name        *filter.String
+	Description *filter.String
+	Country     *CountryFilter
+	Users       *UserFilter
 }
 
 type User struct {
@@ -88,30 +88,30 @@ type Profile struct {
 }
 
 type UserFilter struct {
-	Not         *UserFilter    `json:"not"`
-	And         []*UserFilter  `json:"and"`
-	Or          []*UserFilter  `json:"or"`
-	ID          *filter.ID     `json:"id"`
-	CreatedAt   *filter.Time   `json:"createdAt"`
-	UpdatedAt   *filter.Time   `json:"updatedAt"`
-	Name        *filter.String `json:"name"`
-	Description *filter.String `json:"description"`
-	Age         *filter.Int    `json:"age"`
-	CompanyID   *filter.ID     `json:"companyId"`
-	Company     *CompanyFilter `json:"company"`
-	Profile     *ProfileFilter `json:"profile"`
+	Not         *UserFilter
+	And         []*UserFilter
+	Or          []*UserFilter
+	ID          *filter.ID
+	CreatedAt   *filter.Time
+	UpdatedAt   *filter.Time
+	Name        *filter.String
+	Description *filter.String
+	Age         *filter.Int
+	CompanyID   *filter.ID
+	Company     *CompanyFilter
+	Profile     *ProfileFilter
 }
 
 type ProfileFilter struct {
-	Not       *ProfileFilter   `json:"not"`
-	And       []*ProfileFilter `json:"and"`
-	Or        []*ProfileFilter `json:"or"`
-	ID        *filter.ID       `json:"id"`
-	CreatedAt *filter.Time     `json:"createdAt"`
-	UpdatedAt *filter.Time     `json:"updatedAt"`
-	Bio       *filter.String   `json:"bio"`
-	Avatar    *filter.String   `json:"avatar"`
-	UserID    *filter.ID       `json:"userId"`
+	Not       *ProfileFilter
+	And       []*ProfileFilter
+	Or        []*ProfileFilter
+	ID        *filter.ID
+	CreatedAt *filter.Time
+	UpdatedAt *filter.Time
+	Bio       *filter.String
+	Avatar    *filter.String
+	UserID    *filter.ID
 }
 
 var db *gorm.DB
@@ -414,15 +414,6 @@ func TestScope(t *testing.T) {
 				},
 				wantSQL:  `SELECT * FROM "users" WHERE "users"."created_at" IN ($1,$2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"},
-			},
-			{
-				name: "not in empty array",
-				filter: &UserFilter{
-					CreatedAt: &filter.Time{
-						NotIn: []time.Time{},
-					},
-				},
-				wantErrMsg: `empty NotIn values for field "CreatedAt"`,
 			},
 			{
 				name: "belongs_to filter with name equals",

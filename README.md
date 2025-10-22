@@ -222,8 +222,8 @@ import (
 )
 
 type UserFilter struct {
-    Name *filter.String `json:"name"`
-    Age  *filter.Int    `json:"age"`
+    Name *filter.String
+    Age  *filter.Int
 }
 
 db.Scopes(
@@ -275,11 +275,11 @@ Filters support `And`, `Or`, and `Not` logical operators:
 
 ```go
 type UserFilter struct {
-    And  []*UserFilter `json:"and"`
-    Or   []*UserFilter `json:"or"`
-    Not  *UserFilter   `json:"not"`
-    Name *filter.String `json:"name"`
-    Age  *filter.Int    `json:"age"`
+    And  []*UserFilter
+    Or   []*UserFilter
+    Not  *UserFilter
+    Name *filter.String
+    Age  *filter.Int
 }
 
 // Complex filter example
@@ -308,18 +308,18 @@ The filter supports filtering by `BelongsTo` relationships with multi-level nest
 
 ```go
 type CountryFilter struct {
-    Code *filter.String `json:"code"`
-    Name *filter.String `json:"name"`
+    Code *filter.String
+    Name *filter.String
 }
 
 type CompanyFilter struct {
-    Name    *filter.String   `json:"name"`
-    Country *CountryFilter   `json:"country"`  // BelongsTo relationship
+    Name    *filter.String
+    Country *CountryFilter  // BelongsTo relationship
 }
 
 type UserFilter struct {
-    Age     *filter.Int      `json:"age"`
-    Company *CompanyFilter   `json:"company"`  // BelongsTo relationship
+    Age     *filter.Int
+    Company *CompanyFilter  // BelongsTo relationship
 }
 
 // Filter users by company's country
@@ -359,9 +359,9 @@ import (
 )
 
 type UserFilter struct {
-    Name    *filter.String   `json:"name"`
-    Age     *filter.Int      `json:"age"`
-    Company *CompanyFilter   `json:"company"`
+    Name    *filter.String
+    Age     *filter.Int
+    Company *CompanyFilter
 }
 
 // Create paginator with filter
