@@ -13,27 +13,14 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// Integer is a type constraint for integer types.
-type Integer interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
-}
-
-// PtrAs converts a pointer to a different integer type.
-func PtrAs[From, To Integer](v *From) *To {
-	if v == nil {
-		return nil
-	}
-	return lo.ToPtr(To(*v))
-}
-
 // ParsePagination parses a proto pagination to a paginate request.
 func ParsePagination[T any](p *relayv1.Pagination, orderBy ...relay.Order) *relay.PaginateRequest[T] {
 	return &relay.PaginateRequest[T]{
 		OrderBy: orderBy,
 		After:   p.After,
 		Before:  p.Before,
-		First:   PtrAs[int32, int](p.First),
-		Last:    PtrAs[int32, int](p.Last),
+		First:   relay.PtrAs[int32, int](p.First),
+		Last:    relay.PtrAs[int32, int](p.Last),
 	}
 }
 

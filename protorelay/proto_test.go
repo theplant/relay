@@ -16,6 +16,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/theplant/testenv"
+
 	"github.com/theplant/relay"
 	"github.com/theplant/relay/cursor"
 	"github.com/theplant/relay/filter/gormfilter"
@@ -24,7 +26,6 @@ import (
 	"github.com/theplant/relay/protorelay"
 	relayv1 "github.com/theplant/relay/protorelay/gen/relay/v1"
 	testdatav1 "github.com/theplant/relay/protorelay/testdata/gen/testdata/v1"
-	"github.com/theplant/testenv"
 )
 
 type ProductService struct {
@@ -84,7 +85,7 @@ func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListP
 			StartCursor: conn.PageInfo.StartCursor,
 			EndCursor:   conn.PageInfo.EndCursor,
 		},
-		TotalCount: protorelay.PtrAs[int, int32](conn.TotalCount),
+		TotalCount: relay.PtrAs[int, int32](conn.TotalCount),
 	}, nil
 }
 
