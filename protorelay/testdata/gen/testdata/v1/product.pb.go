@@ -7,14 +7,13 @@
 package testdatav1
 
 import (
-	reflect "reflect"
-	sync "sync"
-	unsafe "unsafe"
-
 	v1 "github.com/theplant/relay/protorelay/gen/relay/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	reflect "reflect"
+	sync "sync"
+	unsafe "unsafe"
 )
 
 const (
@@ -1406,35 +1405,32 @@ func file_testdata_v1_product_proto_rawDescGZIP() []byte {
 	return file_testdata_v1_product_proto_rawDescData
 }
 
-var (
-	file_testdata_v1_product_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-	file_testdata_v1_product_proto_msgTypes  = make([]protoimpl.MessageInfo, 16)
-	file_testdata_v1_product_proto_goTypes   = []any{
-		(ProductStatus)(0),                     // 0: testdata.v1.ProductStatus
-		(ProductOrderField)(0),                 // 1: testdata.v1.ProductOrderField
-		(*Category)(nil),                       // 2: testdata.v1.Category
-		(*Product)(nil),                        // 3: testdata.v1.Product
-		(*ProductOrder)(nil),                   // 4: testdata.v1.ProductOrder
-		(*CategoryFilter)(nil),                 // 5: testdata.v1.CategoryFilter
-		(*ProductFilter)(nil),                  // 6: testdata.v1.ProductFilter
-		(*ListProductsRequest)(nil),            // 7: testdata.v1.ListProductsRequest
-		(*ProductEdge)(nil),                    // 8: testdata.v1.ProductEdge
-		(*ListProductsResponse)(nil),           // 9: testdata.v1.ListProductsResponse
-		(*CategoryFilter_NameFilter)(nil),      // 10: testdata.v1.CategoryFilter.NameFilter
-		(*CategoryFilter_CodeFilter)(nil),      // 11: testdata.v1.CategoryFilter.CodeFilter
-		(*ProductFilter_StatusFilter)(nil),     // 12: testdata.v1.ProductFilter.StatusFilter
-		(*ProductFilter_NameFilter)(nil),       // 13: testdata.v1.ProductFilter.NameFilter
-		(*ProductFilter_CodeFilter)(nil),       // 14: testdata.v1.ProductFilter.CodeFilter
-		(*ProductFilter_CreatedAtFilter)(nil),  // 15: testdata.v1.ProductFilter.CreatedAtFilter
-		(*ProductFilter_UpdatedAtFilter)(nil),  // 16: testdata.v1.ProductFilter.UpdatedAtFilter
-		(*ProductFilter_CategoryIDFilter)(nil), // 17: testdata.v1.ProductFilter.CategoryIDFilter
-		(*timestamppb.Timestamp)(nil),          // 18: google.protobuf.Timestamp
-		(v1.OrderDirection)(0),                 // 19: relay.v1.OrderDirection
-		(*v1.Pagination)(nil),                  // 20: relay.v1.Pagination
-		(*v1.PageInfo)(nil),                    // 21: relay.v1.PageInfo
-	}
-)
-
+var file_testdata_v1_product_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_testdata_v1_product_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_testdata_v1_product_proto_goTypes = []any{
+	(ProductStatus)(0),                     // 0: testdata.v1.ProductStatus
+	(ProductOrderField)(0),                 // 1: testdata.v1.ProductOrderField
+	(*Category)(nil),                       // 2: testdata.v1.Category
+	(*Product)(nil),                        // 3: testdata.v1.Product
+	(*ProductOrder)(nil),                   // 4: testdata.v1.ProductOrder
+	(*CategoryFilter)(nil),                 // 5: testdata.v1.CategoryFilter
+	(*ProductFilter)(nil),                  // 6: testdata.v1.ProductFilter
+	(*ListProductsRequest)(nil),            // 7: testdata.v1.ListProductsRequest
+	(*ProductEdge)(nil),                    // 8: testdata.v1.ProductEdge
+	(*ListProductsResponse)(nil),           // 9: testdata.v1.ListProductsResponse
+	(*CategoryFilter_NameFilter)(nil),      // 10: testdata.v1.CategoryFilter.NameFilter
+	(*CategoryFilter_CodeFilter)(nil),      // 11: testdata.v1.CategoryFilter.CodeFilter
+	(*ProductFilter_StatusFilter)(nil),     // 12: testdata.v1.ProductFilter.StatusFilter
+	(*ProductFilter_NameFilter)(nil),       // 13: testdata.v1.ProductFilter.NameFilter
+	(*ProductFilter_CodeFilter)(nil),       // 14: testdata.v1.ProductFilter.CodeFilter
+	(*ProductFilter_CreatedAtFilter)(nil),  // 15: testdata.v1.ProductFilter.CreatedAtFilter
+	(*ProductFilter_UpdatedAtFilter)(nil),  // 16: testdata.v1.ProductFilter.UpdatedAtFilter
+	(*ProductFilter_CategoryIDFilter)(nil), // 17: testdata.v1.ProductFilter.CategoryIDFilter
+	(*timestamppb.Timestamp)(nil),          // 18: google.protobuf.Timestamp
+	(v1.OrderDirection)(0),                 // 19: relay.v1.OrderDirection
+	(*v1.Pagination)(nil),                  // 20: relay.v1.Pagination
+	(*v1.PageInfo)(nil),                    // 21: relay.v1.PageInfo
+}
 var file_testdata_v1_product_proto_depIdxs = []int32{
 	18, // 0: testdata.v1.Category.created_at:type_name -> google.protobuf.Timestamp
 	18, // 1: testdata.v1.Category.updated_at:type_name -> google.protobuf.Timestamp
