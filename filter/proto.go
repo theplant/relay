@@ -6,10 +6,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
-	"github.com/theplant/relay"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/theplant/relay"
 )
 
 // ParseProtoFilter parses a proto filter message to a map

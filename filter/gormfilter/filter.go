@@ -10,10 +10,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
-	filterpkg "github.com/theplant/relay/filter"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
+
+	filterpkg "github.com/theplant/relay/filter"
 )
 
 type options struct {
