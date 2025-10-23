@@ -3,7 +3,6 @@ version: v2
 modules:
   - path: proto
     name: buf.build/theplant/relay
-  - path: testdata/proto
 
 lint:
   use:

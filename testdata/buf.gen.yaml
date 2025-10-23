@@ -1,15 +1,16 @@
+# Example buf generation configuration
 version: v2
+
 managed:
   enabled: true
   disable:
-    - module: buf.build/googleapis/googleapis
-  override:
-    - file_option: go_package_prefix
-      value: github.com/theplant/relay/gen
+    - module: buf.build/theplant/relay
+
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.36.8
     out: gen
     opt:
       - paths=source_relative
+
 inputs:
   - directory: proto

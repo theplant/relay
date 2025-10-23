@@ -421,6 +421,8 @@ For detailed performance analysis comparing `IN` subqueries with `JOIN` approach
 
 For a complete example of proto definitions with pagination, ordering, and filtering support, see:
 
+- Buf configuration: [`testdata/buf.yaml`](testdata/buf.yaml)
+- Buf generation config: [`testdata/buf.gen.yaml`](testdata/buf.gen.yaml)
 - Proto definitions: [`testdata/proto/testdata/v1/product.proto`](testdata/proto/testdata/v1/product.proto)
 - Relay pagination types: [`proto/relay/v1/relay.proto`](proto/relay/v1/relay.proto)
 

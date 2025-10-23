@@ -19,8 +19,8 @@ import (
 	"github.com/theplant/relay/filter"
 	"github.com/theplant/relay/filter/gormfilter"
 	relayv1 "github.com/theplant/relay/gen/relay/v1"
-	testdatav1 "github.com/theplant/relay/gen/testdata/v1"
 	"github.com/theplant/relay/gormrelay"
+	testdatav1 "github.com/theplant/relay/testdata/gen/testdata/v1"
 )
 
 type ProductService struct {

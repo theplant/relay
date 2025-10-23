@@ -1,16 +1,11 @@
-
-
-
-
-
-
-
 syntax = "proto3";
 
 package testdata.v1;
 
 import "google/protobuf/timestamp.proto";
 import "relay/v1/relay.proto";
+
+option go_package = "github.com/theplant/relay/testdata/gen/testdata/v1;testdatav1";
 
 service ProductService {
   rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {}

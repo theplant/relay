@@ -1,0 +1,12 @@
+# Example buf configuration showing how to use buf.build/theplant/relay
+version: v2
+
+modules:
+  - path: proto
+
+deps:
+  - buf.build/theplant/relay
+
+lint:
+  use:
+    - STANDARD
