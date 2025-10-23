@@ -28,8 +28,8 @@ func TestScopeKeyset(t *testing.T) {
 				nil,
 				&map[string]any{"Age": 85},
 				nil,
-				[]relay.OrderBy{
-					{Field: "Age", Desc: false},
+				[]relay.Order{
+					{Field: "Age", Direction: relay.OrderDirectionAsc},
 				},
 				-1,
 				false,
@@ -44,8 +44,8 @@ func TestScopeKeyset(t *testing.T) {
 				nil,
 				&map[string]any{"Age": 85},
 				nil,
-				[]relay.OrderBy{
-					{Field: "Age", Desc: false},
+				[]relay.Order{
+					{Field: "Age", Direction: relay.OrderDirectionAsc},
 				},
 				10,
 				false,
@@ -62,8 +62,8 @@ func TestScopeKeyset(t *testing.T) {
 				nil,
 				&map[string]any{"Age": 85},
 				nil,
-				[]relay.OrderBy{
-					{Field: "Age", Desc: false},
+				[]relay.Order{
+					{Field: "Age", Direction: relay.OrderDirectionAsc},
 				},
 				10,
 				false,
@@ -79,8 +79,8 @@ func TestScopeKeyset(t *testing.T) {
 				nil,
 				&map[string]any{"Age": 85},
 				&map[string]any{"Age": 88},
-				[]relay.OrderBy{
-					{Field: "Age", Desc: false},
+				[]relay.Order{
+					{Field: "Age", Direction: relay.OrderDirectionAsc},
 				},
 				10,
 				false,
@@ -96,9 +96,9 @@ func TestScopeKeyset(t *testing.T) {
 				nil,
 				&map[string]any{"Age": 85, "Name": "name15"},
 				&map[string]any{"Age": 88, "Name": "name12"},
-				[]relay.OrderBy{
-					{Field: "Age", Desc: false},
-					{Field: "Name", Desc: true},
+				[]relay.Order{
+					{Field: "Age", Direction: relay.OrderDirectionAsc},
+					{Field: "Name", Direction: relay.OrderDirectionDesc},
 				},
 				10,
 				false,
@@ -114,9 +114,9 @@ func TestScopeKeyset(t *testing.T) {
 				nil,
 				&map[string]any{"Age": 85, "Name": "name15"},
 				&map[string]any{"Age": 88, "Name": "name12"},
-				[]relay.OrderBy{
-					{Field: "Age", Desc: false},
-					{Field: "Name", Desc: true},
+				[]relay.Order{
+					{Field: "Age", Direction: relay.OrderDirectionAsc},
+					{Field: "Name", Direction: relay.OrderDirectionDesc},
 				},
 				10,
 				true, // from last
@@ -134,9 +134,9 @@ func TestScopeKeyset(t *testing.T) {
 					nil,
 					&map[string]any{"Age": 85, "Name": "name15"},
 					&map[string]any{"Age": 88, "Name": "name12"},
-					[]relay.OrderBy{
-						{Field: "Age", Desc: false},
-						{Field: "Name", Desc: true},
+					[]relay.Order{
+						{Field: "Age", Direction: relay.OrderDirectionAsc},
+						{Field: "Name", Direction: relay.OrderDirectionDesc},
 					},
 					10,
 					false,
@@ -165,9 +165,9 @@ END)`,
 						"Age":      50,
 					},
 					nil,
-					[]relay.OrderBy{
-						{Field: "Priority", Desc: true},
-						{Field: "Age", Desc: false},
+					[]relay.Order{
+						{Field: "Priority", Direction: relay.OrderDirectionDesc},
+						{Field: "Age", Direction: relay.OrderDirectionAsc},
 					},
 					10,
 					false,
@@ -201,8 +201,8 @@ func TestKeysetCursor(t *testing.T) {
 	primaryOrderByKeys := []string{"ID", "Age"}
 	otherMiddlewares := []relay.PaginationMiddleware[*User]{
 		relay.EnsurePrimaryOrderBy[*User](
-			relay.OrderBy{Field: "ID", Desc: false},
-			relay.OrderBy{Field: "Age", Desc: true},
+			relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
+			relay.Order{Field: "Age", Direction: relay.OrderDirectionDesc},
 		),
 	}
 
@@ -831,14 +831,14 @@ func TestKeysetCursor(t *testing.T) {
 	}
 }
 
-func TestKeysetEmptyOrderBys(t *testing.T) {
+func TestKeysetEmptyOrderBy(t *testing.T) {
 	conn, err := relay.New(
 		NewKeysetAdapter[*User](db),
 		relay.EnsureLimits[*User](10, 10),
 	).Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		First: lo.ToPtr(10),
 	})
-	require.ErrorContains(t, err, "keyset pagination requires orderBys to be set")
+	require.ErrorContains(t, err, "keyset pagination requires orderBy to be set")
 	require.Nil(t, conn)
 }
 
@@ -850,7 +850,7 @@ func TestKeysetInvalidCursor(t *testing.T) {
 			// This is a generic(T: any) function, so we need to cast the model to the correct type
 			return NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
 		},
-		relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+		relay.EnsurePrimaryOrderBy[any](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 		relay.EnsureLimits[any](10, 10),
 	)
 	conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{

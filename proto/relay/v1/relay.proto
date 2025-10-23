@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package relay.v1;
+
+option go_package = "github.com/theplant/relay/gen/relay/v1;relayv1";
+
+// OrderDirection specifies the direction of an order.
+enum OrderDirection {
+  ORDER_DIRECTION_UNSPECIFIED = 0;
+  ORDER_DIRECTION_ASC = 1;
+  ORDER_DIRECTION_DESC = 2;
+}
+
+// Pagination specifies cursor-based pagination parameters.
+// Uses Relay-style cursor pagination for efficient and scalable data traversal.
+// This message is reusable across all entity types.
+//
+// Forward pagination example (fetch first 10 items):
+//   {
+//     "first": 10
+//   }
+//
+// Forward pagination with cursor (fetch next 10 items):
+//   {
+//     "after": "eyJpZCI6MjB9",
+//     "first": 10
+//   }
+//
+// Backward pagination example (fetch last 10 items):
+//   {
+//     "last": 10
+//   }
+//
+// Backward pagination with cursor (fetch previous 10 items):
+//   {
+//     "before": "eyJpZCI6MTB9",
+//     "last": 10
+//   }
+message Pagination {
+  // Cursor pointing to the item after which to start fetching.
+  // Use with 'first' for forward pagination.
+  // Example: "eyJpZCI6MjB9" (base64-encoded cursor)
+  optional string after = 1;
+
+  // Number of items to fetch in forward direction (after the 'after' cursor).
+  // Must be positive. Typically combined with 'after' or used alone for initial page.
+  // Example: 20 (fetch 20 items)
+  optional int32 first = 2;
+
+  // Cursor pointing to the item before which to start fetching.
+  // Use with 'last' for backward pagination.
+  // Example: "eyJpZCI6MTB9" (base64-encoded cursor)
+  optional string before = 3;
+
+  // Number of items to fetch in backward direction (before the 'before' cursor).
+  // Must be positive. Typically combined with 'before'.
+  // Example: 20 (fetch previous 20 items)
+  optional int32 last = 4;
+}
+
+// PageInfo contains pagination metadata for cursor-based pagination responses.
+// It indicates whether more data is available and provides cursors for navigation.
+//
+// Example response:
+//   {
+//     "items": [...],
+//     "page_info": {
+//       "has_next_page": true,
+//       "has_prev_page": false,
+//       "start_cursor": "eyJpZCI6MTB9",
+//       "end_cursor": "eyJpZCI6MjB9"
+//     }
+//   }
+message PageInfo {
+  // Indicates if there are more items available after the current page.
+  // Use end_cursor with 'after' to fetch the next page.
+  bool has_next_page = 1;
+
+  // Indicates if there are more items available before the current page.
+  // Use start_cursor with 'before' to fetch the previous page.
+  bool has_prev_page = 2;
+
+  // Opaque cursor pointing to the first item in the current page.
+  // Use this with 'before' parameter to paginate backwards.
+  optional string start_cursor = 3;
+
+  // Opaque cursor pointing to the last item in the current page.
+  // Use this with 'after' parameter to paginate forwards.
+  optional string end_cursor = 4;
+}

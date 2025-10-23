@@ -54,7 +54,7 @@ type User struct {
 	Age  int    `gorm:"index;not null;" json:"age"`
 }
 
-func TestUnexpectOrderBys(t *testing.T) {
+func TestUnexpectOrderBy(t *testing.T) {
 	resetDB(t)
 
 	p := relay.New(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
@@ -62,9 +62,9 @@ func TestUnexpectOrderBys(t *testing.T) {
 	})
 	conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 		First: lo.ToPtr(10),
-		OrderBys: []relay.OrderBy{
-			{Field: "ID", Desc: false},
-			{Field: "ID", Desc: true},
+		OrderBy: []relay.Order{
+			{Field: "ID", Direction: relay.OrderDirectionAsc},
+			{Field: "ID", Direction: relay.OrderDirectionDesc},
 		},
 	})
 	require.ErrorContains(t, err, "duplicated order by fields [ID]")
@@ -78,7 +78,7 @@ func TestContext(t *testing.T) {
 		{
 			p := relay.New(
 				f(db),
-				relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 				relay.EnsureLimits[*User](10, 10),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -96,7 +96,7 @@ func TestContext(t *testing.T) {
 					// Set WithContext here
 					return f(db.WithContext(ctx))(ctx, req)
 				},
-				relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 				relay.EnsureLimits[*User](10, 10),
 			)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -118,7 +118,7 @@ func TestSkip(t *testing.T) {
 	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
-			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 			relay.EnsureLimits[*User](10, 10),
 		)
 		t.Run("SkipEdges", func(t *testing.T) {
@@ -265,7 +265,7 @@ func TestGenericTypeAny(t *testing.T) {
 					// This is a generic(T: any) function, so we need to call db.Model(x)
 					return f(db.Model(&User{}))(ctx, req)
 				},
-				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsurePrimaryOrderBy[any](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 				relay.EnsureLimits[any](10, 10),
 			)
 			conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
@@ -294,7 +294,7 @@ func TestGenericTypeAny(t *testing.T) {
 					// This is wrong, we need to call db.Model(x) for generic(T: any) function
 					return f(db)(ctx, req)
 				},
-				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsurePrimaryOrderBy[any](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 				relay.EnsureLimits[any](10, 10),
 			)
 			conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
@@ -312,7 +312,7 @@ func TestGenericTypeAny(t *testing.T) {
 		t.Run("Wrong(SkipTotalCount)", func(t *testing.T) {
 			p := relay.New(
 				applyCursorsFunc,
-				relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsurePrimaryOrderBy[any](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 				relay.EnsureLimits[any](10, 10),
 			)
 			conn, err := p.Paginate(
@@ -340,7 +340,7 @@ func TestTotalCountZero(t *testing.T) {
 	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
-			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 			relay.EnsureLimits[*User](10, 10),
 		)
 		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
@@ -370,7 +370,7 @@ func TestCursorMiddleware(t *testing.T) {
 	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
-			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 			relay.EnsureLimits[*User](10, 10),
 		)
 		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
@@ -469,7 +469,7 @@ func TestCursorMiddleware(t *testing.T) {
 						return rsp, nil
 					}
 				}(f(db)),
-				relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+				relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 				relay.EnsureLimits[*User](10, 10),
 			)
 			conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
@@ -498,7 +498,7 @@ func TestAppendCursorMiddleware(t *testing.T) {
 		p := relay.New(
 			f(db),
 			relay.AppendCursorMiddleware(gcmMiddleware),
-			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 			relay.EnsureLimits[*User](10, 10),
 		)
 
@@ -537,7 +537,7 @@ func TestWithNodeProcessor(t *testing.T) {
 	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
-			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 			relay.EnsureLimits[*User](10, 10),
 		)
 		t.Run("AddSuffixForName", func(t *testing.T) {
@@ -589,21 +589,21 @@ func TestWithNodeProcessor(t *testing.T) {
 	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 }
 
-func TestOrderBys(t *testing.T) {
+func TestOrderBy(t *testing.T) {
 	resetDB(t)
 
 	testCase := func(t *testing.T, cursorTest bool, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
-			relay.EnsurePrimaryOrderBy[*User](relay.OrderBy{Field: "ID", Desc: false}),
+			relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 			relay.EnsureLimits[*User](10, 10),
 		)
 		ctx := context.Background()
 		t.Run("Normal", func(t *testing.T) {
 			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
-				OrderBys: []relay.OrderBy{
-					{Field: "ID", Desc: true},
+				OrderBy: []relay.Order{
+					{Field: "ID", Direction: relay.OrderDirectionDesc},
 				},
 			})
 			require.NoError(t, err)
@@ -617,8 +617,8 @@ func TestOrderBys(t *testing.T) {
 		t.Run("UnexpectField", func(t *testing.T) {
 			conn, err := p.Paginate(ctx, &relay.PaginateRequest[*User]{
 				First: lo.ToPtr(10),
-				OrderBys: []relay.OrderBy{
-					{Field: "Unexpect", Desc: true},
+				OrderBy: []relay.Order{
+					{Field: "Unexpect", Direction: relay.OrderDirectionDesc},
 				},
 			})
 			require.ErrorContains(t, err, `missing field "Unexpect" in schema`)
@@ -631,8 +631,8 @@ func TestOrderBys(t *testing.T) {
 						&User{ID: 2 + 1, Name: "name2", Age: 98}, []string{"ID"},
 					)),
 					First: lo.ToPtr(10),
-					OrderBys: []relay.OrderBy{
-						{Field: "ID", Desc: true},
+					OrderBy: []relay.Order{
+						{Field: "ID", Direction: relay.OrderDirectionDesc},
 					},
 				})
 				require.NoError(t, err)
@@ -649,9 +649,9 @@ func TestOrderBys(t *testing.T) {
 						&User{ID: 2 + 1, Name: "name2", Age: 98}, []string{"ID"},
 					)),
 					First: lo.ToPtr(10),
-					OrderBys: []relay.OrderBy{
-						{Field: "ID", Desc: true},
-						{Field: "Name", Desc: true},
+					OrderBy: []relay.Order{
+						{Field: "ID", Direction: relay.OrderDirectionDesc},
+						{Field: "Name", Direction: relay.OrderDirectionDesc},
 					},
 				})
 				require.ErrorContains(t, err, "invalid cursor: has 1 keys, but 2 keys are expected")
@@ -663,9 +663,9 @@ func TestOrderBys(t *testing.T) {
 						&User{ID: 2 + 1, Name: "name2", Age: 98}, []string{"ID", "Name", "Age"},
 					)),
 					First: lo.ToPtr(10),
-					OrderBys: []relay.OrderBy{
-						{Field: "ID", Desc: true},
-						{Field: "Name", Desc: true},
+					OrderBy: []relay.Order{
+						{Field: "ID", Direction: relay.OrderDirectionDesc},
+						{Field: "Name", Direction: relay.OrderDirectionDesc},
 					},
 				})
 				require.ErrorContains(t, err, "invalid cursor: has 3 keys, but 2 keys are expected")
@@ -677,9 +677,9 @@ func TestOrderBys(t *testing.T) {
 						&User{ID: 2 + 1, Name: "name2", Age: 98}, []string{"ID", "Age"},
 					)),
 					First: lo.ToPtr(10),
-					OrderBys: []relay.OrderBy{
-						{Field: "ID", Desc: true},
-						{Field: "Name", Desc: true},
+					OrderBy: []relay.Order{
+						{Field: "ID", Direction: relay.OrderDirectionDesc},
+						{Field: "Name", Direction: relay.OrderDirectionDesc},
 					},
 				})
 				require.ErrorContains(t, err, `required key "Name" not found in cursor`)
@@ -697,9 +697,9 @@ func TestOrderBys(t *testing.T) {
 						}, []string{"ID", "NameX"},
 					)),
 					First: lo.ToPtr(10),
-					OrderBys: []relay.OrderBy{
-						{Field: "ID", Desc: true},
-						{Field: "NameX", Desc: true},
+					OrderBy: []relay.Order{
+						{Field: "ID", Direction: relay.OrderDirectionDesc},
+						{Field: "NameX", Direction: relay.OrderDirectionDesc},
 					},
 				})
 				require.ErrorContains(t, err, `failed to find records with keyset pagination: missing field "NameX" in schema`)
@@ -713,48 +713,48 @@ func TestOrderBys(t *testing.T) {
 }
 
 func TestAppendPrimaryOrderBy(t *testing.T) {
-	primaryOrderBy := []relay.OrderBy{
-		{Field: "ID", Desc: true},
-		{Field: "CreatedAt", Desc: true},
+	primaryOrderBy := []relay.Order{
+		{Field: "ID", Direction: relay.OrderDirectionDesc},
+		{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
 	}
 
 	require.Equal(t,
-		[]relay.OrderBy{
-			{Field: "Age", Desc: false},
-			{Field: "ID", Desc: true},
-			{Field: "CreatedAt", Desc: true},
+		[]relay.Order{
+			{Field: "Age", Direction: relay.OrderDirectionAsc},
+			{Field: "ID", Direction: relay.OrderDirectionDesc},
+			{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
 		},
-		relay.AppendPrimaryOrderBy([]relay.OrderBy{
-			{Field: "Age", Desc: false},
+		relay.AppendPrimaryOrderBy([]relay.Order{
+			{Field: "Age", Direction: relay.OrderDirectionAsc},
 		}, primaryOrderBy...),
 	)
 
 	require.Equal(t,
-		[]relay.OrderBy{
-			{Field: "ID", Desc: false},
-			{Field: "CreatedAt", Desc: true},
+		[]relay.Order{
+			{Field: "ID", Direction: relay.OrderDirectionAsc},
+			{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
 		},
-		relay.AppendPrimaryOrderBy([]relay.OrderBy{
-			{Field: "ID", Desc: false},
+		relay.AppendPrimaryOrderBy([]relay.Order{
+			{Field: "ID", Direction: relay.OrderDirectionAsc},
 		}, primaryOrderBy...),
 	)
 
 	require.Equal(t,
-		[]relay.OrderBy{
-			{Field: "CreatedAt", Desc: false},
-			{Field: "ID", Desc: true},
+		[]relay.Order{
+			{Field: "CreatedAt", Direction: relay.OrderDirectionAsc},
+			{Field: "ID", Direction: relay.OrderDirectionDesc},
 		},
-		relay.AppendPrimaryOrderBy([]relay.OrderBy{
-			{Field: "CreatedAt", Desc: false},
+		relay.AppendPrimaryOrderBy([]relay.Order{
+			{Field: "CreatedAt", Direction: relay.OrderDirectionAsc},
 		}, primaryOrderBy...),
 	)
 
 	require.Equal(t,
-		[]relay.OrderBy{
-			{Field: "CreatedAt", Desc: false},
+		[]relay.Order{
+			{Field: "CreatedAt", Direction: relay.OrderDirectionAsc},
 		},
-		relay.AppendPrimaryOrderBy([]relay.OrderBy{
-			{Field: "CreatedAt", Desc: false},
+		relay.AppendPrimaryOrderBy([]relay.Order{
+			{Field: "CreatedAt", Direction: relay.OrderDirectionAsc},
 		}),
 	)
 }
@@ -781,9 +781,9 @@ func TestWithComputed(t *testing.T) {
 
 		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
-			OrderBys: []relay.OrderBy{
-				{Field: "GlobalPriority", Desc: false},
-				{Field: "ID", Desc: false},
+			OrderBy: []relay.Order{
+				{Field: "GlobalPriority", Direction: relay.OrderDirectionAsc},
+				{Field: "ID", Direction: relay.OrderDirectionAsc},
 			},
 		})
 		require.NoError(t, err)
@@ -796,9 +796,9 @@ func TestWithComputed(t *testing.T) {
 		nextConn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
 			After: conn.PageInfo.EndCursor,
-			OrderBys: []relay.OrderBy{
-				{Field: "GlobalPriority", Desc: false},
-				{Field: "ID", Desc: false},
+			OrderBy: []relay.Order{
+				{Field: "GlobalPriority", Direction: relay.OrderDirectionAsc},
+				{Field: "ID", Direction: relay.OrderDirectionAsc},
 			},
 		})
 		require.NoError(t, err)
@@ -810,9 +810,9 @@ func TestWithComputed(t *testing.T) {
 
 		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
-			OrderBys: []relay.OrderBy{
-				{Field: "GlobalPriority", Desc: true},
-				{Field: "ID", Desc: false},
+			OrderBy: []relay.Order{
+				{Field: "GlobalPriority", Direction: relay.OrderDirectionDesc},
+				{Field: "ID", Direction: relay.OrderDirectionAsc},
 			},
 		})
 		require.NoError(t, err)
@@ -825,9 +825,9 @@ func TestWithComputed(t *testing.T) {
 		nextConn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
 			After: conn.PageInfo.EndCursor,
-			OrderBys: []relay.OrderBy{
-				{Field: "GlobalPriority", Desc: true},
-				{Field: "ID", Desc: false},
+			OrderBy: []relay.Order{
+				{Field: "GlobalPriority", Direction: relay.OrderDirectionDesc},
+				{Field: "ID", Direction: relay.OrderDirectionAsc},
 			},
 		})
 		require.NoError(t, err)
@@ -838,9 +838,9 @@ func TestWithComputed(t *testing.T) {
 
 		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
-			OrderBys: []relay.OrderBy{
-				{Field: "GlobalPriority", Desc: false},
-				{Field: "ID", Desc: true},
+			OrderBy: []relay.Order{
+				{Field: "GlobalPriority", Direction: relay.OrderDirectionAsc},
+				{Field: "ID", Direction: relay.OrderDirectionDesc},
 			},
 		})
 		require.NoError(t, err)
@@ -853,9 +853,9 @@ func TestWithComputed(t *testing.T) {
 		nextConn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
 			After: conn.PageInfo.EndCursor,
-			OrderBys: []relay.OrderBy{
-				{Field: "GlobalPriority", Desc: false},
-				{Field: "ID", Desc: true},
+			OrderBy: []relay.Order{
+				{Field: "GlobalPriority", Direction: relay.OrderDirectionAsc},
+				{Field: "ID", Direction: relay.OrderDirectionDesc},
 			},
 		})
 		require.NoError(t, err)
@@ -868,9 +868,9 @@ func TestWithComputed(t *testing.T) {
 		middleConn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 			First: lo.ToPtr(3),
 			After: &conn.Edges[0].Cursor,
-			OrderBys: []relay.OrderBy{
-				{Field: "GlobalPriority", Desc: false},
-				{Field: "ID", Desc: true},
+			OrderBy: []relay.Order{
+				{Field: "GlobalPriority", Direction: relay.OrderDirectionAsc},
+				{Field: "ID", Direction: relay.OrderDirectionDesc},
 			},
 		})
 		require.NoError(t, err)
@@ -942,9 +942,9 @@ func TestWithComputedShop(t *testing.T) {
 		// Test pagination with Priority ascending order
 		conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*Shop]{
 			First: lo.ToPtr(3),
-			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: false},
-				{Field: "ID", Desc: false},
+			OrderBy: []relay.Order{
+				{Field: "Priority", Direction: relay.OrderDirectionAsc},
+				{Field: "ID", Direction: relay.OrderDirectionAsc},
 			},
 		})
 		require.NoError(t, err)
@@ -962,9 +962,9 @@ func TestWithComputedShop(t *testing.T) {
 		nextConn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*Shop]{
 			First: lo.ToPtr(3),
 			After: conn.PageInfo.EndCursor,
-			OrderBys: []relay.OrderBy{
-				{Field: "Priority", Desc: false},
-				{Field: "ID", Desc: false},
+			OrderBy: []relay.Order{
+				{Field: "Priority", Direction: relay.OrderDirectionAsc},
+				{Field: "ID", Direction: relay.OrderDirectionAsc},
 			},
 		})
 		require.NoError(t, err)
@@ -980,8 +980,8 @@ func TestWithComputedShop(t *testing.T) {
 		// no priority order by
 		conn, err = p.Paginate(context.Background(), &relay.PaginateRequest[*Shop]{
 			First: lo.ToPtr(3),
-			OrderBys: []relay.OrderBy{
-				{Field: "ID", Desc: false},
+			OrderBy: []relay.Order{
+				{Field: "ID", Direction: relay.OrderDirectionAsc},
 			},
 		})
 		require.NoError(t, err)

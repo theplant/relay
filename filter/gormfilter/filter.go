@@ -8,12 +8,13 @@ import (
 	"sort"
 	"strings"
 
-	jsoniter "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
+
+	filterpkg "github.com/theplant/relay/filter"
 )
 
 type options struct {
@@ -59,13 +60,13 @@ func WithDisableRelationships() Option {
 // Example:
 //
 //	type UserFilter struct {
-//	    Name    *filter.String     `json:"name"`
-//	    Age     *filter.Int        `json:"age"`
-//	    Company *CompanyFilter     `json:"company"`  // BelongsTo relationship
-//	    Profile *ProfileFilter     `json:"profile"`  // HasOne relationship
-//	    And     []*UserFilter      `json:"and"`
-//	    Or      []*UserFilter      `json:"or"`
-//	    Not     *UserFilter        `json:"not"`
+//	    Name    *filter.String
+//	    Age     *filter.Int
+//	    Company *CompanyFilter  // BelongsTo relationship
+//	    Profile *ProfileFilter  // HasOne relationship
+//	    And     []*UserFilter
+//	    Or      []*UserFilter
+//	    Not     *UserFilter
 //	}
 //
 //	// Simple filter
@@ -99,6 +100,10 @@ func Scope(filter any, opts ...Option) func(db *gorm.DB) *gorm.DB {
 			return nil
 		}
 
+		if filter == nil {
+			return db
+		}
+
 		options := &options{}
 		for _, opt := range opts {
 			opt(options)
@@ -112,16 +117,6 @@ func Scope(filter any, opts ...Option) func(db *gorm.DB) *gorm.DB {
 		return fdb
 	}
 }
-
-const FilterTagKey = "~~~filter~~~"
-
-// use strcut field name as key and force emit empty
-var jsoniterForFilter = jsoniter.Config{
-	EscapeHTML:             true,
-	SortMapKeys:            true,
-	ValidateJsonRawMessage: true,
-	TagKey:                 FilterTagKey,
-}.Froze()
 
 func addFilter(db *gorm.DB, filter any, opts *options) (*gorm.DB, error) {
 	if db == nil {
@@ -140,14 +135,15 @@ func addFilter(db *gorm.DB, filter any, opts *options) (*gorm.DB, error) {
 		return nil, errors.Wrap(err, "parse schema with db")
 	}
 
-	data, err := jsoniterForFilter.Marshal(filter)
-	if err != nil {
-		return nil, errors.Wrap(err, "marshal filter")
-	}
-
 	var filterMap map[string]any
-	if err := jsoniterForFilter.Unmarshal(data, &filterMap); err != nil {
-		return nil, errors.Wrap(err, "unmarshal filter")
+	if _, ok := filter.(map[string]any); ok {
+		filterMap = filter.(map[string]any)
+	} else {
+		var err error
+		filterMap, err = filterpkg.ToMap(filter)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	expr, err := buildFilterExpr(stmt, filterMap, opts)

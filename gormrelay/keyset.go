@@ -14,21 +14,21 @@ import (
 	"github.com/theplant/relay/cursor"
 )
 
-func buildWhereExpr(getColumn func(fieldName string) (clause.Column, error), orderBys []relay.OrderBy, keyset map[string]any, reverse bool) (clause.Expression, error) {
-	ors := make([]clause.Expression, 0, len(orderBys))
-	eqs := make([]clause.Expression, 0, len(orderBys))
-	for i, orderBy := range orderBys {
-		v, ok := keyset[orderBy.Field]
+func buildWhereExpr(getColumn func(fieldName string) (clause.Column, error), orderBy []relay.Order, keyset map[string]any, reverse bool) (clause.Expression, error) {
+	ors := make([]clause.Expression, 0, len(orderBy))
+	eqs := make([]clause.Expression, 0, len(orderBy))
+	for i, order := range orderBy {
+		v, ok := keyset[order.Field]
 		if !ok {
-			return nil, errors.Errorf("missing field %q in keyset", orderBy.Field)
+			return nil, errors.Errorf("missing field %q in keyset", order.Field)
 		}
 
-		column, err := getColumn(orderBy.Field)
+		column, err := getColumn(order.Field)
 		if err != nil {
 			return nil, err
 		}
 
-		desc := orderBy.Desc
+		desc := order.Direction == relay.OrderDirectionDesc
 		if reverse {
 			desc = !desc
 		}
@@ -45,7 +45,7 @@ func buildWhereExpr(getColumn func(fieldName string) (clause.Column, error), ord
 		ands[len(eqs)] = expr
 		ors = append(ors, clause.And(ands...))
 
-		if i < len(orderBys)-1 {
+		if i < len(orderBy)-1 {
 			eqs = append(eqs, clause.Eq{Column: column, Value: v})
 		}
 	}
@@ -87,7 +87,7 @@ func buildWhereExpr(getColumn func(fieldName string) (clause.Column, error), ord
 //		clause.Limit{Limit: &limit},
 //
 // )
-func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) func(db *gorm.DB) *gorm.DB {
+func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[string]any, orderBy []relay.Order, limit int, fromEnd bool) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if db.Statement.Model == nil {
 			_ = db.AddError(errors.New("model is nil"))
@@ -114,7 +114,7 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 		var exprs []clause.Expression
 
 		if after != nil {
-			expr, err := buildWhereExpr(getColumn, orderBys, *after, false)
+			expr, err := buildWhereExpr(getColumn, orderBy, *after, false)
 			if err != nil {
 				_ = db.AddError(err)
 				return db
@@ -123,7 +123,7 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 		}
 
 		if before != nil {
-			expr, err := buildWhereExpr(getColumn, orderBys, *before, true)
+			expr, err := buildWhereExpr(getColumn, orderBy, *before, true)
 			if err != nil {
 				_ = db.AddError(err)
 				return db
@@ -136,9 +136,9 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 			return field, column
 		})
 
-		if len(orderBys) > 0 {
-			orderByColumns := make([]clause.OrderByColumn, 0, len(orderBys))
-			for _, orderBy := range orderBys {
+		if len(orderBy) > 0 {
+			orderByColumns := make([]clause.OrderByColumn, 0, len(orderBy))
+			for _, orderBy := range orderBy {
 				column, ok := computedColumns[orderBy.Field]
 				if ok {
 					column = clause.Column{Name: column.Alias, Raw: true}
@@ -150,7 +150,7 @@ func scopeKeyset(computedColumns map[string]clause.Column, after, before *map[st
 					}
 				}
 
-				desc := orderBy.Desc
+				desc := orderBy.Direction == relay.OrderDirectionDesc
 				if fromEnd {
 					desc = !desc
 				}
@@ -187,7 +187,7 @@ func NewKeysetFinder[T any](db *gorm.DB, opts ...Option[T]) *KeysetFinder[T] {
 	return &KeysetFinder[T]{db: db, opts: o}
 }
 
-func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]cursor.Node[T], error) {
+func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]any, orderBy []relay.Order, limit int, fromEnd bool) ([]cursor.Node[T], error) {
 	if limit == 0 {
 		return []cursor.Node[T]{}, nil
 	}
@@ -215,7 +215,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 
 		computedResults, err := splitComputedScan(
 			a.opts.Computed.Columns,
-			db.Scopes(scopeKeyset(a.opts.Computed.Columns, after, before, orderBys, limit, fromEnd)),
+			db.Scopes(scopeKeyset(a.opts.Computed.Columns, after, before, orderBy, limit, fromEnd)),
 			scanner.Destination,
 		)
 		if err != nil {
@@ -234,7 +234,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 		sliceType := reflect.SliceOf(modelType)
 		nodesVal := reflect.New(sliceType).Elem()
 
-		err := db.Scopes(scopeKeyset(nil, after, before, orderBys, limit, fromEnd)).Find(nodesVal.Addr().Interface()).Error
+		err := db.Scopes(scopeKeyset(nil, after, before, orderBy, limit, fromEnd)).Find(nodesVal.Addr().Interface()).Error
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to find records based on model")
 		}
@@ -253,7 +253,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 	}
 
 	var nodes []T
-	err = db.Scopes(scopeKeyset(nil, after, before, orderBys, limit, fromEnd)).Find(&nodes).Error
+	err = db.Scopes(scopeKeyset(nil, after, before, orderBy, limit, fromEnd)).Find(&nodes).Error
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find records with keyset pagination")
 	}

@@ -10,14 +10,14 @@ import (
 )
 
 type OffsetFinder[T any] interface {
-	Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]Node[T], error)
+	Find(ctx context.Context, orderBy []relay.Order, skip, limit int) ([]Node[T], error)
 	Count(ctx context.Context) (int, error)
 }
 
-type OffsetFinderFunc[T any] func(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]Node[T], error)
+type OffsetFinderFunc[T any] func(ctx context.Context, orderBy []relay.Order, skip, limit int) ([]Node[T], error)
 
-func (f OffsetFinderFunc[T]) Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]Node[T], error) {
-	return f(ctx, orderBys, skip, limit)
+func (f OffsetFinderFunc[T]) Find(ctx context.Context, orderBy []relay.Order, skip, limit int) ([]Node[T], error) {
+	return f(ctx, orderBy, skip, limit)
 }
 
 // NewOffsetAdapter creates a relay.ApplyCursorsFunc from an OffsetFinder.
@@ -84,7 +84,7 @@ func NewOffsetAdapter[T any](finder OffsetFinder[T]) relay.ApplyCursorsFunc[T] {
 		if limit <= 0 || (totalCount != nil && (skip >= *totalCount || *totalCount <= 0)) {
 			edges = make([]*relay.LazyEdge[T], 0)
 		} else {
-			nodes, err := finder.Find(ctx, req.OrderBys, skip, limit)
+			nodes, err := finder.Find(ctx, req.OrderBy, skip, limit)
 			if err != nil {
 				return nil, err
 			}

@@ -27,7 +27,7 @@ func NewOffsetFinder[T any](db *gorm.DB, opts ...Option[T]) *OffsetFinder[T] {
 	return &OffsetFinder[T]{db: db, opts: o}
 }
 
-func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, skip, limit int) ([]cursor.Node[T], error) {
+func (a *OffsetFinder[T]) Find(ctx context.Context, orderBy []relay.Order, skip, limit int) ([]cursor.Node[T], error) {
 	if limit == 0 {
 		return []cursor.Node[T]{}, nil
 	}
@@ -61,7 +61,7 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 		})
 	}
 
-	if len(orderBys) > 0 {
+	if len(orderBy) > 0 {
 		s, err := parseSchema(db, db.Statement.Model)
 		if err != nil {
 			return nil, err
@@ -75,8 +75,8 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 			return clause.Column{Table: clause.CurrentTable, Name: field.DBName}, nil
 		}
 
-		orderByColumns := make([]clause.OrderByColumn, 0, len(orderBys))
-		for _, orderBy := range orderBys {
+		orderByColumns := make([]clause.OrderByColumn, 0, len(orderBy))
+		for _, orderBy := range orderBy {
 			column, ok := computedColumns[orderBy.Field]
 			if ok {
 				column = clause.Column{Name: column.Alias, Raw: true}
@@ -89,7 +89,7 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBys []relay.OrderBy, sk
 
 			orderByColumns = append(orderByColumns, clause.OrderByColumn{
 				Column: column,
-				Desc:   orderBy.Desc,
+				Desc:   orderBy.Direction == relay.OrderDirectionDesc,
 			})
 		}
 		db = db.Order(clause.OrderBy{Columns: orderByColumns})

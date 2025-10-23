@@ -11,17 +11,17 @@ import (
 )
 
 type KeysetFinder[T any] interface {
-	Find(ctx context.Context, after, before *map[string]any, orderBys []relay.OrderBy, limit int, fromEnd bool) ([]Node[T], error)
+	Find(ctx context.Context, after, before *map[string]any, orderBy []relay.Order, limit int, fromEnd bool) ([]Node[T], error)
 	Count(ctx context.Context) (int, error)
 }
 
 func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 	return func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[T], error) {
-		keys := lo.Map(req.OrderBys, func(item relay.OrderBy, _ int) string {
+		keys := lo.Map(req.OrderBy, func(item relay.Order, _ int) string {
 			return item.Field
 		})
 		if len(keys) == 0 {
-			return nil, errors.New("keyset pagination requires orderBys to be set")
+			return nil, errors.New("keyset pagination requires orderBy to be set")
 		}
 
 		after, before, err := decodeKeysetCursors(req.After, req.Before, keys)
@@ -50,7 +50,7 @@ func NewKeysetAdapter[T any](finder KeysetFinder[T]) relay.ApplyCursorsFunc[T] {
 		if req.Limit <= 0 || (totalCount != nil && *totalCount <= 0) {
 			edges = make([]*relay.LazyEdge[T], 0)
 		} else {
-			nodes, err := finder.Find(ctx, after, before, req.OrderBys, req.Limit, req.FromEnd)
+			nodes, err := finder.Find(ctx, after, before, req.OrderBy, req.Limit, req.FromEnd)
 			if err != nil {
 				return nil, err
 			}

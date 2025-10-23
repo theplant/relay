@@ -12,6 +12,7 @@
 - **Non-generic support**: Even without using Go generics, you can paginate using the `any` type for flexible use cases.
 - **Computed fields**: Add database-level calculated fields using SQL expressions for sorting and pagination.
 - **Powerful filtering**: Type-safe filtering with support for comparison operators, string matching, logical combinations, and relationship filtering.
+- **gRPC/Protocol Buffers integration**: Built-in utilities for parsing proto messages, including enums, order fields, filters, and pagination requests.
 
 ## Usage
 
@@ -30,8 +31,8 @@ p := relay.New(
     relay.EnsureLimits[*User](10, 100),
     // Append primary sorting fields, if any are unspecified
     relay.EnsurePrimaryOrderBy[*User](
-        relay.OrderBy{Field: "ID", Desc: false},
-        relay.OrderBy{Field: "Version", Desc: false},
+        relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
+        relay.Order{Field: "Version", Direction: relay.OrderDirectionAsc},
     ),
 )
 
@@ -76,7 +77,7 @@ p := relay.New(
         return gormrelay.NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
     },
     relay.EnsureLimits[any](10, 100),
-    relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+    relay.EnsurePrimaryOrderBy[any](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 )
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
     First: lo.ToPtr(10), // query first 10 records
@@ -106,16 +107,16 @@ p := relay.New(
     ),
     relay.EnsureLimits[*User](10, 100),
     relay.EnsurePrimaryOrderBy[*User](
-        relay.OrderBy{Field: "ID", Desc: false},
+        relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
     ),
 )
 
 // Use computed field in ordering
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
     First: lo.ToPtr(10),
-    OrderBys: []relay.OrderBy{
-        {Field: "Priority", Desc: false}, // Sort by computed field
-        {Field: "ID", Desc: false},
+    OrderBy: []relay.Order{
+        {Field: "Priority", Direction: relay.OrderDirectionAsc}, // Sort by computed field
+        {Field: "ID", Direction: relay.OrderDirectionAsc},
     },
 })
 ```
@@ -187,17 +188,17 @@ p := relay.New(
     ),
     relay.EnsureLimits[*User](10, 100),
     relay.EnsurePrimaryOrderBy[*User](
-        relay.OrderBy{Field: "ID", Desc: false},
+        relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
     ),
 )
 
 // Multi-level sorting with computed fields
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
     First: lo.ToPtr(10),
-    OrderBys: []relay.OrderBy{
-        {Field: "Rank", Desc: false},
-        {Field: "Score", Desc: true},
-        {Field: "ID", Desc: false},
+    OrderBy: []relay.Order{
+        {Field: "Rank", Direction: relay.OrderDirectionAsc},
+        {Field: "Score", Direction: relay.OrderDirectionDesc},
+        {Field: "ID", Direction: relay.OrderDirectionAsc},
     },
 })
 ```
@@ -222,8 +223,8 @@ import (
 )
 
 type UserFilter struct {
-    Name *filter.String `json:"name"`
-    Age  *filter.Int    `json:"age"`
+    Name *filter.String
+    Age  *filter.Int
 }
 
 db.Scopes(
@@ -275,11 +276,11 @@ Filters support `And`, `Or`, and `Not` logical operators:
 
 ```go
 type UserFilter struct {
-    And  []*UserFilter `json:"and"`
-    Or   []*UserFilter `json:"or"`
-    Not  *UserFilter   `json:"not"`
-    Name *filter.String `json:"name"`
-    Age  *filter.Int    `json:"age"`
+    And  []*UserFilter
+    Or   []*UserFilter
+    Not  *UserFilter
+    Name *filter.String
+    Age  *filter.Int
 }
 
 // Complex filter example
@@ -308,18 +309,18 @@ The filter supports filtering by `BelongsTo` relationships with multi-level nest
 
 ```go
 type CountryFilter struct {
-    Code *filter.String `json:"code"`
-    Name *filter.String `json:"name"`
+    Code *filter.String
+    Name *filter.String
 }
 
 type CompanyFilter struct {
-    Name    *filter.String   `json:"name"`
-    Country *CountryFilter   `json:"country"`  // BelongsTo relationship
+    Name    *filter.String
+    Country *CountryFilter  // BelongsTo relationship
 }
 
 type UserFilter struct {
-    Age     *filter.Int      `json:"age"`
-    Company *CompanyFilter   `json:"company"`  // BelongsTo relationship
+    Age     *filter.Int
+    Company *CompanyFilter  // BelongsTo relationship
 }
 
 // Filter users by company's country
@@ -359,9 +360,9 @@ import (
 )
 
 type UserFilter struct {
-    Name    *filter.String   `json:"name"`
-    Age     *filter.Int      `json:"age"`
-    Company *CompanyFilter   `json:"company"`
+    Name    *filter.String
+    Age     *filter.Int
+    Company *CompanyFilter
 }
 
 // Create paginator with filter
@@ -383,7 +384,7 @@ p := relay.New(
     }),
     relay.EnsureLimits[*User](10, 100),
     relay.EnsurePrimaryOrderBy[*User](
-        relay.OrderBy{Field: "ID", Desc: false},
+        relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
     ),
 )
 
@@ -411,6 +412,33 @@ Relationship filters use `IN` subqueries, which are generally efficient for most
 - Query complexity
 
 For detailed performance analysis comparing `IN` subqueries with `JOIN` approaches, see `filter/gormfilter/perf/perf_test.go`.
+
+## gRPC Integration
+
+`relay` provides seamless integration with gRPC/Protocol Buffers, including utilities for parsing proto enums, order fields, filters, and pagination requests.
+
+### Protocol Buffers Definition
+
+For a complete example of proto definitions with pagination, ordering, and filtering support, see:
+
+- Buf configuration: [`testdata/buf.yaml`](testdata/buf.yaml)
+- Buf generation config: [`testdata/buf.gen.yaml`](testdata/buf.gen.yaml)
+- Proto definitions: [`testdata/proto/testdata/v1/product.proto`](testdata/proto/testdata/v1/product.proto)
+- Relay pagination types: [`proto/relay/v1/relay.proto`](proto/relay/v1/relay.proto)
+
+### Implementation Example
+
+For a complete implementation of a gRPC service using `relay`, refer to the `ProductService.ListProducts` method:
+
+- Implementation: [`proto_test.go` (ProductService.ListProducts)](proto_test.go)
+
+This example demonstrates:
+
+- Parsing proto order fields with `relay.ParseProtoOrderBy`
+- Parsing proto filters with `filter.ParseProtoFilter`
+- Creating a paginator with Base64-encoded cursors
+- Converting between proto and internal types with `relay.ParseProtoPagination`
+- Building gRPC responses from pagination results
 
 ## Reference
 

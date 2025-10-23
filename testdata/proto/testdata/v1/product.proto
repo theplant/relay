@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package testdata.v1;
+
+import "google/protobuf/timestamp.proto";
+import "relay/v1/relay.proto";
+
+option go_package = "github.com/theplant/relay/testdata/gen/testdata/v1;testdatav1";
+
+service ProductService {
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {}
+}
+
+message Category {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  string name = 4;
+  string code = 5;
+}
+
+enum ProductStatus {
+  PRODUCT_STATUS_UNSPECIFIED = 0;
+  PRODUCT_STATUS_DRAFT = 1;
+  PRODUCT_STATUS_PENDING_REVIEW = 2;
+  PRODUCT_STATUS_REJECTED = 3;
+  PRODUCT_STATUS_APPROVED = 4;
+  PRODUCT_STATUS_PUBLISHED = 5;
+  PRODUCT_STATUS_UNPUBLISHED = 6;
+}
+
+message Product {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  string name = 4;
+  string code = 5;
+  ProductStatus status = 6;
+  string category_id = 7;
+  Category category = 8;
+}
+
+enum ProductOrderField {
+  PRODUCT_ORDER_FIELD_UNSPECIFIED = 0;
+  PRODUCT_ORDER_FIELD_ID = 1;
+  PRODUCT_ORDER_FIELD_CREATED_AT = 2;
+  PRODUCT_ORDER_FIELD_UPDATED_AT = 3;
+}
+
+message ProductOrder {
+  ProductOrderField field = 1;
+  relay.v1.OrderDirection direction = 2;
+}
+
+message CategoryFilter {
+  message NameFilter {
+    optional string eq = 1;
+    optional string contains = 2;
+    optional string starts_with = 3;
+    bool fold = 4;
+  }
+
+  message CodeFilter {
+    optional string eq = 1;
+    repeated string in = 2;
+    repeated string not_in = 3;
+  }
+
+  repeated CategoryFilter and = 1;
+  repeated CategoryFilter or = 2;
+  optional CategoryFilter not = 3;
+
+  optional NameFilter name = 101;
+  optional CodeFilter code = 102;
+}
+
+message ProductFilter {
+  message StatusFilter {
+    optional ProductStatus eq = 1;
+    repeated ProductStatus in = 2;
+    repeated ProductStatus not_in = 3;
+  }
+
+  message NameFilter {
+    optional string eq = 1;
+    optional string contains = 2;
+    optional string starts_with = 3;
+    bool fold = 4;
+  }
+
+  message CodeFilter {
+    optional string eq = 1;
+    repeated string in = 2;
+    repeated string not_in = 3;
+  }
+
+  message CreatedAtFilter {
+    optional google.protobuf.Timestamp lt = 1;
+    optional google.protobuf.Timestamp lte = 2;
+    optional google.protobuf.Timestamp gt = 3;
+    optional google.protobuf.Timestamp gte = 4;
+  }
+
+  message UpdatedAtFilter {
+    optional google.protobuf.Timestamp lt = 1;
+    optional google.protobuf.Timestamp lte = 2;
+    optional google.protobuf.Timestamp gt = 3;
+    optional google.protobuf.Timestamp gte = 4;
+  }
+
+  message CategoryIDFilter {
+    optional string eq = 1;
+    repeated string in = 2;
+    repeated string not_in = 3;
+  }
+
+  repeated ProductFilter and = 1;
+  repeated ProductFilter or = 2;
+  optional ProductFilter not = 3;
+
+  optional StatusFilter status = 101;
+  optional NameFilter name = 102;
+  optional CodeFilter code = 103;
+  optional CreatedAtFilter created_at = 104;
+  optional UpdatedAtFilter updated_at = 105;
+  optional CategoryFilter category = 106;
+  optional CategoryIDFilter category_id = 107;
+}
+
+message ListProductsRequest {
+  optional ProductFilter filter = 1;
+  repeated ProductOrder order_by = 2;
+  optional relay.v1.Pagination pagination = 3;
+}
+
+message ProductEdge {
+  Product node = 1;
+  string cursor = 2;
+}
+
+message ListProductsResponse {
+  repeated ProductEdge edges = 1;
+  relay.v1.PageInfo page_info = 2;
+  optional int32 total_count = 3;
+}
