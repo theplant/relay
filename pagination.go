@@ -235,10 +235,7 @@ func New[T any](applyCursorsFunc ApplyCursorsFunc[T], hooks ...func(next Paginat
 		}
 		return paginate(ctx, req, applyCursors)
 	})
-	return Wrap(p, hooks...)
-}
 
-func Wrap[T any](p Paginator[T], hooks ...func(next Paginator[T]) Paginator[T]) Paginator[T] {
 	hook := hook.Chain(hooks...)
 	if hook != nil {
 		return hook(p)
