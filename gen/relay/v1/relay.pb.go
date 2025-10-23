@@ -21,6 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// OrderDirection specifies the direction of an order.
 type OrderDirection int32
 
 const (
