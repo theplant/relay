@@ -3,6 +3,7 @@ package relay_test
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/theplant/relay"
@@ -727,5 +729,59 @@ func TestProductService_ListProducts(t *testing.T) {
 			categoryID := edge.Node.CategoryId
 			assert.True(t, categoryID == "cat-electronics" || categoryID == "cat-books")
 		}
+	})
+
+	t.Run("custom handle operator", func(t *testing.T) {
+		protoFilter := &testdatav1.ProductFilter{
+			Status: &testdatav1.ProductFilter_StatusFilter{
+				Eq: lo.ToPtr(testdatav1.ProductStatus_PRODUCT_STATUS_PUBLISHED),
+			},
+			CreatedAt: &testdatav1.ProductFilter_CreatedAtFilter{
+				Gte: timestamppb.New(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
+			},
+		}
+
+		// Custom hook that converts timestamps to Unix milliseconds
+		customHook := func(next filter.HandleOperatorFunc) filter.HandleOperatorFunc {
+			return func(input *filter.HandleOperatorInput) (*filter.HandleOperatorOutput, error) {
+				if input.OperatorType == reflect.TypeOf((*timestamppb.Timestamp)(nil)) {
+					ts, ok := input.OperatorValue.Interface().(*timestamppb.Timestamp)
+					if !ok {
+						return nil, fmt.Errorf("expected timestamp value, got %T", input.OperatorValue.Interface())
+					}
+					// Convert to Unix milliseconds instead of time.Time
+					input.FilterMap[input.OperatorName] = ts.AsTime().UnixMilli()
+					return &filter.HandleOperatorOutput{}, nil
+				}
+
+				// Handle enums with custom format
+				enumType := reflect.TypeOf((*protoreflect.Enum)(nil)).Elem()
+				if input.OperatorType.Implements(enumType) {
+					if _, err := next(input); err != nil {
+						return nil, err
+					}
+					input.FilterMap[input.OperatorName] = "custom_" + input.FilterMap[input.OperatorName].(string)
+					return &filter.HandleOperatorOutput{}, nil
+				}
+
+				// Pass to next hook (or default handler)
+				return next(input)
+			}
+		}
+
+		filterMap, err := filter.ParseProtoFilter(protoFilter, filter.WithHandleOperatorHook(customHook))
+		require.NoError(t, err)
+
+		// Verify that timestamp was converted to Unix milliseconds
+		createdAtFilter := filterMap["CreatedAt"].(map[string]any)
+		gte, ok := createdAtFilter["Gte"].(int64)
+		require.True(t, ok, "expected timestamp to be converted to int64")
+		assert.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli(), gte)
+
+		// Verify that enum was still converted normally
+		statusFilter := filterMap["Status"].(map[string]any)
+		eq, ok := statusFilter["Eq"].(string)
+		require.True(t, ok, "expected enum to be converted to string")
+		assert.Equal(t, "custom_PUBLISHED", eq)
 	})
 }
