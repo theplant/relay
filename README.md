@@ -113,7 +113,7 @@ p := relay.New(
 // Use computed field in ordering
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
     First: lo.ToPtr(10),
-    OrderBys: []relay.OrderBy{
+    OrderBy: []relay.OrderBy{
         {Field: "Priority", Desc: false}, // Sort by computed field
         {Field: "ID", Desc: false},
     },
@@ -194,7 +194,7 @@ p := relay.New(
 // Multi-level sorting with computed fields
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
     First: lo.ToPtr(10),
-    OrderBys: []relay.OrderBy{
+    OrderBy: []relay.OrderBy{
         {Field: "Rank", Desc: false},
         {Field: "Score", Desc: true},
         {Field: "ID", Desc: false},

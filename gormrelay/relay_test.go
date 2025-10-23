@@ -54,7 +54,7 @@ type User struct {
 	Age  int    `gorm:"index;not null;" json:"age"`
 }
 
-func TestUnexpectOrderBys(t *testing.T) {
+func TestUnexpectOrderBy(t *testing.T) {
 	resetDB(t)
 
 	p := relay.New(func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*User], error) {
@@ -589,7 +589,7 @@ func TestWithNodeProcessor(t *testing.T) {
 	t.Run("offset", func(t *testing.T) { testCase(t, NewOffsetAdapter) })
 }
 
-func TestOrderBys(t *testing.T) {
+func TestOrderBy(t *testing.T) {
 	resetDB(t)
 
 	testCase := func(t *testing.T, cursorTest bool, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {

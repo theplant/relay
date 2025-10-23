@@ -831,7 +831,7 @@ func TestKeysetCursor(t *testing.T) {
 	}
 }
 
-func TestKeysetEmptyOrderBys(t *testing.T) {
+func TestKeysetEmptyOrderBy(t *testing.T) {
 	conn, err := relay.New(
 		NewKeysetAdapter[*User](db),
 		relay.EnsureLimits[*User](10, 10),

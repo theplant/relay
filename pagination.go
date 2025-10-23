@@ -47,11 +47,11 @@ type Connection[T any] struct {
 }
 
 type ApplyCursorsRequest struct {
-	Before   *string
-	After    *string
-	OrderBys []Order
-	Limit    int
-	FromEnd  bool
+	Before  *string
+	After   *string
+	OrderBy []Order
+	Limit   int
+	FromEnd bool
 }
 
 type LazyEdge[T any] struct {
@@ -110,11 +110,11 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 	}
 
 	rsp, err := applyCursorsFunc(ctx, &ApplyCursorsRequest{
-		Before:   req.Before,
-		After:    req.After,
-		OrderBys: orderBy,
-		Limit:    limit,
-		FromEnd:  req.Last != nil,
+		Before:  req.Before,
+		After:   req.After,
+		OrderBy: orderBy,
+		Limit:   limit,
+		FromEnd: req.Last != nil,
 	})
 	if err != nil {
 		return nil, err
