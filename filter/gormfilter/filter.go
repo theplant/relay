@@ -99,6 +99,10 @@ func Scope(filter any, opts ...Option) func(db *gorm.DB) *gorm.DB {
 			return nil
 		}
 
+		if filter == nil {
+			return db
+		}
+
 		options := &options{}
 		for _, opt := range opts {
 			opt(options)
