@@ -1,4 +1,4 @@
-package relay_test
+package protorelay_test
 
 import (
 	"context"
@@ -18,11 +18,13 @@ import (
 
 	"github.com/theplant/relay"
 	"github.com/theplant/relay/cursor"
-	"github.com/theplant/relay/filter"
 	"github.com/theplant/relay/filter/gormfilter"
+	"github.com/theplant/relay/filter/protofilter"
 	relayv1 "github.com/theplant/relay/gen/relay/v1"
 	"github.com/theplant/relay/gormrelay"
+	"github.com/theplant/relay/protorelay"
 	testdatav1 "github.com/theplant/relay/testdata/gen/testdata/v1"
+	"github.com/theplant/testenv"
 )
 
 type ProductService struct {
@@ -34,14 +36,14 @@ func NewProductService(db *gorm.DB) *ProductService {
 }
 
 func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListProductsRequest) (*testdatav1.ListProductsResponse, error) {
-	orderBy, err := relay.ParseProtoOrderBy(req.OrderBy, []relay.Order{
+	orderBy, err := protorelay.ParseOrderBy(req.OrderBy, []relay.Order{
 		{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	filterMap, err := filter.ParseProtoFilter(req.Filter)
+	filterMap, err := protofilter.ToMap(req.Filter)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +64,7 @@ func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListP
 		relay.EnsureLimits[*Product](10, 100),
 	)
 
-	paginateReq := relay.ParseProtoPagination[*Product](req.Pagination, orderBy...)
+	paginateReq := protorelay.ParsePagination[*Product](req.Pagination, orderBy...)
 
 	conn, err := paginator.Paginate(ctx, paginateReq)
 	if err != nil {
@@ -82,7 +84,7 @@ func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListP
 			StartCursor: conn.PageInfo.StartCursor,
 			EndCursor:   conn.PageInfo.EndCursor,
 		},
-		TotalCount: relay.PtrAs[int, int32](conn.TotalCount),
+		TotalCount: protorelay.PtrAs[int, int32](conn.TotalCount),
 	}, nil
 }
 
@@ -152,6 +154,21 @@ func (p *Product) ToProto() *testdatav1.Product {
 		Category:   p.Category.ToProto(),
 	}
 	return proto
+}
+
+var db *gorm.DB
+
+func TestMain(m *testing.M) {
+	env, err := testenv.New().DBEnable(true).SetUp()
+	if err != nil {
+		panic(err)
+	}
+	defer env.TearDown()
+
+	db = env.DB
+	db.Logger = db.Logger.LogMode(logger.Info)
+
+	m.Run()
 }
 
 func resetDB(t *testing.T) {
@@ -257,7 +274,7 @@ func TestParseProtoEnum(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := relay.ParseProtoEnum(tt.enum)
+			got, err := protorelay.ParseEnum(tt.enum)
 			if tt.wantError {
 				assert.Error(t, err)
 				return
@@ -299,7 +316,7 @@ func TestParseProtoOrderField(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := relay.ParseProtoOrderField(tt.field)
+			got, err := protorelay.ParseOrderField(tt.field)
 			if tt.wantError {
 				assert.Error(t, err)
 				return
@@ -392,7 +409,7 @@ func TestParseProtoOrderBy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := relay.ParseProtoOrderBy(tt.orderBy, tt.defaultOrderBy)
+			got, err := protorelay.ParseOrderBy(tt.orderBy, tt.defaultOrderBy)
 			if tt.wantError {
 				assert.Error(t, err)
 				return
@@ -404,7 +421,7 @@ func TestParseProtoOrderBy(t *testing.T) {
 }
 
 func TestProtoOrderInterface(t *testing.T) {
-	var _ relay.ProtoOrder[testdatav1.ProductOrderField] = (*testdatav1.ProductOrder)(nil)
+	var _ protorelay.Order[testdatav1.ProductOrderField] = (*testdatav1.ProductOrder)(nil)
 
 	order := &testdatav1.ProductOrder{
 		Field:     testdatav1.ProductOrderField_PRODUCT_ORDER_FIELD_CREATED_AT,
@@ -742,8 +759,8 @@ func TestProductService_ListProducts(t *testing.T) {
 		}
 
 		// Custom hook that converts timestamps to Unix milliseconds
-		customHook := func(next filter.HandleOperatorFunc) filter.HandleOperatorFunc {
-			return func(input *filter.HandleOperatorInput) (*filter.HandleOperatorOutput, error) {
+		customHook := func(next protofilter.HandleOperatorFunc) protofilter.HandleOperatorFunc {
+			return func(input *protofilter.HandleOperatorInput) (*protofilter.HandleOperatorOutput, error) {
 				if input.OperatorType == reflect.TypeOf((*timestamppb.Timestamp)(nil)) {
 					ts, ok := input.OperatorValue.Interface().(*timestamppb.Timestamp)
 					if !ok {
@@ -751,7 +768,7 @@ func TestProductService_ListProducts(t *testing.T) {
 					}
 					// Convert to Unix milliseconds instead of time.Time
 					input.FilterMap[input.OperatorName] = ts.AsTime().UnixMilli()
-					return &filter.HandleOperatorOutput{}, nil
+					return &protofilter.HandleOperatorOutput{}, nil
 				}
 
 				// Handle enums with custom format
@@ -761,7 +778,7 @@ func TestProductService_ListProducts(t *testing.T) {
 						return nil, err
 					}
 					input.FilterMap[input.OperatorName] = "custom_" + input.FilterMap[input.OperatorName].(string)
-					return &filter.HandleOperatorOutput{}, nil
+					return &protofilter.HandleOperatorOutput{}, nil
 				}
 
 				// Pass to next hook (or default handler)
@@ -769,7 +786,7 @@ func TestProductService_ListProducts(t *testing.T) {
 			}
 		}
 
-		filterMap, err := filter.ParseProtoFilter(protoFilter, filter.WithHandleOperatorHook(customHook))
+		filterMap, err := protofilter.ToMap(protoFilter, protofilter.WithHandleOperatorHook(customHook))
 		require.NoError(t, err)
 
 		// Verify that timestamp was converted to Unix milliseconds

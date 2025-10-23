@@ -1,4 +1,4 @@
-package filter
+package protofilter
 
 import (
 	"reflect"
@@ -10,8 +10,9 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/theplant/relay"
+	"github.com/theplant/relay/filter"
 	"github.com/theplant/relay/internal/hook"
+	"github.com/theplant/relay/protorelay"
 )
 
 // HandleOperatorInput provides input information for operator handling
@@ -32,40 +33,40 @@ type HandleOperatorOutput struct{}
 // To pass control to the next handler in the chain, call next(input).
 type HandleOperatorFunc func(input *HandleOperatorInput) (*HandleOperatorOutput, error)
 
-// ParseProtoFilterOptions holds configuration options for ParseProtoFilter
-type ParseProtoFilterOptions struct {
+// toMapOptions holds configuration options for ToMap
+type toMapOptions struct {
 	handleOperatorHook func(next HandleOperatorFunc) HandleOperatorFunc
 }
 
-// ParseProtoFilterOption is a function that configures ParseProtoFilterOptions
-type ParseProtoFilterOption func(*ParseProtoFilterOptions)
+// ToMapOption is a function that configures toMapOptions
+type ToMapOption func(*toMapOptions)
 
 // WithHandleOperatorHook adds custom operator handler hooks.
 // Hooks are applied in the order they are added.
 // The default handler is always at the end of the chain.
-func WithHandleOperatorHook(hooks ...func(next HandleOperatorFunc) HandleOperatorFunc) ParseProtoFilterOption {
-	return func(o *ParseProtoFilterOptions) {
+func WithHandleOperatorHook(hooks ...func(next HandleOperatorFunc) HandleOperatorFunc) ToMapOption {
+	return func(o *toMapOptions) {
 		o.handleOperatorHook = hook.Prepend(o.handleOperatorHook, hooks...)
 	}
 }
 
-// ParseProtoFilter parses a proto filter message to a map
+// ToMap parses a proto filter message to a map
 // It uses Go reflection to automatically handle type conversions:
 // - Proto enums -> strings (with validation)
 // - Timestamps -> time.Time
 // - Recursively processes nested filters (And/Or/Not)
 // Custom transformers can be provided via options to override default behavior.
-func ParseProtoFilter[T proto.Message](protoFilter T, opts ...ParseProtoFilterOption) (map[string]any, error) {
+func ToMap[T proto.Message](protoFilter T, opts ...ToMapOption) (map[string]any, error) {
 	if lo.IsNil(protoFilter) {
 		return nil, nil
 	}
 
-	options := &ParseProtoFilterOptions{}
+	options := &toMapOptions{}
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	filterMap, err := ToMap(protoFilter)
+	filterMap, err := filter.ToMap(protoFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +80,7 @@ func ParseProtoFilter[T proto.Message](protoFilter T, opts ...ParseProtoFilterOp
 	return filterMap, nil
 }
 
-func fixFilterMap(m map[string]any, schemaType reflect.Type, schemaValue reflect.Value, options *ParseProtoFilterOptions) error {
+func fixFilterMap(m map[string]any, schemaType reflect.Type, schemaValue reflect.Value, options *toMapOptions) error {
 	if m == nil {
 		return nil
 	}
@@ -110,7 +111,7 @@ func fixFilterMap(m map[string]any, schemaType reflect.Type, schemaValue reflect
 	return nil
 }
 
-func fixLogicalFilterList(m map[string]any, key string, schemaType reflect.Type, schemaValue reflect.Value, options *ParseProtoFilterOptions) error {
+func fixLogicalFilterList(m map[string]any, key string, schemaType reflect.Type, schemaValue reflect.Value, options *toMapOptions) error {
 	value := m[key]
 	if value == nil {
 		return nil
@@ -151,7 +152,7 @@ func fixLogicalFilterList(m map[string]any, key string, schemaType reflect.Type,
 	return nil
 }
 
-func fixLogicalFilterSingle(m map[string]any, key string, schemaType reflect.Type, schemaValue reflect.Value, options *ParseProtoFilterOptions) error {
+func fixLogicalFilterSingle(m map[string]any, key string, schemaType reflect.Type, schemaValue reflect.Value, options *toMapOptions) error {
 	value := m[key]
 	if value == nil {
 		return nil
@@ -177,7 +178,7 @@ func fixLogicalFilterSingle(m map[string]any, key string, schemaType reflect.Typ
 	return fixFilterMap(subMap, schemaType, reflect.Indirect(fieldValue), options)
 }
 
-func fixNestedFilterMap(m map[string]any, key string, parentType reflect.Type, parentValue reflect.Value, options *ParseProtoFilterOptions) error {
+func fixNestedFilterMap(m map[string]any, key string, parentType reflect.Type, parentValue reflect.Value, options *toMapOptions) error {
 	value := m[key]
 	if value == nil {
 		return nil
@@ -266,7 +267,7 @@ func defaultHandleOperator(input *HandleOperatorInput) (*HandleOperatorOutput, e
 		if !ok {
 			return nil, errors.Errorf("expected enum value, got %T", enumValue)
 		}
-		converted, err := relay.ParseProtoEnum(protoEnum)
+		converted, err := protorelay.ParseEnum(protoEnum)
 		if err != nil {
 			return nil, err
 		}
@@ -301,7 +302,7 @@ func convertProtoEnumSlice(sliceValue reflect.Value) ([]any, error) {
 		if !ok {
 			return nil, errors.Errorf("index %d: expected enum value, got %T", i, elemValue)
 		}
-		converted, err := relay.ParseProtoEnum(protoEnum)
+		converted, err := protorelay.ParseEnum(protoEnum)
 		if err != nil {
 			return nil, errors.Wrapf(err, "index %d", i)
 		}
