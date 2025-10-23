@@ -2,10 +2,7 @@
 version: v2
 modules:
   - path: proto
-  - path: testdata/proto
-
-deps:
-  - buf.build/googleapis/googleapis
+    name: buf.build/theplant/relay
 
 lint:
   use:

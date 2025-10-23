@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package relay.v1;
 
+// OrderDirection specifies the direction of an order.
 enum OrderDirection {
   ORDER_DIRECTION_UNSPECIFIED = 0;
   ORDER_DIRECTION_ASC = 1;
