@@ -42,7 +42,7 @@ message Pagination {
   // Number of items to fetch in forward direction (after the 'after' cursor).
   // Must be positive. Typically combined with 'after' or used alone for initial page.
   // Example: 20 (fetch 20 items)
-  optional int64 first = 2;
+  optional int32 first = 2;
 
   // Cursor pointing to the item before which to start fetching.
   // Use with 'last' for backward pagination.
@@ -52,7 +52,7 @@ message Pagination {
   // Number of items to fetch in backward direction (before the 'before' cursor).
   // Must be positive. Typically combined with 'before'.
   // Example: 20 (fetch previous 20 items)
-  optional int64 last = 4;
+  optional int32 last = 4;
 }
 
 // PageInfo contains pagination metadata for cursor-based pagination responses.

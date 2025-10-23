@@ -108,7 +108,7 @@ type Pagination struct {
 	// Number of items to fetch in forward direction (after the 'after' cursor).
 	// Must be positive. Typically combined with 'after' or used alone for initial page.
 	// Example: 20 (fetch 20 items)
-	First *int64 `protobuf:"varint,2,opt,name=first,proto3,oneof" json:"first,omitempty"`
+	First *int32 `protobuf:"varint,2,opt,name=first,proto3,oneof" json:"first,omitempty"`
 	// Cursor pointing to the item before which to start fetching.
 	// Use with 'last' for backward pagination.
 	// Example: "eyJpZCI6MTB9" (base64-encoded cursor)
@@ -116,7 +116,7 @@ type Pagination struct {
 	// Number of items to fetch in backward direction (before the 'before' cursor).
 	// Must be positive. Typically combined with 'before'.
 	// Example: 20 (fetch previous 20 items)
-	Last          *int64 `protobuf:"varint,4,opt,name=last,proto3,oneof" json:"last,omitempty"`
+	Last          *int32 `protobuf:"varint,4,opt,name=last,proto3,oneof" json:"last,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -158,7 +158,7 @@ func (x *Pagination) GetAfter() string {
 	return ""
 }
 
-func (x *Pagination) GetFirst() int64 {
+func (x *Pagination) GetFirst() int32 {
 	if x != nil && x.First != nil {
 		return *x.First
 	}
@@ -172,7 +172,7 @@ func (x *Pagination) GetBefore() string {
 	return ""
 }
 
-func (x *Pagination) GetLast() int64 {
+func (x *Pagination) GetLast() int32 {
 	if x != nil && x.Last != nil {
 		return *x.Last
 	}
@@ -277,9 +277,9 @@ const file_relay_v1_relay_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x12\x19\n" +
 	"\x05after\x18\x01 \x01(\tH\x00R\x05after\x88\x01\x01\x12\x19\n" +
-	"\x05first\x18\x02 \x01(\x03H\x01R\x05first\x88\x01\x01\x12\x1b\n" +
+	"\x05first\x18\x02 \x01(\x05H\x01R\x05first\x88\x01\x01\x12\x1b\n" +
 	"\x06before\x18\x03 \x01(\tH\x02R\x06before\x88\x01\x01\x12\x17\n" +
-	"\x04last\x18\x04 \x01(\x03H\x03R\x04last\x88\x01\x01B\b\n" +
+	"\x04last\x18\x04 \x01(\x05H\x03R\x04last\x88\x01\x01B\b\n" +
 	"\x06_afterB\b\n" +
 	"\x06_firstB\t\n" +
 	"\a_beforeB\a\n" +

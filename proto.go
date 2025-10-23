@@ -11,6 +11,38 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+// Integer is a type constraint for integer types.
+type Integer interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
+}
+
+// PtrAs converts a pointer to a different integer type.
+func PtrAs[From, To Integer](v *From) *To {
+	if v == nil {
+		return nil
+	}
+	return lo.ToPtr(To(*v))
+}
+
+// ApplyProtoPagination applies a proto pagination to a paginate request.
+func (req *PaginateRequest[T]) ApplyProtoPagination(p *relayv1.Pagination) *PaginateRequest[T] {
+	if p == nil {
+		return req
+	}
+	req.After = p.After
+	req.Before = p.Before
+	req.First = PtrAs[int32, int](p.First)
+	req.Last = PtrAs[int32, int](p.Last)
+	return req
+}
+
+// ParseProtoPagination parses a proto pagination to a paginate request.
+func ParseProtoPagination[T any](p *relayv1.Pagination, orderBy ...Order) *PaginateRequest[T] {
+	return (&PaginateRequest[T]{
+		OrderBy: orderBy,
+	}).ApplyProtoPagination(p)
+}
+
 // ProtoOrder is an interface that all proto order messages must implement.
 type ProtoOrder[T protoreflect.Enum] interface {
 	GetField() T

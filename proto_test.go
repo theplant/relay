@@ -9,7 +9,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/theplant/testenv"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -24,19 +23,65 @@ import (
 	"github.com/theplant/relay/gormrelay"
 )
 
-var db *gorm.DB
+type ProductService struct {
+	db *gorm.DB
+}
 
-func TestMain(m *testing.M) {
-	env, err := testenv.New().DBEnable(true).SetUp()
+func NewProductService(db *gorm.DB) *ProductService {
+	return &ProductService{db: db}
+}
+
+func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListProductsRequest) (*testdatav1.ListProductsResponse, error) {
+	orderBy, err := relay.ParseProtoOrderBy(req.OrderBy, []relay.Order{
+		{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
+	})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	defer env.TearDown()
 
-	db = env.DB
-	db.Logger = db.Logger.LogMode(logger.Info)
+	filterMap, err := filter.ParseProtoFilter(req.Filter)
+	if err != nil {
+		return nil, err
+	}
 
-	m.Run()
+	applyCursorsFunc := cursor.Base64(
+		func(ctx context.Context, req *relay.ApplyCursorsRequest) (*relay.ApplyCursorsResponse[*Product], error) {
+			return gormrelay.NewKeysetAdapter[*Product](
+				s.db.WithContext(ctx).Scopes(gormfilter.Scope(filterMap)),
+			)(ctx, req)
+		},
+	)
+
+	paginator := relay.New(
+		applyCursorsFunc,
+		relay.EnsurePrimaryOrderBy[*Product](
+			relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
+		),
+		relay.EnsureLimits[*Product](10, 100),
+	)
+
+	paginateReq := relay.ParseProtoPagination[*Product](req.Pagination, orderBy...)
+
+	conn, err := paginator.Paginate(ctx, paginateReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &testdatav1.ListProductsResponse{
+		Edges: lo.Map(conn.Edges, func(edge *relay.Edge[*Product], _ int) *testdatav1.ProductEdge {
+			return &testdatav1.ProductEdge{
+				Node:   edge.Node.ToProto(),
+				Cursor: string(edge.Cursor),
+			}
+		}),
+		PageInfo: &relayv1.PageInfo{
+			HasNextPage: conn.PageInfo.HasNextPage,
+			HasPrevPage: conn.PageInfo.HasPreviousPage,
+			StartCursor: conn.PageInfo.StartCursor,
+			EndCursor:   conn.PageInfo.EndCursor,
+		},
+		TotalCount: relay.PtrAs[int, int32](conn.TotalCount),
+	}, nil
 }
 
 type Category struct {
@@ -105,86 +150,6 @@ func (p *Product) ToProto() *testdatav1.Product {
 		Category:   p.Category.ToProto(),
 	}
 	return proto
-}
-
-type ProductService struct {
-	db *gorm.DB
-}
-
-func NewProductService(db *gorm.DB) *ProductService {
-	return &ProductService{db: db}
-}
-
-func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListProductsRequest) (*testdatav1.ListProductsResponse, error) {
-	orderBy, err := relay.ParseProtoOrderBy(req.OrderBy, []relay.Order{
-		{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	filterMap, err := filter.ParseProtoFilter(req.Filter)
-	if err != nil {
-		return nil, err
-	}
-
-	applyCursorsFunc := cursor.Base64(
-		gormrelay.NewKeysetAdapter[*Product](
-			s.db.WithContext(ctx).Scopes(gormfilter.Scope(filterMap)),
-		),
-	)
-
-	paginator := relay.New(
-		applyCursorsFunc,
-		relay.EnsurePrimaryOrderBy[*Product](
-			relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
-		),
-		relay.EnsureLimits[*Product](10, 100),
-	)
-
-	paginateReq := &relay.PaginateRequest[*Product]{
-		OrderBy: orderBy,
-	}
-
-	if req.Pagination != nil {
-		paginateReq.After = req.Pagination.After
-		if req.Pagination.First != nil {
-			paginateReq.First = lo.ToPtr(int(*req.Pagination.First))
-		}
-		paginateReq.Before = req.Pagination.Before
-		if req.Pagination.Last != nil {
-			paginateReq.Last = lo.ToPtr(int(*req.Pagination.Last))
-		}
-	}
-
-	conn, err := paginator.Paginate(ctx, paginateReq)
-	if err != nil {
-		return nil, err
-	}
-
-	edges := make([]*testdatav1.ProductEdge, 0, len(conn.Edges))
-	for _, edge := range conn.Edges {
-		edges = append(edges, &testdatav1.ProductEdge{
-			Node:   edge.Node.ToProto(),
-			Cursor: string(edge.Cursor),
-		})
-	}
-
-	resp := &testdatav1.ListProductsResponse{
-		Edges: edges,
-		PageInfo: &relayv1.PageInfo{
-			HasNextPage: conn.PageInfo.HasNextPage,
-			HasPrevPage: conn.PageInfo.HasPreviousPage,
-			StartCursor: conn.PageInfo.StartCursor,
-			EndCursor:   conn.PageInfo.EndCursor,
-		},
-	}
-
-	if conn.TotalCount != nil {
-		resp.TotalCount = lo.ToPtr(int64(*conn.TotalCount))
-	}
-
-	return resp, nil
 }
 
 func resetDB(t *testing.T) {
@@ -456,7 +421,7 @@ func TestProductService_ListProducts(t *testing.T) {
 	t.Run("list first page", func(t *testing.T) {
 		req := &testdatav1.ListProductsRequest{
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(10)),
+				First: lo.ToPtr(int32(10)),
 			},
 		}
 
@@ -479,7 +444,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(5)),
+				First: lo.ToPtr(int32(5)),
 			},
 		}
 
@@ -499,7 +464,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 
@@ -521,7 +486,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 
@@ -537,7 +502,7 @@ func TestProductService_ListProducts(t *testing.T) {
 	t.Run("pagination - forward", func(t *testing.T) {
 		req := &testdatav1.ListProductsRequest{
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(5)),
+				First: lo.ToPtr(int32(5)),
 			},
 		}
 
@@ -561,7 +526,7 @@ func TestProductService_ListProducts(t *testing.T) {
 	t.Run("pagination - backward", func(t *testing.T) {
 		req := &testdatav1.ListProductsRequest{
 			Pagination: &relayv1.Pagination{
-				Last: lo.ToPtr(int64(5)),
+				Last: lo.ToPtr(int32(5)),
 			},
 		}
 
@@ -593,7 +558,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 
@@ -617,7 +582,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 
@@ -639,7 +604,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 
@@ -664,7 +629,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 
@@ -688,7 +653,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 
@@ -716,7 +681,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 
@@ -749,7 +714,7 @@ func TestProductService_ListProducts(t *testing.T) {
 				},
 			},
 			Pagination: &relayv1.Pagination{
-				First: lo.ToPtr(int64(100)),
+				First: lo.ToPtr(int32(100)),
 			},
 		}
 

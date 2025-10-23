@@ -4,6 +4,7 @@
 
 
 
+
 syntax = "proto3";
 
 package testdata.v1;
@@ -145,5 +146,5 @@ message ProductEdge {
 message ListProductsResponse {
   repeated ProductEdge edges = 1;
   relay.v1.PageInfo page_info = 2;
-  optional int64 total_count = 3;
+  optional int32 total_count = 3;
 }

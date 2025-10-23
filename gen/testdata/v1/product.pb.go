@@ -672,7 +672,7 @@ type ListProductsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Edges         []*ProductEdge         `protobuf:"bytes,1,rep,name=edges,proto3" json:"edges,omitempty"`
 	PageInfo      *v1.PageInfo           `protobuf:"bytes,2,opt,name=page_info,json=pageInfo,proto3" json:"page_info,omitempty"`
-	TotalCount    *int64                 `protobuf:"varint,3,opt,name=total_count,json=totalCount,proto3,oneof" json:"total_count,omitempty"`
+	TotalCount    *int32                 `protobuf:"varint,3,opt,name=total_count,json=totalCount,proto3,oneof" json:"total_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -721,7 +721,7 @@ func (x *ListProductsResponse) GetPageInfo() *v1.PageInfo {
 	return nil
 }
 
-func (x *ListProductsResponse) GetTotalCount() int64 {
+func (x *ListProductsResponse) GetTotalCount() int32 {
 	if x != nil && x.TotalCount != nil {
 		return *x.TotalCount
 	}
@@ -1373,7 +1373,7 @@ const file_testdata_v1_product_proto_rawDesc = "" +
 	"\x14ListProductsResponse\x12.\n" +
 	"\x05edges\x18\x01 \x03(\v2\x18.testdata.v1.ProductEdgeR\x05edges\x12/\n" +
 	"\tpage_info\x18\x02 \x01(\v2\x12.relay.v1.PageInfoR\bpageInfo\x12$\n" +
-	"\vtotal_count\x18\x03 \x01(\x03H\x00R\n" +
+	"\vtotal_count\x18\x03 \x01(\x05H\x00R\n" +
 	"totalCount\x88\x01\x01B\x0e\n" +
 	"\f_total_count*\xe4\x01\n" +
 	"\rProductStatus\x12\x1e\n" +
