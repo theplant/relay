@@ -84,31 +84,6 @@ conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
 })
 ```
 
-## gRPC Integration
-
-`relay` provides seamless integration with gRPC/Protocol Buffers, including utilities for parsing proto enums, order fields, filters, and pagination requests.
-
-### Protocol Buffers Definition
-
-For a complete example of proto definitions with pagination, ordering, and filtering support, see:
-
-- Proto definitions: [`testdata/proto/testdata/v1/product.proto`](testdata/proto/testdata/v1/product.proto)
-- Relay pagination types: [`proto/relay/v1/relay.proto`](proto/relay/v1/relay.proto)
-
-### Implementation Example
-
-For a complete implementation of a gRPC service using `relay`, refer to the `ProductService.ListProducts` method:
-
-- Implementation: [`proto_test.go` (ProductService.ListProducts)](proto_test.go)
-
-This example demonstrates:
-
-- Parsing proto order fields with `relay.ParseProtoOrderBy`
-- Parsing proto filters with `filter.ParseProtoFilter`
-- Creating a paginator with Base64-encoded cursors
-- Converting between proto and internal types with `relay.ParseProtoPagination`
-- Building gRPC responses from pagination results
-
 ## Computed Fields
 
 `relay` supports computed fields, allowing you to add SQL expressions calculated at the database level and use them for sorting and pagination.
@@ -437,6 +412,31 @@ Relationship filters use `IN` subqueries, which are generally efficient for most
 - Query complexity
 
 For detailed performance analysis comparing `IN` subqueries with `JOIN` approaches, see `filter/gormfilter/perf/perf_test.go`.
+
+## gRPC Integration
+
+`relay` provides seamless integration with gRPC/Protocol Buffers, including utilities for parsing proto enums, order fields, filters, and pagination requests.
+
+### Protocol Buffers Definition
+
+For a complete example of proto definitions with pagination, ordering, and filtering support, see:
+
+- Proto definitions: [`testdata/proto/testdata/v1/product.proto`](testdata/proto/testdata/v1/product.proto)
+- Relay pagination types: [`proto/relay/v1/relay.proto`](proto/relay/v1/relay.proto)
+
+### Implementation Example
+
+For a complete implementation of a gRPC service using `relay`, refer to the `ProductService.ListProducts` method:
+
+- Implementation: [`proto_test.go` (ProductService.ListProducts)](proto_test.go)
+
+This example demonstrates:
+
+- Parsing proto order fields with `relay.ParseProtoOrderBy`
+- Parsing proto filters with `filter.ParseProtoFilter`
+- Creating a paginator with Base64-encoded cursors
+- Converting between proto and internal types with `relay.ParseProtoPagination`
+- Building gRPC responses from pagination results
 
 ## Reference
 
