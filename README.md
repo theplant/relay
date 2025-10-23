@@ -12,6 +12,7 @@
 - **Non-generic support**: Even without using Go generics, you can paginate using the `any` type for flexible use cases.
 - **Computed fields**: Add database-level calculated fields using SQL expressions for sorting and pagination.
 - **Powerful filtering**: Type-safe filtering with support for comparison operators, string matching, logical combinations, and relationship filtering.
+- **gRPC/Protocol Buffers integration**: Built-in utilities for parsing proto messages, including enums, order fields, filters, and pagination requests.
 
 ## Usage
 
@@ -30,8 +31,8 @@ p := relay.New(
     relay.EnsureLimits[*User](10, 100),
     // Append primary sorting fields, if any are unspecified
     relay.EnsurePrimaryOrderBy[*User](
-        relay.OrderBy{Field: "ID", Desc: false},
-        relay.OrderBy{Field: "Version", Desc: false},
+        relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
+        relay.Order{Field: "Version", Direction: relay.OrderDirectionAsc},
     ),
 )
 
@@ -76,12 +77,37 @@ p := relay.New(
         return gormrelay.NewKeysetAdapter[any](db.Model(&User{}))(ctx, req)
     },
     relay.EnsureLimits[any](10, 100),
-    relay.EnsurePrimaryOrderBy[any](relay.OrderBy{Field: "ID", Desc: false}),
+    relay.EnsurePrimaryOrderBy[any](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 )
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[any]{
     First: lo.ToPtr(10), // query first 10 records
 })
 ```
+
+## gRPC Integration
+
+`relay` provides seamless integration with gRPC/Protocol Buffers, including utilities for parsing proto enums, order fields, filters, and pagination requests.
+
+### Protocol Buffers Definition
+
+For a complete example of proto definitions with pagination, ordering, and filtering support, see:
+
+- Proto definitions: [`testdata/proto/testdata/v1/product.proto`](testdata/proto/testdata/v1/product.proto)
+- Relay pagination types: [`proto/relay/v1/relay.proto`](proto/relay/v1/relay.proto)
+
+### Implementation Example
+
+For a complete implementation of a gRPC service using `relay`, refer to the `ProductService.ListProducts` method:
+
+- Implementation: [`proto_test.go` (ProductService.ListProducts)](proto_test.go)
+
+This example demonstrates:
+
+- Parsing proto order fields with `relay.ParseProtoOrderBy`
+- Parsing proto filters with `filter.ParseProtoFilter`
+- Creating a paginator with Base64-encoded cursors
+- Converting between proto and internal types with `relay.ParseProtoPagination`
+- Building gRPC responses from pagination results
 
 ## Computed Fields
 
@@ -106,16 +132,16 @@ p := relay.New(
     ),
     relay.EnsureLimits[*User](10, 100),
     relay.EnsurePrimaryOrderBy[*User](
-        relay.OrderBy{Field: "ID", Desc: false},
+        relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
     ),
 )
 
 // Use computed field in ordering
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
     First: lo.ToPtr(10),
-    OrderBy: []relay.OrderBy{
-        {Field: "Priority", Desc: false}, // Sort by computed field
-        {Field: "ID", Desc: false},
+    OrderBy: []relay.Order{
+        {Field: "Priority", Direction: relay.OrderDirectionAsc}, // Sort by computed field
+        {Field: "ID", Direction: relay.OrderDirectionAsc},
     },
 })
 ```
@@ -187,17 +213,17 @@ p := relay.New(
     ),
     relay.EnsureLimits[*User](10, 100),
     relay.EnsurePrimaryOrderBy[*User](
-        relay.OrderBy{Field: "ID", Desc: false},
+        relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
     ),
 )
 
 // Multi-level sorting with computed fields
 conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
     First: lo.ToPtr(10),
-    OrderBy: []relay.OrderBy{
-        {Field: "Rank", Desc: false},
-        {Field: "Score", Desc: true},
-        {Field: "ID", Desc: false},
+    OrderBy: []relay.Order{
+        {Field: "Rank", Direction: relay.OrderDirectionAsc},
+        {Field: "Score", Direction: relay.OrderDirectionDesc},
+        {Field: "ID", Direction: relay.OrderDirectionAsc},
     },
 })
 ```
@@ -383,7 +409,7 @@ p := relay.New(
     }),
     relay.EnsureLimits[*User](10, 100),
     relay.EnsurePrimaryOrderBy[*User](
-        relay.OrderBy{Field: "ID", Desc: false},
+        relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
     ),
 )
 
