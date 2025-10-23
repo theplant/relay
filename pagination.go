@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+	"github.com/theplant/relay/internal/hook"
 )
 
 type OrderDirection string
@@ -17,26 +18,6 @@ const (
 type Order struct {
 	Field     string         `json:"field"`
 	Direction OrderDirection `json:"direction"`
-}
-
-// Deprecated: Kept for backward compatibility only. Do not use in new code. Use Order instead.
-type OrderBy struct {
-	Field string `json:"field"`
-	Desc  bool   `json:"desc"`
-}
-
-// Deprecated: Kept for backward compatibility only. Do not use in new code. Use Order instead.
-func OrderByFromOrderBys(orderBys []OrderBy) []Order {
-	return lo.Map(orderBys, func(orderBy OrderBy, _ int) Order {
-		direction := OrderDirectionAsc
-		if orderBy.Desc {
-			direction = OrderDirectionDesc
-		}
-		return Order{
-			Field:     orderBy.Field,
-			Direction: direction,
-		}
-	})
 }
 
 type PaginateRequest[T any] struct {
@@ -241,20 +222,26 @@ func (f PaginatorFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T])
 	return f(ctx, req)
 }
 
-type PaginatorMiddleware[T any] func(next Paginator[T]) Paginator[T]
-
-func New[T any](applyCursorsFunc ApplyCursorsFunc[T], middlewares ...PaginatorMiddleware[T]) Paginator[T] {
+func New[T any](applyCursorsFunc ApplyCursorsFunc[T], hooks ...func(next Paginator[T]) Paginator[T]) Paginator[T] {
 	if applyCursorsFunc == nil {
 		panic("applyCursorsFunc must be set")
 	}
 
 	var p Paginator[T] = PaginatorFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
-		cursorMiddlewares := CursorMiddlewaresFromContext[T](ctx)
-		return paginate(ctx, req, chainCursorMiddlewares(cursorMiddlewares)(applyCursorsFunc))
+		applyCursors := applyCursorsFunc
+		cursorHook := CursorHookFromContext[T](ctx)
+		if cursorHook != nil {
+			applyCursors = cursorHook(applyCursors)
+		}
+		return paginate(ctx, req, applyCursors)
 	})
-	return Wrap(p, middlewares...)
+	return Wrap(p, hooks...)
 }
 
-func Wrap[T any](p Paginator[T], middlewares ...PaginatorMiddleware[T]) Paginator[T] {
-	return chainPaginatorMiddlewares(middlewares)(p)
+func Wrap[T any](p Paginator[T], hooks ...func(next Paginator[T]) Paginator[T]) Paginator[T] {
+	hook := hook.Chain(hooks...)
+	if hook != nil {
+		return hook(p)
+	}
+	return p
 }

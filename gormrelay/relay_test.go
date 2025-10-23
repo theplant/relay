@@ -364,7 +364,7 @@ func generateGCMKey(length int) ([]byte, error) {
 	return key, nil
 }
 
-func TestCursorMiddleware(t *testing.T) {
+func TestCursorHook(t *testing.T) {
 	resetDB(t)
 
 	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
@@ -483,7 +483,7 @@ func TestCursorMiddleware(t *testing.T) {
 	})
 }
 
-func TestAppendCursorMiddleware(t *testing.T) {
+func TestPrependCursorHook(t *testing.T) {
 	resetDB(t)
 
 	encryptionKey, err := generateGCMKey(32)
@@ -492,12 +492,12 @@ func TestAppendCursorMiddleware(t *testing.T) {
 	gcm, err := cursor.NewGCM(encryptionKey)
 	require.NoError(t, err)
 
-	gcmMiddleware := cursor.GCM[*User](gcm)
+	gcmHook := cursor.GCM[*User](gcm)
 
 	testCase := func(t *testing.T, f func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User]) {
 		p := relay.New(
 			f(db),
-			relay.AppendCursorMiddleware(gcmMiddleware),
+			relay.PrependCursorHook(gcmHook),
 			relay.EnsurePrimaryOrderBy[*User](relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc}),
 			relay.EnsureLimits[*User](10, 10),
 		)
