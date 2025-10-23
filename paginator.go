@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+
 	"github.com/theplant/relay/internal/hook"
 )
 
@@ -238,7 +239,7 @@ func New[T any](applyCursorsFunc ApplyCursorsFunc[T], hooks ...func(next Paginat
 
 	hook := hook.Chain(hooks...)
 	if hook != nil {
-		return hook(p)
+		p = hook(p)
 	}
 	return p
 }
