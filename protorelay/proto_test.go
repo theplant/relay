@@ -20,10 +20,10 @@ import (
 	"github.com/theplant/relay/cursor"
 	"github.com/theplant/relay/filter/gormfilter"
 	"github.com/theplant/relay/filter/protofilter"
-	relayv1 "github.com/theplant/relay/gen/relay/v1"
 	"github.com/theplant/relay/gormrelay"
 	"github.com/theplant/relay/protorelay"
-	testdatav1 "github.com/theplant/relay/testdata/gen/testdata/v1"
+	relayv1 "github.com/theplant/relay/protorelay/gen/relay/v1"
+	testdatav1 "github.com/theplant/relay/protorelay/testdata/gen/testdata/v1"
 	"github.com/theplant/testenv"
 )
 

@@ -421,23 +421,23 @@ For detailed performance analysis comparing `IN` subqueries with `JOIN` approach
 
 For a complete example of proto definitions with pagination, ordering, and filtering support, see:
 
-- Buf configuration: [`testdata/buf.yaml`](testdata/buf.yaml)
-- Buf generation config: [`testdata/buf.gen.yaml`](testdata/buf.gen.yaml)
-- Proto definitions: [`testdata/proto/testdata/v1/product.proto`](testdata/proto/testdata/v1/product.proto)
-- Relay pagination types: [`proto/relay/v1/relay.proto`](proto/relay/v1/relay.proto)
+- Buf configuration: [`protorelay/testdata/buf.yaml`](protorelay/testdata/buf.yaml)
+- Buf generation config: [`protorelay/testdata/buf.gen.yaml`](protorelay/testdata/buf.gen.yaml)
+- Proto definitions: [`protorelay/testdata/proto/testdata/v1/product.proto`](protorelay/testdata/proto/testdata/v1/product.proto)
+- Relay pagination types: [`protorelay/proto/relay/v1/relay.proto`](protorelay/proto/relay/v1/relay.proto)
 
 ### Implementation Example
 
 For a complete implementation of a gRPC service using `relay`, refer to the `ProductService.ListProducts` method:
 
-- Implementation: [`proto_test.go` (ProductService.ListProducts)](proto_test.go)
+- Implementation: [`protorelay/proto_test.go` (ProductService.ListProducts)](protorelay/proto_test.go)
 
 This example demonstrates:
 
-- Parsing proto order fields with `relay.ParseProtoOrderBy`
-- Parsing proto filters with `filter.ParseProtoFilter`
+- Parsing proto order fields with `protorelay.ParseOrderBy`
+- Parsing proto filters with `protofilter.ToMap`
 - Creating a paginator with Base64-encoded cursors
-- Converting between proto and internal types with `relay.ParseProtoPagination`
+- Converting between proto and internal types with `protorelay.ParsePagination`
 - Building gRPC responses from pagination results
 
 ## Reference

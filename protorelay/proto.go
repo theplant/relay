@@ -8,7 +8,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/theplant/relay"
-	relayv1 "github.com/theplant/relay/gen/relay/v1"
+	relayv1 "github.com/theplant/relay/protorelay/gen/relay/v1"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 )

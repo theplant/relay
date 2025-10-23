@@ -5,7 +5,7 @@ package testdata.v1;
 import "google/protobuf/timestamp.proto";
 import "relay/v1/relay.proto";
 
-option go_package = "github.com/theplant/relay/testdata/gen/testdata/v1;testdatav1";
+option go_package = "github.com/theplant/relay/protorelay/testdata/gen/testdata/v1;testdatav1";
 
 service ProductService {
   rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {}
