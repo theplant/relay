@@ -199,7 +199,7 @@ func TestKeysetCursor(t *testing.T) {
 	applyCursorsFunc := NewKeysetAdapter[*User](db)
 
 	primaryOrderByKeys := []string{"ID", "Age"}
-	otherMiddlewares := []relay.PaginationMiddleware[*User]{
+	otherMiddlewares := []relay.PaginatorMiddleware[*User]{
 		relay.EnsurePrimaryOrderBy[*User](
 			relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 			relay.Order{Field: "Age", Direction: relay.OrderDirectionDesc},
@@ -800,7 +800,7 @@ func TestKeysetCursor(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			newPagination := func() relay.Pagination[*User] {
+			newPaginator := func() relay.Paginator[*User] {
 				mws := otherMiddlewares
 				if tc.defaultLimit != withoutEnsureLimits {
 					mws = append(mws, relay.EnsureLimits[*User](tc.defaultLimit, tc.maxLimit))
@@ -809,12 +809,12 @@ func TestKeysetCursor(t *testing.T) {
 			}
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					_ = newPagination()
+					_ = newPaginator()
 				})
 				return
 			}
 
-			p := newPagination()
+			p := newPaginator()
 			conn, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {

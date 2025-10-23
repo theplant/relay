@@ -346,9 +346,9 @@ db.Scopes(
 ).Find(&users)
 ```
 
-### Combining with Pagination
+### Combining with Paginator
 
-Filter and pagination can work together seamlessly:
+Filter and paginator can work together seamlessly:
 
 ```go
 import (

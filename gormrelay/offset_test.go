@@ -586,8 +586,8 @@ func TestOffsetCursor(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			newPagination := func() relay.Pagination[*User] {
-				mws := []relay.PaginationMiddleware[*User]{
+			newPaginator := func() relay.Paginator[*User] {
+				mws := []relay.PaginatorMiddleware[*User]{
 					relay.EnsurePrimaryOrderBy[*User](
 						relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 						relay.Order{Field: "Age", Direction: relay.OrderDirectionDesc},
@@ -600,12 +600,12 @@ func TestOffsetCursor(t *testing.T) {
 			}
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					_ = newPagination()
+					_ = newPaginator()
 				})
 				return
 			}
 
-			p := newPagination()
+			p := newPaginator()
 			conn, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {

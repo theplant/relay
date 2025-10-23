@@ -19,6 +19,26 @@ type Order struct {
 	Direction OrderDirection `json:"direction"`
 }
 
+// Deprecated: Kept for backward compatibility only. Do not use in new code. Use Order instead.
+type OrderBy struct {
+	Field string `json:"field"`
+	Desc  bool   `json:"desc"`
+}
+
+// Deprecated: Kept for backward compatibility only. Do not use in new code. Use Order instead.
+func OrderByFromOrderBys(orderBys []OrderBy) []Order {
+	return lo.Map(orderBys, func(orderBy OrderBy, _ int) Order {
+		direction := OrderDirectionAsc
+		if orderBy.Desc {
+			direction = OrderDirectionDesc
+		}
+		return Order{
+			Field:     orderBy.Field,
+			Direction: direction,
+		}
+	})
+}
+
 type PaginateRequest[T any] struct {
 	After   *string `json:"after"`
 	First   *int    `json:"first"`
@@ -211,28 +231,30 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 	return conn, nil
 }
 
-type Pagination[T any] interface {
+type Paginator[T any] interface {
 	Paginate(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error)
 }
 
-type PaginationFunc[T any] func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error)
+type PaginatorFunc[T any] func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error)
 
-func (f PaginationFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
+func (f PaginatorFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 	return f(ctx, req)
 }
 
-func New[T any](applyCursorsFunc ApplyCursorsFunc[T], middlewares ...PaginationMiddleware[T]) Pagination[T] {
+type PaginatorMiddleware[T any] func(next Paginator[T]) Paginator[T]
+
+func New[T any](applyCursorsFunc ApplyCursorsFunc[T], middlewares ...PaginatorMiddleware[T]) Paginator[T] {
 	if applyCursorsFunc == nil {
 		panic("applyCursorsFunc must be set")
 	}
 
-	var p Pagination[T] = PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
+	var p Paginator[T] = PaginatorFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 		cursorMiddlewares := CursorMiddlewaresFromContext[T](ctx)
 		return paginate(ctx, req, chainCursorMiddlewares(cursorMiddlewares)(applyCursorsFunc))
 	})
 	return Wrap(p, middlewares...)
 }
 
-func Wrap[T any](p Pagination[T], middlewares ...PaginationMiddleware[T]) Pagination[T] {
-	return chainPaginationMiddlewares(middlewares)(p)
+func Wrap[T any](p Paginator[T], middlewares ...PaginatorMiddleware[T]) Paginator[T] {
+	return chainPaginatorMiddlewares(middlewares)(p)
 }

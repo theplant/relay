@@ -6,21 +6,18 @@ import (
 	"github.com/samber/lo"
 )
 
-// PaginationMiddleware is a wrapper for Pagination (middleware pattern)
-type PaginationMiddleware[T any] func(next Pagination[T]) Pagination[T]
-
 // EnsureLimits ensures that the limit is within the range 0 -> maxLimit and uses defaultLimit if limit is not set or is negative
 // This method introduced a breaking change in version 0.4.0, intentionally swapping the order of parameters to strongly indicate the breaking change.
 // https://github.com/theplant/relay/compare/genx?expand=1#diff-02f50901140d6057da6310a106670552aa766a093efbc2200fb34c099b762131R14
-func EnsureLimits[T any](defaultLimit, maxLimit int) PaginationMiddleware[T] {
+func EnsureLimits[T any](defaultLimit, maxLimit int) PaginatorMiddleware[T] {
 	if defaultLimit < 0 {
 		panic("defaultLimit cannot be negative")
 	}
 	if maxLimit < defaultLimit {
 		panic("maxLimit must be greater than or equal to defaultLimit")
 	}
-	return func(next Pagination[T]) Pagination[T] {
-		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
+	return func(next Paginator[T]) Paginator[T] {
+		return PaginatorFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 			if req.First != nil {
 				if *req.First > maxLimit {
 					req.First = &maxLimit
@@ -49,9 +46,9 @@ func EnsureLimits[T any](defaultLimit, maxLimit int) PaginationMiddleware[T] {
 	}
 }
 
-func EnsurePrimaryOrderBy[T any](primaryOrderBy ...Order) PaginationMiddleware[T] {
-	return func(next Pagination[T]) Pagination[T] {
-		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
+func EnsurePrimaryOrderBy[T any](primaryOrderBy ...Order) PaginatorMiddleware[T] {
+	return func(next Paginator[T]) Paginator[T] {
+		return PaginatorFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 			req.OrderBy = AppendPrimaryOrderBy(req.OrderBy, primaryOrderBy...)
 			return next.Paginate(ctx, req)
 		})
@@ -84,9 +81,9 @@ func CursorMiddlewaresFromContext[T any](ctx context.Context) []CursorMiddleware
 	return middlewares
 }
 
-func AppendCursorMiddleware[T any](cursorMiddlewares ...CursorMiddleware[T]) PaginationMiddleware[T] {
-	return func(next Pagination[T]) Pagination[T] {
-		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
+func AppendCursorMiddleware[T any](cursorMiddlewares ...CursorMiddleware[T]) PaginatorMiddleware[T] {
+	return func(next Paginator[T]) Paginator[T] {
+		return PaginatorFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 			if len(cursorMiddlewares) > 0 {
 				cursorMiddlewares := append(CursorMiddlewaresFromContext[T](ctx), cursorMiddlewares...)
 				ctx = context.WithValue(ctx, ctxCursorMiddlewares{}, cursorMiddlewares)
@@ -105,8 +102,8 @@ func chainCursorMiddlewares[T any](mws []CursorMiddleware[T]) CursorMiddleware[T
 	}
 }
 
-func chainPaginationMiddlewares[T any](mws []PaginationMiddleware[T]) PaginationMiddleware[T] {
-	return func(next Pagination[T]) Pagination[T] {
+func chainPaginatorMiddlewares[T any](mws []PaginatorMiddleware[T]) PaginatorMiddleware[T] {
+	return func(next Paginator[T]) Paginator[T] {
 		for i := len(mws); i > 0; i-- {
 			next = mws[i-1](next)
 		}
