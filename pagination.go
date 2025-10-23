@@ -7,17 +7,24 @@ import (
 	"github.com/samber/lo"
 )
 
-type OrderBy struct {
-	Field string `json:"field"`
-	Desc  bool   `json:"desc"`
+type OrderDirection string
+
+const (
+	OrderDirectionAsc  OrderDirection = "ASC"
+	OrderDirectionDesc OrderDirection = "DESC"
+)
+
+type Order struct {
+	Field     string         `json:"field"`
+	Direction OrderDirection `json:"direction"`
 }
 
 type PaginateRequest[T any] struct {
-	After    *string   `json:"after"`
-	First    *int      `json:"first"`
-	Before   *string   `json:"before"`
-	Last     *int      `json:"last"`
-	OrderBys []OrderBy `json:"orderBys"`
+	After   *string `json:"after"`
+	First   *int    `json:"first"`
+	Before  *string `json:"before"`
+	Last    *int    `json:"last"`
+	OrderBy []Order `json:"orderBy"`
 }
 
 type Edge[T any] struct {
@@ -42,7 +49,7 @@ type Connection[T any] struct {
 type ApplyCursorsRequest struct {
 	Before   *string
 	After    *string
-	OrderBys []OrderBy
+	OrderBys []Order
 	Limit    int
 	FromEnd  bool
 }
@@ -78,13 +85,13 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 		return nil, errors.New("last must be a non-negative integer")
 	}
 
-	orderBys := req.OrderBys
-	if len(orderBys) > 0 {
-		dups := lo.FindDuplicatesBy(orderBys, func(item OrderBy) string {
+	orderBy := req.OrderBy
+	if len(orderBy) > 0 {
+		dups := lo.FindDuplicatesBy(orderBy, func(item Order) string {
 			return item.Field
 		})
 		if len(dups) > 0 {
-			return nil, errors.Errorf("duplicated order by fields %v", lo.Map(dups, func(item OrderBy, _ int) string {
+			return nil, errors.Errorf("duplicated order by fields %v", lo.Map(dups, func(item Order, _ int) string {
 				return item.Field
 			}))
 		}
@@ -105,7 +112,7 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 	rsp, err := applyCursorsFunc(ctx, &ApplyCursorsRequest{
 		Before:   req.Before,
 		After:    req.After,
-		OrderBys: orderBys,
+		OrderBys: orderBy,
 		Limit:    limit,
 		FromEnd:  req.Last != nil,
 	})

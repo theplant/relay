@@ -18,21 +18,31 @@ type ProtoOrder[T protoreflect.Enum] interface {
 }
 
 // ParseProtoOrderBy parses proto order messages to OrderBy.
-func ParseProtoOrderBy[T protoreflect.Enum, O ProtoOrder[T]](orderBy []O, defaultOrderBy []OrderBy) ([]OrderBy, error) {
+func ParseProtoOrderBy[T protoreflect.Enum, O ProtoOrder[T]](orderBy []O, defaultOrderBy []Order) ([]Order, error) {
 	if len(orderBy) == 0 {
 		return defaultOrderBy, nil
 	}
 
-	result := make([]OrderBy, 0, len(orderBy))
+	result := make([]Order, 0, len(orderBy))
 	for _, o := range orderBy {
 		field, err := ParseProtoOrderField(o.GetField())
 		if err != nil {
 			return nil, err
 		}
 
-		result = append(result, OrderBy{
-			Field: field,
-			Desc:  o.GetDirection() == relayv1.OrderDirection_ORDER_DIRECTION_DESC,
+		var direction OrderDirection
+		switch o.GetDirection() {
+		case relayv1.OrderDirection_ORDER_DIRECTION_ASC:
+			direction = OrderDirectionAsc
+		case relayv1.OrderDirection_ORDER_DIRECTION_DESC:
+			direction = OrderDirectionDesc
+		default:
+			return nil, errors.Errorf("invalid order direction: %s", o.GetDirection())
+		}
+
+		result = append(result, Order{
+			Field:     field,
+			Direction: direction,
 		})
 	}
 

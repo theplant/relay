@@ -1378,7 +1378,7 @@ func TestCombiningWithPagination(t *testing.T) {
 			}),
 			relay.EnsureLimits[*User](2, 100),
 			relay.EnsurePrimaryOrderBy[*User](
-				relay.OrderBy{Field: "ID", Desc: false},
+				relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 			),
 		)
 
@@ -1431,7 +1431,7 @@ func TestCombiningWithPagination(t *testing.T) {
 			}),
 			relay.EnsureLimits[*User](2, 100),
 			relay.EnsurePrimaryOrderBy[*User](
-				relay.OrderBy{Field: "ID", Desc: false},
+				relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 			),
 		)
 
@@ -1479,7 +1479,7 @@ func TestCombiningWithPagination(t *testing.T) {
 			}),
 			relay.EnsureLimits[*User](10, 100),
 			relay.EnsurePrimaryOrderBy[*User](
-				relay.OrderBy{Field: "ID", Desc: false},
+				relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 			),
 		)
 
@@ -1519,8 +1519,8 @@ func TestCombiningWithPagination(t *testing.T) {
 			}),
 			relay.EnsureLimits[*User](10, 100),
 			relay.EnsurePrimaryOrderBy[*User](
-				relay.OrderBy{Field: "Age", Desc: false},
-				relay.OrderBy{Field: "ID", Desc: false},
+				relay.Order{Field: "Age", Direction: relay.OrderDirectionAsc},
+				relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 			),
 		)
 

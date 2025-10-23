@@ -116,8 +116,8 @@ func NewProductService(db *gorm.DB) *ProductService {
 }
 
 func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListProductsRequest) (*testdatav1.ListProductsResponse, error) {
-	orderBy, err := relay.ParseProtoOrderBy(req.OrderBy, []relay.OrderBy{
-		{Field: "CreatedAt", Desc: true},
+	orderBy, err := relay.ParseProtoOrderBy(req.OrderBy, []relay.Order{
+		{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
 	})
 	if err != nil {
 		return nil, err
@@ -137,13 +137,13 @@ func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListP
 	paginator := relay.New(
 		applyCursorsFunc,
 		relay.EnsurePrimaryOrderBy[*Product](
-			relay.OrderBy{Field: "ID", Desc: false},
+			relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 		),
 		relay.EnsureLimits[*Product](10, 100),
 	)
 
 	paginateReq := &relay.PaginateRequest[*Product]{
-		OrderBys: orderBy,
+		OrderBy: orderBy,
 	}
 
 	if req.Pagination != nil {
@@ -347,8 +347,8 @@ func TestParseProtoOrderBy(t *testing.T) {
 	tests := []struct {
 		name           string
 		orderBy        []*testdatav1.ProductOrder
-		defaultOrderBy []relay.OrderBy
-		want           []relay.OrderBy
+		defaultOrderBy []relay.Order
+		want           []relay.Order
 		wantError      bool
 	}{
 		{
@@ -359,8 +359,8 @@ func TestParseProtoOrderBy(t *testing.T) {
 					Direction: relayv1.OrderDirection_ORDER_DIRECTION_DESC,
 				},
 			},
-			want: []relay.OrderBy{
-				{Field: "CreatedAt", Desc: true},
+			want: []relay.Order{
+				{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
 			},
 		},
 		{
@@ -371,8 +371,8 @@ func TestParseProtoOrderBy(t *testing.T) {
 					Direction: relayv1.OrderDirection_ORDER_DIRECTION_ASC,
 				},
 			},
-			want: []relay.OrderBy{
-				{Field: "Id", Desc: false},
+			want: []relay.Order{
+				{Field: "Id", Direction: relay.OrderDirectionAsc},
 			},
 		},
 		{
@@ -387,28 +387,28 @@ func TestParseProtoOrderBy(t *testing.T) {
 					Direction: relayv1.OrderDirection_ORDER_DIRECTION_ASC,
 				},
 			},
-			want: []relay.OrderBy{
-				{Field: "CreatedAt", Desc: true},
-				{Field: "Id", Desc: false},
+			want: []relay.Order{
+				{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
+				{Field: "Id", Direction: relay.OrderDirectionAsc},
 			},
 		},
 		{
 			name:    "empty order - returns default",
 			orderBy: []*testdatav1.ProductOrder{},
-			defaultOrderBy: []relay.OrderBy{
-				{Field: "CreatedAt", Desc: true},
+			defaultOrderBy: []relay.Order{
+				{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
 			},
-			want: []relay.OrderBy{
-				{Field: "CreatedAt", Desc: true},
+			want: []relay.Order{
+				{Field: "CreatedAt", Direction: relay.OrderDirectionDesc},
 			},
 		},
 		{
 			name: "nil order - returns default",
-			defaultOrderBy: []relay.OrderBy{
-				{Field: "CreatedAt", Desc: false},
+			defaultOrderBy: []relay.Order{
+				{Field: "CreatedAt", Direction: relay.OrderDirectionAsc},
 			},
-			want: []relay.OrderBy{
-				{Field: "CreatedAt", Desc: false},
+			want: []relay.Order{
+				{Field: "CreatedAt", Direction: relay.OrderDirectionAsc},
 			},
 		},
 		{

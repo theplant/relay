@@ -49,29 +49,29 @@ func EnsureLimits[T any](defaultLimit, maxLimit int) PaginationMiddleware[T] {
 	}
 }
 
-func EnsurePrimaryOrderBy[T any](primaryOrderBys ...OrderBy) PaginationMiddleware[T] {
+func EnsurePrimaryOrderBy[T any](primaryOrderBys ...Order) PaginationMiddleware[T] {
 	return func(next Pagination[T]) Pagination[T] {
 		return PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
-			req.OrderBys = AppendPrimaryOrderBy(req.OrderBys, primaryOrderBys...)
+			req.OrderBy = AppendPrimaryOrderBy(req.OrderBy, primaryOrderBys...)
 			return next.Paginate(ctx, req)
 		})
 	}
 }
 
-func AppendPrimaryOrderBy(orderBys []OrderBy, primaryOrderBys ...OrderBy) []OrderBy {
+func AppendPrimaryOrderBy(orderBy []Order, primaryOrderBys ...Order) []Order {
 	if len(primaryOrderBys) == 0 {
-		return orderBys
+		return orderBy
 	}
-	orderByFields := lo.SliceToMap(orderBys, func(orderBy OrderBy) (string, bool) {
+	orderByFields := lo.SliceToMap(orderBy, func(orderBy Order) (string, bool) {
 		return orderBy.Field, true
 	})
-	// If there are fields in primaryOrderBys that are not in orderBys, add them to orderBys
+	// If there are fields in primaryOrderBys that are not in orderBy, add them to orderBy
 	for _, primaryOrderBy := range primaryOrderBys {
 		if _, ok := orderByFields[primaryOrderBy.Field]; !ok {
-			orderBys = append(orderBys, primaryOrderBy)
+			orderBy = append(orderBy, primaryOrderBy)
 		}
 	}
-	return orderBys
+	return orderBy
 }
 
 // CursorMiddleware is a wrapper for ApplyCursorsFunc (middleware pattern)

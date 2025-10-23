@@ -589,8 +589,8 @@ func TestOffsetCursor(t *testing.T) {
 			newPagination := func() relay.Pagination[*User] {
 				mws := []relay.PaginationMiddleware[*User]{
 					relay.EnsurePrimaryOrderBy[*User](
-						relay.OrderBy{Field: "ID", Desc: false},
-						relay.OrderBy{Field: "Age", Desc: true},
+						relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
+						relay.Order{Field: "Age", Direction: relay.OrderDirectionDesc},
 					),
 				}
 				if tc.defaultLimit != withoutEnsureLimits {
@@ -634,7 +634,7 @@ func TestOffsetWithLastAndNilBeforeIfSkipTotalCount(t *testing.T) {
 	p := relay.New(
 		cursor.NewOffsetAdapter(NewOffsetFinder[*User](db)),
 		relay.EnsurePrimaryOrderBy[*User](
-			relay.OrderBy{Field: "ID", Desc: false},
+			relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 		),
 		relay.EnsureLimits[*User](10, 10),
 	)
