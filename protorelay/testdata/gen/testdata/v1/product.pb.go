@@ -7,7 +7,7 @@
 package testdatav1
 
 import (
-	v1 "github.com/theplant/relay/gen/relay/v1"
+	v1 "github.com/theplant/relay/protorelay/gen/relay/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -1390,8 +1390,8 @@ const file_testdata_v1_product_proto_rawDesc = "" +
 	"\x1ePRODUCT_ORDER_FIELD_CREATED_AT\x10\x02\x12\"\n" +
 	"\x1ePRODUCT_ORDER_FIELD_UPDATED_AT\x10\x032g\n" +
 	"\x0eProductService\x12U\n" +
-	"\fListProducts\x12 .testdata.v1.ListProductsRequest\x1a!.testdata.v1.ListProductsResponse\"\x00B\xab\x01\n" +
-	"\x0fcom.testdata.v1B\fProductProtoP\x01Z=github.com/theplant/relay/testdata/gen/testdata/v1;testdatav1\xa2\x02\x03TXX\xaa\x02\vTestdata.V1\xca\x02\vTestdata\\V1\xe2\x02\x17Testdata\\V1\\GPBMetadata\xea\x02\fTestdata::V1b\x06proto3"
+	"\fListProducts\x12 .testdata.v1.ListProductsRequest\x1a!.testdata.v1.ListProductsResponse\"\x00B\xb6\x01\n" +
+	"\x0fcom.testdata.v1B\fProductProtoP\x01ZHgithub.com/theplant/relay/protorelay/testdata/gen/testdata/v1;testdatav1\xa2\x02\x03TXX\xaa\x02\vTestdata.V1\xca\x02\vTestdata\\V1\xe2\x02\x17Testdata\\V1\\GPBMetadata\xea\x02\fTestdata::V1b\x06proto3"
 
 var (
 	file_testdata_v1_product_proto_rawDescOnce sync.Once

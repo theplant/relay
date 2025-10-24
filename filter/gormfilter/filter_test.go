@@ -1323,7 +1323,7 @@ func TestAdditionalOperators(t *testing.T) {
 	}
 }
 
-func TestCombiningWithPagination(t *testing.T) {
+func TestCombiningWithPaginator(t *testing.T) {
 	err := db.Migrator().DropTable(&User{}, &Company{}, &Country{})
 	require.NoError(t, err)
 	err = db.AutoMigrate(&Country{}, &Company{}, &User{})

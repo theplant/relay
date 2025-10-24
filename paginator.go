@@ -5,6 +5,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+
+	"github.com/theplant/relay/internal/hook"
 )
 
 type OrderDirection string
@@ -211,28 +213,33 @@ func paginate[T any](ctx context.Context, req *PaginateRequest[T], applyCursorsF
 	return conn, nil
 }
 
-type Pagination[T any] interface {
+type Paginator[T any] interface {
 	Paginate(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error)
 }
 
-type PaginationFunc[T any] func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error)
+type PaginatorFunc[T any] func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error)
 
-func (f PaginationFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
+func (f PaginatorFunc[T]) Paginate(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
 	return f(ctx, req)
 }
 
-func New[T any](applyCursorsFunc ApplyCursorsFunc[T], middlewares ...PaginationMiddleware[T]) Pagination[T] {
+func New[T any](applyCursorsFunc ApplyCursorsFunc[T], hooks ...func(next Paginator[T]) Paginator[T]) Paginator[T] {
 	if applyCursorsFunc == nil {
 		panic("applyCursorsFunc must be set")
 	}
 
-	var p Pagination[T] = PaginationFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
-		cursorMiddlewares := CursorMiddlewaresFromContext[T](ctx)
-		return paginate(ctx, req, chainCursorMiddlewares(cursorMiddlewares)(applyCursorsFunc))
+	var p Paginator[T] = PaginatorFunc[T](func(ctx context.Context, req *PaginateRequest[T]) (*Connection[T], error) {
+		applyCursors := applyCursorsFunc
+		cursorHook := CursorHookFromContext[T](ctx)
+		if cursorHook != nil {
+			applyCursors = cursorHook(applyCursors)
+		}
+		return paginate(ctx, req, applyCursors)
 	})
-	return Wrap(p, middlewares...)
-}
 
-func Wrap[T any](p Pagination[T], middlewares ...PaginationMiddleware[T]) Pagination[T] {
-	return chainPaginationMiddlewares(middlewares)(p)
+	hook := hook.Chain(hooks...)
+	if hook != nil {
+		p = hook(p)
+	}
+	return p
 }

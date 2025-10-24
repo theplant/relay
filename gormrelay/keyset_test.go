@@ -199,7 +199,7 @@ func TestKeysetCursor(t *testing.T) {
 	applyCursorsFunc := NewKeysetAdapter[*User](db)
 
 	primaryOrderByKeys := []string{"ID", "Age"}
-	otherMiddlewares := []relay.PaginationMiddleware[*User]{
+	otherHooks := []func(next relay.Paginator[*User]) relay.Paginator[*User]{
 		relay.EnsurePrimaryOrderBy[*User](
 			relay.Order{Field: "ID", Direction: relay.OrderDirectionAsc},
 			relay.Order{Field: "Age", Direction: relay.OrderDirectionDesc},
@@ -800,21 +800,21 @@ func TestKeysetCursor(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			newPagination := func() relay.Pagination[*User] {
-				mws := otherMiddlewares
+			newPaginator := func() relay.Paginator[*User] {
+				hooks := otherHooks
 				if tc.defaultLimit != withoutEnsureLimits {
-					mws = append(mws, relay.EnsureLimits[*User](tc.defaultLimit, tc.maxLimit))
+					hooks = append(hooks, relay.EnsureLimits[*User](tc.defaultLimit, tc.maxLimit))
 				}
-				return relay.New(tc.applyCursorsFunc, mws...)
+				return relay.New(tc.applyCursorsFunc, hooks...)
 			}
 			if tc.expectedPanic != "" {
 				require.PanicsWithValue(t, tc.expectedPanic, func() {
-					_ = newPagination()
+					_ = newPaginator()
 				})
 				return
 			}
 
-			p := newPagination()
+			p := newPaginator()
 			conn, err := p.Paginate(context.Background(), tc.paginateRequest)
 
 			if tc.expectedError != "" {

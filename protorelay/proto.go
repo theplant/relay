@@ -1,4 +1,4 @@
-package relay
+package protorelay
 
 import (
 	"regexp"
@@ -7,73 +7,53 @@ import (
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 
-	relayv1 "github.com/theplant/relay/gen/relay/v1"
+	"github.com/theplant/relay"
+	relayv1 "github.com/theplant/relay/protorelay/gen/relay/v1"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// Integer is a type constraint for integer types.
-type Integer interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
-}
-
-// PtrAs converts a pointer to a different integer type.
-func PtrAs[From, To Integer](v *From) *To {
-	if v == nil {
-		return nil
-	}
-	return lo.ToPtr(To(*v))
-}
-
-// ApplyProtoPagination applies a proto pagination to a paginate request.
-func (req *PaginateRequest[T]) ApplyProtoPagination(p *relayv1.Pagination) *PaginateRequest[T] {
-	if p == nil {
-		return req
-	}
-	req.After = p.After
-	req.Before = p.Before
-	req.First = PtrAs[int32, int](p.First)
-	req.Last = PtrAs[int32, int](p.Last)
-	return req
-}
-
-// ParseProtoPagination parses a proto pagination to a paginate request.
-func ParseProtoPagination[T any](p *relayv1.Pagination, orderBy ...Order) *PaginateRequest[T] {
-	return (&PaginateRequest[T]{
+// ParsePagination parses a proto pagination to a paginate request.
+func ParsePagination[T any](p *relayv1.Pagination, orderBy ...relay.Order) *relay.PaginateRequest[T] {
+	return &relay.PaginateRequest[T]{
 		OrderBy: orderBy,
-	}).ApplyProtoPagination(p)
+		After:   p.After,
+		Before:  p.Before,
+		First:   relay.PtrAs[int32, int](p.First),
+		Last:    relay.PtrAs[int32, int](p.Last),
+	}
 }
 
-// ProtoOrder is an interface that all proto order messages must implement.
-type ProtoOrder[T protoreflect.Enum] interface {
+// Order is an interface that all proto order messages must implement.
+type Order[T protoreflect.Enum] interface {
 	GetField() T
 	GetDirection() relayv1.OrderDirection
 }
 
-// ParseProtoOrderBy parses proto order messages to OrderBy.
-func ParseProtoOrderBy[T protoreflect.Enum, O ProtoOrder[T]](orderBy []O, defaultOrderBy []Order) ([]Order, error) {
+// ParseOrderBy parses proto order messages to OrderBy.
+func ParseOrderBy[T protoreflect.Enum, O Order[T]](orderBy []O, defaultOrderBy []relay.Order) ([]relay.Order, error) {
 	if len(orderBy) == 0 {
 		return defaultOrderBy, nil
 	}
 
-	result := make([]Order, 0, len(orderBy))
+	result := make([]relay.Order, 0, len(orderBy))
 	for _, o := range orderBy {
-		field, err := ParseProtoOrderField(o.GetField())
+		field, err := ParseOrderField(o.GetField())
 		if err != nil {
 			return nil, err
 		}
 
-		var direction OrderDirection
+		var direction relay.OrderDirection
 		switch o.GetDirection() {
 		case relayv1.OrderDirection_ORDER_DIRECTION_ASC:
-			direction = OrderDirectionAsc
+			direction = relay.OrderDirectionAsc
 		case relayv1.OrderDirection_ORDER_DIRECTION_DESC:
-			direction = OrderDirectionDesc
+			direction = relay.OrderDirectionDesc
 		default:
 			return nil, errors.Errorf("invalid order direction: %s", o.GetDirection())
 		}
 
-		result = append(result, Order{
+		result = append(result, relay.Order{
 			Field:     field,
 			Direction: direction,
 		})
@@ -82,11 +62,11 @@ func ParseProtoOrderBy[T protoreflect.Enum, O ProtoOrder[T]](orderBy []O, defaul
 	return result, nil
 }
 
-// ParseProtoOrderField parses a proto order field to a string.
+// ParseOrderField parses a proto order field to a string.
 // e.g., "PRODUCT_ORDER_FIELD_CREATED_AT" -> "CreatedAt"
-func ParseProtoOrderField(field protoreflect.Enum) (string, error) {
+func ParseOrderField(field protoreflect.Enum) (string, error) {
 	// Get enum value without prefix (e.g., "CREATED_AT")
-	enumStr, err := ParseProtoEnum(field)
+	enumStr, err := ParseEnum(field)
 	if err != nil {
 		return "", errors.Wrap(err, "invalid order field")
 	}
@@ -98,9 +78,9 @@ func ParseProtoOrderField(field protoreflect.Enum) (string, error) {
 
 const unspecifiedEnumValue = "UNSPECIFIED"
 
-// ParseProtoEnum parses a proto enum to a string which is the value of the enum without the prefix.
+// ParseEnum parses a proto enum to a string which is the value of the enum without the prefix.
 // e.g., "PRODUCT_STATUS_DRAFT" -> "DRAFT"
-func ParseProtoEnum(v protoreflect.Enum) (string, error) {
+func ParseEnum(v protoreflect.Enum) (string, error) {
 	// Calculate prefix from enum type name
 	// e.g., "ProductStatus" -> "PRODUCT_STATUS_"
 	descriptor := v.Descriptor()
