@@ -13,18 +13,18 @@ import (
 )
 
 // RowsSplitter wraps a gorm.Rows object and splits column data into different destinations
-// based on column name splitter
+// based on column name splitColumns
 type RowsSplitter struct {
 	gorm.Rows
-	splitter    map[string]func(columnType *sql.ColumnType) any
-	columnTypes []*sql.ColumnType
+	splitColumns map[string]func(columnType *sql.ColumnType) any
+	columnTypes  []*sql.ColumnType
 
 	mu           sync.RWMutex
 	splitResults []map[string]any
 }
 
 // NewRowsSplitter creates a new RowsSplitter instance
-func NewRowsSplitter(rows gorm.Rows, splitter map[string]func(columnType *sql.ColumnType) any) (*RowsSplitter, error) {
+func NewRowsSplitter(rows gorm.Rows, splitColumns map[string]func(columnType *sql.ColumnType) any) (*RowsSplitter, error) {
 	if rows == nil {
 		return nil, errors.New("rows cannot be nil")
 	}
@@ -36,7 +36,7 @@ func NewRowsSplitter(rows gorm.Rows, splitter map[string]func(columnType *sql.Co
 
 	return &RowsSplitter{
 		Rows:         rows,
-		splitter:     splitter,
+		splitColumns: splitColumns,
 		columnTypes:  columnTypes,
 		splitResults: []map[string]any{},
 	}, nil
@@ -45,10 +45,10 @@ func NewRowsSplitter(rows gorm.Rows, splitter map[string]func(columnType *sql.Co
 // Scan intercepts the scan operation to split specific columns
 // into mapped destinations while preserving original scan behavior for others
 func (w *RowsSplitter) Scan(dest ...any) error {
-	// Create values to scan into, splitter specific columns to custom destinations
+	// Create values to scan into, splitColumns specific columns to custom destinations
 	scanDest := make([]any, len(w.columnTypes))
-	splitValues := make([]any, 0, len(w.splitter))
-	splitColumns := make([]string, 0, len(w.splitter))
+	splitValues := make([]any, 0, len(w.splitColumns))
+	splitColumns := make([]string, 0, len(w.splitColumns))
 
 	// Track original dest index to scan position
 	destIndex := 0
@@ -56,7 +56,7 @@ func (w *RowsSplitter) Scan(dest ...any) error {
 	// Assign scan destinations
 	for i, columnType := range w.columnTypes {
 		colName := columnType.Name()
-		if factory, exists := w.splitter[colName]; exists {
+		if factory, exists := w.splitColumns[colName]; exists {
 			v := factory(columnType)
 			if rt, ok := v.(reflect.Type); ok {
 				v = reflect.New(reflect.PointerTo(rt)).Interface()
@@ -106,13 +106,13 @@ func scanIntoMap(mapValue map[string]any, values []any, columns []string) {
 	}
 }
 
-// Columns returns filtered column names based on splitter
+// Columns returns filtered column names based on splitColumns
 func (w *RowsSplitter) Columns() ([]string, error) {
 	result := make([]string, 0, len(w.columnTypes))
 
 	for _, columnType := range w.columnTypes {
 		colName := columnType.Name()
-		if _, exists := w.splitter[colName]; !exists {
+		if _, exists := w.splitColumns[colName]; !exists {
 			result = append(result, colName)
 		}
 	}
@@ -120,9 +120,9 @@ func (w *RowsSplitter) Columns() ([]string, error) {
 	return result, nil
 }
 
-// ColumnTypes returns filtered column types based on splitter
+// ColumnTypes returns filtered column types based on splitColumns
 func (w *RowsSplitter) ColumnTypes() ([]*sql.ColumnType, error) {
-	if len(w.splitter) == 0 {
+	if len(w.splitColumns) == 0 {
 		return w.columnTypes, nil
 	}
 
@@ -130,7 +130,7 @@ func (w *RowsSplitter) ColumnTypes() ([]*sql.ColumnType, error) {
 
 	for _, columnType := range w.columnTypes {
 		colName := columnType.Name()
-		if _, exists := w.splitter[colName]; !exists {
+		if _, exists := w.splitColumns[colName]; !exists {
 			result = append(result, columnType)
 		}
 	}
@@ -145,11 +145,49 @@ func (w *RowsSplitter) SplitResults() []map[string]any {
 	return w.splitResults
 }
 
-// SplitScan executes a query and scans the result into dest while splitter specific columns
-// to custom destinations defined by the splitter parameter.
-// from https://github.com/go-gorm/gorm/blob/489a56329318ee9316bc8a73f035320df6855e53/finisher_api.go#L526-L549 ,
-// but support splitter split scan
-func SplitScan(db *gorm.DB, dest any, splitter map[string]func(columnType *sql.ColumnType) any, splitDest *[]map[string]any) (tx *gorm.DB) {
+// ScanOption configures the Scan operation.
+type ScanOption func(*scanConfig)
+
+type scanConfig struct {
+	splitColumns map[string]func(columnType *sql.ColumnType) any
+	splitDest    *[]map[string]any
+}
+
+// WithSplitter configures column splitting during scan.
+// Columns matched by splitColumns will be intercepted and scanned into splitDest instead of dest.
+//
+// IMPORTANT: Columns intercepted by the splitColumns will NOT be available in dest.
+// This is by design - the splitColumns "splits" those columns away from the main destination.
+//
+// Example:
+//
+//	SQL: SELECT id, name, priority FROM shops
+//	splitColumns: {"priority": ...}
+//	Result:
+//	  - dest receives: id, name (priority is excluded)
+//	  - splitDest receives: [{"priority": 1}, {"priority": 2}, ...]
+func WithSplitter(
+	splitColumns map[string]func(columnType *sql.ColumnType) any,
+	splitDest *[]map[string]any,
+) ScanOption {
+	return func(c *scanConfig) {
+		c.splitColumns = splitColumns
+		c.splitDest = splitDest
+	}
+}
+
+// Scan executes a query and scans the result into dest.
+// When WithSplitter is provided, specific columns will be split into a separate destination.
+// Inspired by https://github.com/go-gorm/gorm/blob/489a56329318ee9316bc8a73f035320df6855e53/finisher_api.go#L526-L549
+func Scan(db *gorm.DB, dest any, opts ...ScanOption) (tx *gorm.DB) {
+	cfg := &scanConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	splitColumns := cfg.splitColumns
+	splitDest := cfg.splitDest
+
 	config := *db.Config
 	currentLogger, newLogger := config.Logger, logger.Recorder.New()
 	config.Logger = newLogger
@@ -159,14 +197,14 @@ func SplitScan(db *gorm.DB, dest any, splitter map[string]func(columnType *sql.C
 
 	sqlRows, err := tx.Rows()
 	if err == nil {
-		rows, err := NewRowsSplitter(sqlRows, splitter)
+		rows, err := NewRowsSplitter(sqlRows, splitColumns)
 		if err != nil {
 			rows.Close()
 			_ = tx.AddError(err)
 		} else {
 			if rows.Next() {
 				_ = splitScanRows(tx, rows, dest)
-				if tx.Error == nil {
+				if tx.Error == nil && splitDest != nil {
 					*splitDest = rows.SplitResults()
 				}
 			} else {

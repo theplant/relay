@@ -75,12 +75,12 @@ func TestWithComputedResult(t *testing.T) {
 // TestComputedValidate verifies the validation logic of the Computed struct.
 // It tests various invalid configurations to ensure they are properly rejected:
 // - Empty Columns map
-// - Nil SetupScanner function
+// - Nil Scanner function
 // - Columns with pre-defined Alias (which should be set during query execution)
 // - Duplicate column aliases that would cause SQL errors
 func TestComputedValidate(t *testing.T) {
-	// Mock SetupScanner function for testing
-	mockSetupScanner := func(db *gorm.DB) (*gormrelay.Scanner[*struct{}], error) {
+	// Mock Scanner function for testing
+	mockScanner := func(db *gorm.DB) (*gormrelay.ComputedScanner[*struct{}], error) {
 		return nil, nil
 	}
 
@@ -96,29 +96,29 @@ func TestComputedValidate(t *testing.T) {
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true},
 				},
-				SetupScanner: mockSetupScanner,
+				Scanner: mockScanner,
 			},
 			expectError: false,
 		},
 		{
 			name: "empty columns",
 			computed: &gormrelay.Computed[*struct{}]{
-				Columns:      map[string]clause.Column{},
-				SetupScanner: mockSetupScanner,
+				Columns: map[string]clause.Column{},
+				Scanner: mockScanner,
 			},
 			expectError: true,
 			errorSubstr: "Columns must not be empty",
 		},
 		{
-			name: "nil SetupScanner",
+			name: "nil Scanner",
 			computed: &gormrelay.Computed[*struct{}]{
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true},
 				},
-				SetupScanner: nil,
+				Scanner: nil,
 			},
 			expectError: true,
-			errorSubstr: "SetupScanner function must not be nil",
+			errorSubstr: "Scanner function must not be nil",
 		},
 		{
 			name: "column with non-empty alias",
@@ -126,7 +126,7 @@ func TestComputedValidate(t *testing.T) {
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true, Alias: "already_set"},
 				},
-				SetupScanner: mockSetupScanner,
+				Scanner: mockScanner,
 			},
 			expectError: true,
 			errorSubstr: "should have empty Alias",
@@ -138,7 +138,7 @@ func TestComputedValidate(t *testing.T) {
 					"UserScore":  {Name: "(AVG(score))", Raw: true},
 					"user_score": {Name: "(SUM(score)/COUNT(*))", Raw: true},
 				},
-				SetupScanner: mockSetupScanner,
+				Scanner: mockScanner,
 			},
 			expectError: true,
 			errorSubstr: "duplicate computed field aliases",
@@ -159,9 +159,9 @@ func TestComputedValidate(t *testing.T) {
 	}
 }
 
-// TestNewScanner verifies the NewScanner function correctly creates a scanner
+// TestNewComputedScanner verifies the NewComputedScanner function correctly creates a scanner
 // that combines entities with their computed results.
-func TestNewScanner(t *testing.T) {
+func TestNewComputedScanner(t *testing.T) {
 	type User struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
@@ -182,7 +182,7 @@ func TestNewScanner(t *testing.T) {
 	db := (&gorm.DB{Statement: &gorm.Statement{}}).Model(&User{})
 
 	// Test 1: Model type matches generic type
-	scanner1, err := gormrelay.NewScanner[*User](db)
+	scanner1, err := gormrelay.NewComputedScanner[*User](db)
 	require.NoError(t, err)
 
 	// Check destination type when model matches generic type
@@ -226,7 +226,7 @@ func TestNewScanner(t *testing.T) {
 	assert.Equal(t, "Bob", user2.Name)
 
 	// Test 2: Model type does NOT match generic type
-	scanner2, err := gormrelay.NewScanner[any](db)
+	scanner2, err := gormrelay.NewComputedScanner[any](db)
 	require.NoError(t, err)
 
 	// Populate result slice with compatible nodes

@@ -87,11 +87,18 @@ var jsoniterForKeyset = jsoniter.Config{
 }.Froze()
 
 func JSONMarshal(v any) ([]byte, error) {
-	return jsoniterForKeyset.Marshal(v)
+	b, err := jsoniterForKeyset.Marshal(v)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal to JSON")
+	}
+	return b, nil
 }
 
 func JSONUnmarshal(data []byte, v any) error {
-	return jsoniterForKeyset.Unmarshal(data, v)
+	if err := jsoniterForKeyset.Unmarshal(data, v); err != nil {
+		return errors.Wrap(err, "failed to unmarshal from JSON")
+	}
+	return nil
 }
 
 func EncodeKeysetCursor(node any, keys []string) (string, error) {

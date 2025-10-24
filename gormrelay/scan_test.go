@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestSplitScan verifies SplitScan behavior in different scenarios
-func TestSplitScan(t *testing.T) {
+// TestScan verifies Scan with WithSplitter behavior in different scenarios
+func TestScan(t *testing.T) {
 	resetScanTestDB(t)
 
 	// Map the Category columns to a separate destination
-	splitSplitter := map[string]func(columnType *sql.ColumnType) any{
+	splitColumns := map[string]func(columnType *sql.ColumnType) any{
 		"_category_id_":   func(columnType *sql.ColumnType) any { return columnType.ScanType() },
 		"_category_name_": func(columnType *sql.ColumnType) any { return columnType.ScanType() },
 		"_a_null_column_": func(columnType *sql.ColumnType) any { return lo.ToPtr(new(string)) },
@@ -41,8 +41,8 @@ func TestSplitScan(t *testing.T) {
 			Joins("LEFT JOIN categories ON products.category_id = categories.id").
 			Where("products.id = ?", product.ID)
 
-		// Execute SplitScan
-		tx = SplitScan(tx, &result, splitSplitter, &splitResults)
+		// Execute Scan with splitter
+		tx = Scan(tx, &result, WithSplitter(splitColumns, &splitResults))
 		require.NoError(t, tx.Error)
 
 		// Verify main result
@@ -68,7 +68,7 @@ func TestSplitScan(t *testing.T) {
 			Joins("LEFT JOIN categories ON products.category_id = categories.id").
 			Where("products.id = ?", 999999) // Non-existent ID
 
-		tx = SplitScan(tx, &result, splitSplitter, &splitResults)
+		tx = Scan(tx, &result, WithSplitter(splitColumns, &splitResults))
 
 		// Should have RowsAffected = 0
 		require.Equal(t, int64(0), tx.RowsAffected)
@@ -78,7 +78,7 @@ func TestSplitScan(t *testing.T) {
 		require.Empty(t, splitResults)
 	})
 
-	t.Run("nil splitter", func(t *testing.T) {
+	t.Run("scan without splitter", func(t *testing.T) {
 		product := &Product{
 			Name:  "Simple Product",
 			Price: 50.0,
@@ -86,22 +86,19 @@ func TestSplitScan(t *testing.T) {
 		require.NoError(t, db.Create(product).Error)
 
 		var result Product
-		var splitResults []map[string]any
 
-		// Use nil splitter
+		// Execute Scan without splitter
 		tx := db.Table("products").
 			Where("products.id = ?", product.ID)
 
-		// Execute SplitScan with nil splitter
-		tx = SplitScan(tx, &result, nil, &splitResults)
+		tx = Scan(tx, &result)
 		require.NoError(t, tx.Error)
 
 		// Verify main result
 		require.Equal(t, product.ID, result.ID)
 		require.Equal(t, product.Name, result.Name)
 		require.Equal(t, product.Price, result.Price)
-
-		require.Equal(t, tx.RowsAffected, int64(len(splitResults)))
+		require.Equal(t, int64(1), tx.RowsAffected)
 	})
 
 	t.Run("multiple rows", func(t *testing.T) {
@@ -140,7 +137,7 @@ func TestSplitScan(t *testing.T) {
 			var result Product
 			var splitResults []map[string]any
 
-			tx := SplitScan(tx, &result, splitSplitter, &splitResults)
+			tx := Scan(tx, &result, WithSplitter(splitColumns, &splitResults))
 			require.NoError(t, tx.Error)
 
 			// Should only have the first product
@@ -157,7 +154,7 @@ func TestSplitScan(t *testing.T) {
 			var result []Product
 			var splitResults []map[string]any
 
-			tx := SplitScan(tx, &result, splitSplitter, &splitResults)
+			tx := Scan(tx, &result, WithSplitter(splitColumns, &splitResults))
 			require.NoError(t, tx.Error)
 
 			// Should have all products
@@ -178,7 +175,7 @@ func TestSplitScan(t *testing.T) {
 		tx := db.Table("non_existent_table").
 			Select("*")
 
-		tx = SplitScan(tx, &result, splitSplitter, &splitResults)
+		tx = Scan(tx, &result, WithSplitter(splitColumns, &splitResults))
 
 		// Should have an error
 		require.Error(t, tx.Error)

@@ -99,10 +99,10 @@ p := relay.New(
     gormrelay.NewKeysetAdapter[*User](
         db,
         gormrelay.WithComputed(&gormrelay.Computed[*User]{
-            Columns: gormrelay.ComputedColumns(map[string]string{
+            Columns: gormrelay.NewComputedColumns(map[string]string{
                 "Priority": "CASE WHEN status = 'premium' THEN 1 WHEN status = 'vip' THEN 2 ELSE 3 END",
             }),
-            SetupScanner: gormrelay.NewScanner[*User],
+            Scanner: gormrelay.NewComputedScanner[*User],
         }),
     ),
     relay.EnsureLimits[*User](10, 100),
@@ -123,48 +123,48 @@ conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 
 ### Key Components
 
-**ComputedColumns**
+**NewComputedColumns**
 
 Helper function to create computed column definitions from SQL expressions:
 
 ```go
-gormrelay.ComputedColumns(map[string]string{
+gormrelay.NewComputedColumns(map[string]string{
     "FieldName": "SQL expression",
 })
 ```
 
-**NewScanner**
+**NewComputedScanner**
 
 Standard scanner function that handles result scanning and wrapping. This is the recommended implementation for most use cases:
 
 ```go
-gormrelay.NewScanner[*User]
+gormrelay.NewComputedScanner[*User]
 ```
 
-**Custom SetupScanner**
+**Custom Scanner**
 
-For custom types or complex scenarios, implement your own SetupScanner function:
+For custom types or complex scenarios, implement your own Scanner function:
 
 ```go
 type Shop struct {
     ID       int
     Name     string
-    Priority int // Computed field, not stored in DB
+    Priority int `gorm:"-"` // Computed field, not stored in DB
 }
 
 gormrelay.WithComputed(&gormrelay.Computed[*Shop]{
-    Columns: gormrelay.ComputedColumns(map[string]string{
+    Columns: gormrelay.NewComputedColumns(map[string]string{
         "Priority": "CASE WHEN name = 'premium' THEN 1 ELSE 2 END",
     }),
-    SetupScanner: func(db *gorm.DB) (*gormrelay.Scanner[*Shop], error) {
+    Scanner: func(db *gorm.DB) (*gormrelay.ComputedScanner[*Shop], error) {
         shops := []*Shop{}
-        return &gormrelay.Scanner[*Shop]{
+        return &gormrelay.ComputedScanner[*Shop]{
             Destination: &shops,
             Transform: func(computedResults []map[string]any) []cursor.Node[*Shop] {
                 return lo.Map(shops, func(s *Shop, i int) cursor.Node[*Shop] {
                     // Populate computed field
                     s.Priority = int(computedResults[i]["Priority"].(int32))
-                    return &cursor.SelfNode[*Shop]{Node: s}
+                    return gormrelay.NewComputedNode(s, computedResults[i])
                 })
             },
         }, nil
@@ -179,11 +179,11 @@ p := relay.New(
     gormrelay.NewKeysetAdapter[*User](
         db,
         gormrelay.WithComputed(&gormrelay.Computed[*User]{
-            Columns: gormrelay.ComputedColumns(map[string]string{
+            Columns: gormrelay.NewComputedColumns(map[string]string{
                 "Score": "(points * 10 + bonus)",
                 "Rank":  "CASE WHEN score > 100 THEN 'A' WHEN score > 50 THEN 'B' ELSE 'C' END",
             }),
-            SetupScanner: gormrelay.NewScanner[*User],
+            Scanner: gormrelay.NewComputedScanner[*User],
         }),
     ),
     relay.EnsureLimits[*User](10, 100),
@@ -207,8 +207,10 @@ conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 
 - Computed fields are calculated by the database, ensuring consistency and performance
 - The computed values are automatically included in cursor serialization for pagination
-- Field names in `ComputedColumns` are converted to SQL aliases using `ComputedFieldToColumnAlias`
+- Field names in `NewComputedColumns` are converted to SQL aliases using `ComputedFieldToColumnAlias`
 - Both keyset and offset pagination support computed fields
+
+For more details on computed fields design and common questions, see [FAQ: Computed Fields](FAQ_COMPUTED.md).
 
 ## Filter Support
 
@@ -305,7 +307,7 @@ db.Scopes(
 
 ### Relationship Filtering
 
-The filter supports filtering by `BelongsTo` relationships with multi-level nesting:
+The filter supports filtering by `BelongsTo/HasOne` relationships with multi-level nesting:
 
 ```go
 type CountryFilter struct {
@@ -395,11 +397,16 @@ conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 
 ### Filter Options
 
-**Disable BelongsTo Filtering:**
+**Disable Relationship Filtering:**
 
 ```go
 db.Scopes(
-    gormfilter.Scope(userFilter, gormfilter.WithDisableBelongsTo()),
+    gormfilter.Scope(
+        userFilter,
+        gormfilter.WithDisableBelongsTo(),
+        gormfilter.WithDisableHasOne(),
+        // gormfilter.WithDisableRelationships(), // disable all relationships
+    ),
 ).Find(&users)
 ```
 
@@ -442,4 +449,5 @@ This example demonstrates:
 
 ## Reference
 
-For more information about Relay-style pagination, refer to [GraphQL Connections](https://relay.dev/graphql/connections.htm).
+- [FAQ: Computed Fields](FAQ_COMPUTED.md) - Detailed guide on computed fields design and common questions
+- [GraphQL Connections](https://relay.dev/graphql/connections.htm) - Relay-style pagination specification

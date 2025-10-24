@@ -419,12 +419,12 @@ func TestCursorHook(t *testing.T) {
 	t.Run("Base64", func(t *testing.T) {
 		t.Run("keyset", func(t *testing.T) {
 			testCase(t, func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User] {
-				return cursor.Base64[*User](NewKeysetAdapter[*User](db))
+				return cursor.Base64(NewKeysetAdapter[*User](db))
 			})
 		})
 		t.Run("keyset", func(t *testing.T) {
 			testCase(t, func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User] {
-				return cursor.Base64[*User](NewOffsetAdapter[*User](db))
+				return cursor.Base64(NewOffsetAdapter[*User](db))
 			})
 		})
 	})
@@ -770,10 +770,10 @@ func TestWithComputed(t *testing.T) {
 			f(
 				db,
 				WithComputed(&Computed[*User]{
-					Columns: ComputedColumns(map[string]string{
+					Columns: NewComputedColumns(map[string]string{
 						"GlobalPriority": "(CASE WHEN users.name = 'molon' THEN 1 WHEN users.name = 'sam' THEN 2 ELSE 3 END)",
 					}),
-					SetupScanner: NewScanner[*User],
+					Scanner: NewComputedScanner[*User],
 				}),
 			),
 			relay.EnsureLimits[*User](10, 50),
@@ -918,18 +918,18 @@ func TestWithComputedShop(t *testing.T) {
 			f(
 				db,
 				WithComputed(&Computed[*Shop]{
-					Columns: ComputedColumns(map[string]string{
+					Columns: NewComputedColumns(map[string]string{
 						// Define computed Priority column based on shop name
 						"Priority": "(CASE WHEN shops.name = 'premium' THEN 1 WHEN shops.name = 'featured' THEN 2 ELSE 3 END)",
 					}),
-					SetupScanner: func(_ *gorm.DB) (*Scanner[*Shop], error) {
+					Scanner: func(_ *gorm.DB) (*ComputedScanner[*Shop], error) {
 						nodes := []*Shop{}
-						return &Scanner[*Shop]{
+						return &ComputedScanner[*Shop]{
 							Destination: &nodes,
 							Transform: func(computedResults []map[string]any) []cursor.Node[*Shop] {
 								return lo.Map(nodes, func(s *Shop, i int) cursor.Node[*Shop] {
 									s.Priority = int(computedResults[i]["Priority"].(int32))
-									return &cursor.SelfNode[*Shop]{Node: s}
+									return NewComputedNode(s, computedResults[i])
 								})
 							},
 						}, nil

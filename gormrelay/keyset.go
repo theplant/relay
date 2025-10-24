@@ -208,15 +208,15 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 			return nil, err
 		}
 
-		scanner, err := a.opts.Computed.SetupScanner(db)
+		scanner, err := a.opts.Computed.Scanner(db)
 		if err != nil {
 			return nil, err
 		}
 
-		computedResults, err := splitComputedScan(
-			a.opts.Computed.Columns,
+		computedResults, err := computedSplitScan(
 			db.Scopes(scopeKeyset(a.opts.Computed.Columns, after, before, orderBy, limit, fromEnd)),
 			scanner.Destination,
+			a.opts.Computed.Columns,
 		)
 		if err != nil {
 			return nil, err
