@@ -171,17 +171,17 @@ func NewComputedScanner[T any](db *gorm.DB) (*ComputedScanner[T], error) {
 
 func computedSplitScan(tx *gorm.DB, dest any, computedColumns map[string]clause.Column) ([]map[string]any, error) {
 	aliasToField := make(map[string]string)
-	computedSplitter := make(map[string]func(columnType *sql.ColumnType) any)
+	computedSplitColumns := make(map[string]func(columnType *sql.ColumnType) any)
 	for field := range computedColumns {
 		alias := ComputedFieldToColumnAlias(field)
 		aliasToField[alias] = field
-		computedSplitter[alias] = func(columnType *sql.ColumnType) any {
+		computedSplitColumns[alias] = func(columnType *sql.ColumnType) any {
 			return columnType.ScanType()
 		}
 	}
 
 	computedResults := make([]map[string]any, 0)
-	if err := SplitScan(tx, dest, computedSplitter, &computedResults).Error; err != nil {
+	if err := Scan(tx, dest, WithSplitter(computedSplitColumns, &computedResults)).Error; err != nil {
 		return nil, errors.Wrap(err, "failed to scan records with computed columns")
 	}
 

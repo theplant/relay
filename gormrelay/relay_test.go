@@ -419,12 +419,12 @@ func TestCursorHook(t *testing.T) {
 	t.Run("Base64", func(t *testing.T) {
 		t.Run("keyset", func(t *testing.T) {
 			testCase(t, func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User] {
-				return cursor.Base64[*User](NewKeysetAdapter[*User](db))
+				return cursor.Base64(NewKeysetAdapter[*User](db))
 			})
 		})
 		t.Run("keyset", func(t *testing.T) {
 			testCase(t, func(db *gorm.DB, opts ...Option[*User]) relay.ApplyCursorsFunc[*User] {
-				return cursor.Base64[*User](NewOffsetAdapter[*User](db))
+				return cursor.Base64(NewOffsetAdapter[*User](db))
 			})
 		})
 	})
