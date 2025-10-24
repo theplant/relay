@@ -67,8 +67,8 @@ func (c *Computed[T]) Validate() error {
 	return nil
 }
 
-// ComputedColumns creates a map of Column objects from field-to-SQL expression mappings.
-var ComputedColumns = func(columns map[string]string) map[string]clause.Column {
+// NewComputedColumns creates a map of Column objects from field-to-SQL expression mappings.
+func NewComputedColumns(columns map[string]string) map[string]clause.Column {
 	return lo.MapEntries(columns, func(field string, value string) (string, clause.Column) {
 		value = strings.Trim(value, " ()")
 		return field, clause.Column{Name: fmt.Sprintf("(%s)", value), Raw: true}
@@ -111,6 +111,15 @@ func WithComputedResult(object any, computedResults map[string]any) *withCompute
 	}
 }
 
+// NewComputedNode creates a cursor node with computed results for pagination.
+// This is a convenience function for use in ComputedScanner.Transform.
+func NewComputedNode[T any](node T, computedResults map[string]any) cursor.Node[T] {
+	return &cursor.NodeWrapper[T]{
+		Object: WithComputedResult(node, computedResults),
+		Unwrap: func() T { return node },
+	}
+}
+
 // ComputedScanner holds the configuration for scanning database results with computed fields.
 type ComputedScanner[T any] struct {
 	// Destination is the target for GORM to scan results into (e.g., &[]User{})
@@ -138,10 +147,7 @@ func NewComputedScanner[T any](db *gorm.DB) (*ComputedScanner[T], error) {
 			Destination: &nodes,
 			Transform: func(computedResults []map[string]any) []cursor.Node[T] {
 				return lo.Map(nodes, func(node T, i int) cursor.Node[T] {
-					return &cursor.NodeWrapper[T]{
-						Object: WithComputedResult(node, computedResults[i]),
-						Unwrap: func() T { return node },
-					}
+					return NewComputedNode(node, computedResults[i])
 				})
 			},
 		}, nil
@@ -156,10 +162,7 @@ func NewComputedScanner[T any](db *gorm.DB) (*ComputedScanner[T], error) {
 			result := make([]cursor.Node[T], nodesVal.Len())
 			for i := 0; i < nodesVal.Len(); i++ {
 				node := nodesVal.Index(i).Interface().(T)
-				result[i] = &cursor.NodeWrapper[T]{
-					Object: WithComputedResult(node, computedResults[i]),
-					Unwrap: func() T { return node },
-				}
+				result[i] = NewComputedNode(node, computedResults[i])
 			}
 			return result
 		},

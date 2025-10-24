@@ -770,7 +770,7 @@ func TestWithComputed(t *testing.T) {
 			f(
 				db,
 				WithComputed(&Computed[*User]{
-					Columns: ComputedColumns(map[string]string{
+					Columns: NewComputedColumns(map[string]string{
 						"GlobalPriority": "(CASE WHEN users.name = 'molon' THEN 1 WHEN users.name = 'sam' THEN 2 ELSE 3 END)",
 					}),
 					Scanner: NewComputedScanner[*User],
@@ -918,7 +918,7 @@ func TestWithComputedShop(t *testing.T) {
 			f(
 				db,
 				WithComputed(&Computed[*Shop]{
-					Columns: ComputedColumns(map[string]string{
+					Columns: NewComputedColumns(map[string]string{
 						// Define computed Priority column based on shop name
 						"Priority": "(CASE WHEN shops.name = 'premium' THEN 1 WHEN shops.name = 'featured' THEN 2 ELSE 3 END)",
 					}),
@@ -929,7 +929,7 @@ func TestWithComputedShop(t *testing.T) {
 							Transform: func(computedResults []map[string]any) []cursor.Node[*Shop] {
 								return lo.Map(nodes, func(s *Shop, i int) cursor.Node[*Shop] {
 									s.Priority = int(computedResults[i]["Priority"].(int32))
-									return &cursor.SelfNode[*Shop]{Node: s}
+									return NewComputedNode(s, computedResults[i])
 								})
 							},
 						}, nil
