@@ -101,10 +101,10 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBy []relay.Order, skip,
 			return nil, err
 		}
 
-		computedResults, err := splitComputedScan(
-			computedColumns,
+		computedResults, err := computedSplitScan(
 			db.Scopes(AppendSelect(maps.Values(computedColumns)...)),
 			scanner.Destination,
+			computedColumns,
 		)
 		if err != nil {
 			return nil, err

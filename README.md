@@ -102,7 +102,7 @@ p := relay.New(
             Columns: gormrelay.ComputedColumns(map[string]string{
                 "Priority": "CASE WHEN status = 'premium' THEN 1 WHEN status = 'vip' THEN 2 ELSE 3 END",
             }),
-            Scanner: gormrelay.NewScanner[*User],
+            Scanner: gormrelay.NewComputedScanner[*User],
         }),
     ),
     relay.EnsureLimits[*User](10, 100),
@@ -133,12 +133,12 @@ gormrelay.ComputedColumns(map[string]string{
 })
 ```
 
-**NewScanner**
+**NewComputedScanner**
 
 Standard scanner function that handles result scanning and wrapping. This is the recommended implementation for most use cases:
 
 ```go
-gormrelay.NewScanner[*User]
+gormrelay.NewComputedScanner[*User]
 ```
 
 **Custom Scanner**
@@ -156,7 +156,7 @@ gormrelay.WithComputed(&gormrelay.Computed[*Shop]{
     Columns: gormrelay.ComputedColumns(map[string]string{
         "Priority": "CASE WHEN name = 'premium' THEN 1 ELSE 2 END",
     }),
-    Scanner: func(db *gorm.DB) (*gormrelay.Scanner[*Shop], error) {
+    Scanner: func(db *gorm.DB) (*gormrelay.ComputedScanner[*Shop], error) {
         shops := []*Shop{}
         return &gormrelay.Scanner[*Shop]{
             Destination: &shops,
@@ -183,7 +183,7 @@ p := relay.New(
                 "Score": "(points * 10 + bonus)",
                 "Rank":  "CASE WHEN score > 100 THEN 'A' WHEN score > 50 THEN 'B' ELSE 'C' END",
             }),
-            Scanner: gormrelay.NewScanner[*User],
+            Scanner: gormrelay.NewComputedScanner[*User],
         }),
     ),
     relay.EnsureLimits[*User](10, 100),

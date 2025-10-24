@@ -15,13 +15,11 @@ import (
 	"github.com/theplant/relay/cursor"
 )
 
-// Scanner holds the configuration for scanning database results with computed fields.
-type Scanner[T any] struct {
-	// Destination is the target for GORM to scan results into (e.g., &[]User{})
-	Destination any
-
-	// Transform converts scanned results with their computed values into cursor nodes
-	Transform func(computedResults []map[string]any) []cursor.Node[T]
+// WithComputed adds computed fields to a query.
+func WithComputed[T any](computed *Computed[T]) Option[T] {
+	return func(opts *options[T]) {
+		opts.Computed = computed
+	}
 }
 
 // Computed defines SQL expressions calculated at database level and attached to query results.
@@ -30,7 +28,7 @@ type Computed[T any] struct {
 	Columns map[string]clause.Column
 
 	// Scanner prepares a scanner for database operations with computed fields
-	Scanner func(db *gorm.DB) (*Scanner[T], error)
+	Scanner func(db *gorm.DB) (*ComputedScanner[T], error)
 }
 
 // Validate ensures the Computed configuration is valid.
@@ -67,13 +65,6 @@ func (c *Computed[T]) Validate() error {
 	}
 
 	return nil
-}
-
-// WithComputed adds computed fields to a query.
-func WithComputed[T any](computed *Computed[T]) Option[T] {
-	return func(opts *options[T]) {
-		opts.Computed = computed
-	}
 }
 
 // ComputedColumns creates a map of Column objects from field-to-SQL expression mappings.
@@ -120,10 +111,19 @@ func WithComputedResult(object any, computedResults map[string]any) *withCompute
 	}
 }
 
-// NewScanner creates a standard scanner for computed fields.
+// ComputedScanner holds the configuration for scanning database results with computed fields.
+type ComputedScanner[T any] struct {
+	// Destination is the target for GORM to scan results into (e.g., &[]User{})
+	Destination any
+
+	// Transform converts scanned results with their computed values into cursor nodes
+	Transform func(computedResults []map[string]any) []cursor.Node[T]
+}
+
+// NewComputedScanner creates a standard scanner for computed fields.
 // This is the recommended implementation for most use cases.
 // It wraps objects with their computed values and makes them accessible in the resulting cursor.Node objects.
-func NewScanner[T any](db *gorm.DB) (*Scanner[T], error) {
+func NewComputedScanner[T any](db *gorm.DB) (*ComputedScanner[T], error) {
 	if db.Statement.Model == nil {
 		return nil, errors.New("db.Statement.Model cannot be nil")
 	}
@@ -134,7 +134,7 @@ func NewScanner[T any](db *gorm.DB) (*Scanner[T], error) {
 	// Only use []T when Model type exactly matches T
 	if modelType == genericType {
 		nodes := []T{}
-		return &Scanner[T]{
+		return &ComputedScanner[T]{
 			Destination: &nodes,
 			Transform: func(computedResults []map[string]any) []cursor.Node[T] {
 				return lo.Map(nodes, func(node T, i int) cursor.Node[T] {
@@ -150,7 +150,7 @@ func NewScanner[T any](db *gorm.DB) (*Scanner[T], error) {
 	sliceType := reflect.SliceOf(modelType)
 	nodesVal := reflect.New(sliceType).Elem()
 
-	return &Scanner[T]{
+	return &ComputedScanner[T]{
 		Destination: nodesVal.Addr().Interface(),
 		Transform: func(computedResults []map[string]any) []cursor.Node[T] {
 			result := make([]cursor.Node[T], nodesVal.Len())
@@ -166,18 +166,19 @@ func NewScanner[T any](db *gorm.DB) (*Scanner[T], error) {
 	}, nil
 }
 
-func splitComputedScan(computedColumns map[string]clause.Column, tx *gorm.DB, dest any) (computedResults []map[string]any, err error) {
+func computedSplitScan(tx *gorm.DB, dest any, computedColumns map[string]clause.Column) ([]map[string]any, error) {
 	aliasToField := make(map[string]string)
-	splitter := make(map[string]func(columnType *sql.ColumnType) any)
+	computedSplitter := make(map[string]func(columnType *sql.ColumnType) any)
 	for field := range computedColumns {
 		alias := ComputedFieldToColumnAlias(field)
 		aliasToField[alias] = field
-		splitter[alias] = func(columnType *sql.ColumnType) any {
+		computedSplitter[alias] = func(columnType *sql.ColumnType) any {
 			return columnType.ScanType()
 		}
 	}
 
-	if err := SplitScan(tx, dest, splitter, &computedResults).Error; err != nil {
+	computedResults := make([]map[string]any, 0)
+	if err := SplitScan(tx, dest, computedSplitter, &computedResults).Error; err != nil {
 		return nil, errors.Wrap(err, "failed to scan records with computed columns")
 	}
 
