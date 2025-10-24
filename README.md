@@ -1,8 +1,6 @@
 # relay
 
-`relay` is a library designed to simplify Relay-style pagination in Go applications, supporting both keyset-based and offset-based pagination. It helps developers efficiently implement pagination queries while offering optimization options, such as skipping `TotalCount` queries and encrypting cursors.
-
-**Currently, only the `GORM` adapter is provided by default. For other adapters, refer to `gormrelay` to implement them yourself.**
+`relay` is a comprehensive Go library for implementing Relay-style pagination with advanced features. Beyond supporting both keyset-based and offset-based pagination strategies, it provides powerful filtering capabilities, computed fields for database-level calculations, seamless gRPC/Protocol Buffers integration, and flexible cursor encryption options. Whether you're building REST APIs or gRPC services, `relay` helps you implement efficient, type-safe pagination with minimal boilerplate.
 
 ## Features
 
