@@ -75,12 +75,12 @@ func TestWithComputedResult(t *testing.T) {
 // TestComputedValidate verifies the validation logic of the Computed struct.
 // It tests various invalid configurations to ensure they are properly rejected:
 // - Empty Columns map
-// - Nil SetupScanner function
+// - Nil Scanner function
 // - Columns with pre-defined Alias (which should be set during query execution)
 // - Duplicate column aliases that would cause SQL errors
 func TestComputedValidate(t *testing.T) {
-	// Mock SetupScanner function for testing
-	mockSetupScanner := func(db *gorm.DB) (*gormrelay.Scanner[*struct{}], error) {
+	// Mock Scanner function for testing
+	mockScanner := func(db *gorm.DB) (*gormrelay.Scanner[*struct{}], error) {
 		return nil, nil
 	}
 
@@ -96,29 +96,29 @@ func TestComputedValidate(t *testing.T) {
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true},
 				},
-				SetupScanner: mockSetupScanner,
+				Scanner: mockScanner,
 			},
 			expectError: false,
 		},
 		{
 			name: "empty columns",
 			computed: &gormrelay.Computed[*struct{}]{
-				Columns:      map[string]clause.Column{},
-				SetupScanner: mockSetupScanner,
+				Columns: map[string]clause.Column{},
+				Scanner: mockScanner,
 			},
 			expectError: true,
 			errorSubstr: "Columns must not be empty",
 		},
 		{
-			name: "nil SetupScanner",
+			name: "nil Scanner",
 			computed: &gormrelay.Computed[*struct{}]{
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true},
 				},
-				SetupScanner: nil,
+				Scanner: nil,
 			},
 			expectError: true,
-			errorSubstr: "SetupScanner function must not be nil",
+			errorSubstr: "Scanner function must not be nil",
 		},
 		{
 			name: "column with non-empty alias",
@@ -126,7 +126,7 @@ func TestComputedValidate(t *testing.T) {
 				Columns: map[string]clause.Column{
 					"TotalCount": {Name: "(COUNT(*))", Raw: true, Alias: "already_set"},
 				},
-				SetupScanner: mockSetupScanner,
+				Scanner: mockScanner,
 			},
 			expectError: true,
 			errorSubstr: "should have empty Alias",
@@ -138,7 +138,7 @@ func TestComputedValidate(t *testing.T) {
 					"UserScore":  {Name: "(AVG(score))", Raw: true},
 					"user_score": {Name: "(SUM(score)/COUNT(*))", Raw: true},
 				},
-				SetupScanner: mockSetupScanner,
+				Scanner: mockScanner,
 			},
 			expectError: true,
 			errorSubstr: "duplicate computed field aliases",

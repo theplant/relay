@@ -102,7 +102,7 @@ p := relay.New(
             Columns: gormrelay.ComputedColumns(map[string]string{
                 "Priority": "CASE WHEN status = 'premium' THEN 1 WHEN status = 'vip' THEN 2 ELSE 3 END",
             }),
-            SetupScanner: gormrelay.NewScanner[*User],
+            Scanner: gormrelay.NewScanner[*User],
         }),
     ),
     relay.EnsureLimits[*User](10, 100),
@@ -141,9 +141,9 @@ Standard scanner function that handles result scanning and wrapping. This is the
 gormrelay.NewScanner[*User]
 ```
 
-**Custom SetupScanner**
+**Custom Scanner**
 
-For custom types or complex scenarios, implement your own SetupScanner function:
+For custom types or complex scenarios, implement your own Scanner function:
 
 ```go
 type Shop struct {
@@ -156,7 +156,7 @@ gormrelay.WithComputed(&gormrelay.Computed[*Shop]{
     Columns: gormrelay.ComputedColumns(map[string]string{
         "Priority": "CASE WHEN name = 'premium' THEN 1 ELSE 2 END",
     }),
-    SetupScanner: func(db *gorm.DB) (*gormrelay.Scanner[*Shop], error) {
+    Scanner: func(db *gorm.DB) (*gormrelay.Scanner[*Shop], error) {
         shops := []*Shop{}
         return &gormrelay.Scanner[*Shop]{
             Destination: &shops,
@@ -183,7 +183,7 @@ p := relay.New(
                 "Score": "(points * 10 + bonus)",
                 "Rank":  "CASE WHEN score > 100 THEN 'A' WHEN score > 50 THEN 'B' ELSE 'C' END",
             }),
-            SetupScanner: gormrelay.NewScanner[*User],
+            Scanner: gormrelay.NewScanner[*User],
         }),
     ),
     relay.EnsureLimits[*User](10, 100),
@@ -305,7 +305,7 @@ db.Scopes(
 
 ### Relationship Filtering
 
-The filter supports filtering by `BelongsTo` relationships with multi-level nesting:
+The filter supports filtering by `BelongsTo/HasOne` relationships with multi-level nesting:
 
 ```go
 type CountryFilter struct {
@@ -395,11 +395,16 @@ conn, err := p.Paginate(context.Background(), &relay.PaginateRequest[*User]{
 
 ### Filter Options
 
-**Disable BelongsTo Filtering:**
+**Disable Relationship Filtering:**
 
 ```go
 db.Scopes(
-    gormfilter.Scope(userFilter, gormfilter.WithDisableBelongsTo()),
+    gormfilter.Scope(
+        userFilter,
+        gormfilter.WithDisableBelongsTo(),
+        gormfilter.WithDisableHasOne(),
+        // gormfilter.WithDisableRelationships(), // disable all relationships
+    ),
 ).Find(&users)
 ```
 

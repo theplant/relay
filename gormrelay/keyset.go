@@ -208,7 +208,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 			return nil, err
 		}
 
-		scanner, err := a.opts.Computed.SetupScanner(db)
+		scanner, err := a.opts.Computed.Scanner(db)
 		if err != nil {
 			return nil, err
 		}

@@ -96,7 +96,7 @@ func (a *OffsetFinder[T]) Find(ctx context.Context, orderBy []relay.Order, skip,
 	}
 
 	if len(computedColumns) > 0 {
-		scanner, err := a.opts.Computed.SetupScanner(db)
+		scanner, err := a.opts.Computed.Scanner(db)
 		if err != nil {
 			return nil, err
 		}

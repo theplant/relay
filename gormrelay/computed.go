@@ -29,8 +29,8 @@ type Computed[T any] struct {
 	// Maps field names to SQL expressions
 	Columns map[string]clause.Column
 
-	// SetupScanner prepares a scanner for database operations with computed fields
-	SetupScanner func(db *gorm.DB) (*Scanner[T], error)
+	// Scanner prepares a scanner for database operations with computed fields
+	Scanner func(db *gorm.DB) (*Scanner[T], error)
 }
 
 // Validate ensures the Computed configuration is valid.
@@ -45,8 +45,8 @@ func (c *Computed[T]) Validate() error {
 		}
 	}
 
-	if c.SetupScanner == nil {
-		return errors.New("SetupScanner function must not be nil")
+	if c.Scanner == nil {
+		return errors.New("Scanner function must not be nil")
 	}
 
 	aliasMap := make(map[string][]string)

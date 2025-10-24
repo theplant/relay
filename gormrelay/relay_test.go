@@ -773,7 +773,7 @@ func TestWithComputed(t *testing.T) {
 					Columns: ComputedColumns(map[string]string{
 						"GlobalPriority": "(CASE WHEN users.name = 'molon' THEN 1 WHEN users.name = 'sam' THEN 2 ELSE 3 END)",
 					}),
-					SetupScanner: NewScanner[*User],
+					Scanner: NewScanner[*User],
 				}),
 			),
 			relay.EnsureLimits[*User](10, 50),
@@ -922,7 +922,7 @@ func TestWithComputedShop(t *testing.T) {
 						// Define computed Priority column based on shop name
 						"Priority": "(CASE WHEN shops.name = 'premium' THEN 1 WHEN shops.name = 'featured' THEN 2 ELSE 3 END)",
 					}),
-					SetupScanner: func(_ *gorm.DB) (*Scanner[*Shop], error) {
+					Scanner: func(_ *gorm.DB) (*Scanner[*Shop], error) {
 						nodes := []*Shop{}
 						return &Scanner[*Shop]{
 							Destination: &nodes,
