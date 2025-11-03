@@ -17,12 +17,13 @@ import (
 
 // HandleOperatorInput provides input information for operator handling
 type HandleOperatorInput struct {
-	FilterName    string         // Name of the filter (e.g., "Status", "CreatedAt")
-	FilterType    reflect.Type   // Type of the filter
-	FilterMap     map[string]any // The filter map being built (can be modified directly)
-	OperatorName  string         // Name of the operator (e.g., "Eq", "Gte")
-	OperatorValue reflect.Value  // Value of the operator
-	OperatorType  reflect.Type   // Type of the operator value
+	FilterName      string         // Name of the filter (e.g., "Status", "CreatedAt")
+	FilterType      reflect.Type   // Type of the filter
+	ParentFilterMap map[string]any // The parent filter map (read-only reference)
+	FilterMap       map[string]any // The filter map being built (can be modified directly)
+	OperatorName    string         // Name of the operator (e.g., "Eq", "Gte")
+	OperatorValue   reflect.Value  // Value of the operator
+	OperatorType    reflect.Type   // Type of the operator value
 }
 
 // HandleOperatorOutput represents the result of operator handling
@@ -229,12 +230,13 @@ func fixNestedFilterMap(m map[string]any, key string, parentType reflect.Type, p
 		}
 
 		_, err := handleOperator(&HandleOperatorInput{
-			FilterName:    key,
-			FilterType:    filterField.Type, // original field type, not indirect type
-			FilterMap:     filterMap,
-			OperatorName:  operatorName,
-			OperatorValue: operatorValue,
-			OperatorType:  operatorField.Type, // original field type, not indirect type
+			FilterName:      key,
+			FilterType:      filterField.Type, // original field type, not indirect type
+			ParentFilterMap: m,
+			FilterMap:       filterMap,
+			OperatorName:    operatorName,
+			OperatorValue:   operatorValue,
+			OperatorType:    operatorField.Type, // original field type, not indirect type
 		})
 		if err != nil {
 			return errors.Wrapf(err, "operator %s", operatorName)
