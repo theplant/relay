@@ -3,7 +3,6 @@ package gormfilter
 
 import (
 	"cmp"
-	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -15,11 +14,28 @@ import (
 	"gorm.io/gorm/schema"
 
 	filterpkg "github.com/theplant/relay/filter"
+	"github.com/theplant/relay/internal/hook"
 )
+
+// FieldColumnInput provides context for building a field's column.
+type FieldColumnInput struct {
+	FieldName string
+	Fold      bool
+}
+
+// FieldColumnOutput specifies the column to use for filtering.
+// Column can be clause.Column or clause.Expr (for computed expressions like LOWER()).
+type FieldColumnOutput struct {
+	Column any // clause.Column or clause.Expr (for computed expressions like LOWER())
+}
+
+// FieldColumnFunc builds a column for a given field.
+type FieldColumnFunc func(input *FieldColumnInput) (*FieldColumnOutput, error)
 
 type options struct {
 	disableBelongsTo bool
 	disableHasOne    bool
+	fieldColumnHook  func(next FieldColumnFunc) FieldColumnFunc
 }
 
 type Option func(*options)
@@ -45,6 +61,35 @@ func WithDisableRelationships() Option {
 	return func(o *options) {
 		o.disableBelongsTo = true
 		o.disableHasOne = true
+	}
+}
+
+// WithFieldColumnHook installs a hook to customize how field columns are built.
+// This allows dynamic column resolution based on field name and filter context (e.g., Fold).
+// Multiple hooks can be chained together.
+//
+// Example:
+//
+//	// Filter on JSON field: WHERE "snapshot"->>'name' = 'Old Name'
+//	snapshotHook := func(next gormfilter.FieldColumnFunc) gormfilter.FieldColumnFunc {
+//	    return func(input *gormfilter.FieldColumnInput) (*gormfilter.FieldColumnOutput, error) {
+//	        if input.FieldName == "SnapshotName" {
+//	            var column any = clause.Column{Name: `"snapshot"->>'name'`, Raw: true}
+//	            if input.Fold {
+//	                column = clause.Expr{SQL: "LOWER(?)", Vars: []any{column}}
+//	            }
+//	            return &gormfilter.FieldColumnOutput{Column: column}, nil
+//	        }
+//	        return next(input)
+//	    }
+//	}
+//
+//	db.Scopes(gormfilter.Scope(&ProductFilter{
+//	    Name: &filter.String{Eq: lo.ToPtr("Old Name")},
+//	}, gormfilter.WithFieldColumnHook(snapshotHook)))
+func WithFieldColumnHook(hooks ...func(next FieldColumnFunc) FieldColumnFunc) Option {
+	return func(o *options) {
+		o.fieldColumnHook = hook.Prepend(o.fieldColumnHook, hooks...)
 	}
 }
 
@@ -246,11 +291,6 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 		}
 	}
 
-	field, ok := stmt.Schema.FieldsByName[fieldName]
-	if !ok {
-		return nil, errors.Errorf("missing field %q in schema", fieldName)
-	}
-
 	var exprs []clause.Expression
 
 	fold := false
@@ -258,11 +298,36 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 		fold = true
 	}
 
-	var column any
-	column = clause.Column{Table: stmt.Table, Name: field.DBName}
-	if fold {
-		column = clause.Expr{SQL: fmt.Sprintf(`LOWER(%s)`, stmt.Quote(column))}
+	// Build default field column function
+	fieldColumnFunc := func(input *FieldColumnInput) (*FieldColumnOutput, error) {
+		field, ok := stmt.Schema.FieldsByName[input.FieldName]
+		if !ok {
+			return nil, errors.Errorf("missing field %q in schema", input.FieldName)
+		}
+
+		var column any
+		column = clause.Column{Table: stmt.Table, Name: field.DBName}
+		if input.Fold {
+			column = clause.Expr{SQL: "LOWER(?)", Vars: []any{column}}
+		}
+		return &FieldColumnOutput{Column: column}, nil
 	}
+
+	// Apply hook if provided
+	if opts != nil && opts.fieldColumnHook != nil {
+		fieldColumnFunc = opts.fieldColumnHook(fieldColumnFunc)
+	}
+
+	// Get column from field column func
+	output, err := fieldColumnFunc(&FieldColumnInput{
+		FieldName: fieldName,
+		Fold:      fold,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "field column func failed for field %q", fieldName)
+	}
+
+	column := output.Column
 
 	ops := lo.Keys(filter)
 	sort.Strings(ops)
