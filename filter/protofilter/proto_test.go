@@ -168,3 +168,119 @@ func TestToMap_EmitUnpopulated(t *testing.T) {
 		assert.JSONEq(t, expected, toJSON(t, result))
 	})
 }
+
+// Test model with Go naming conventions (ID, not Id)
+type Product struct {
+	ID         string    `json:"id"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+	Name       string    `json:"name"`
+	Code       string    `json:"code"`
+	Status     string    `json:"status"`
+	CategoryID string    `json:"categoryID"`
+}
+
+type Category struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Code string `json:"code"`
+}
+
+func TestAlignWith(t *testing.T) {
+	t.Run("maps proto camelCase to model PascalCase with ID acronym", func(t *testing.T) {
+		filter := &testdatav1.ProductFilter{
+			Status: &testdatav1.ProductFilter_StatusFilter{
+				Eq: lo.ToPtr(testdatav1.ProductStatus_PRODUCT_STATUS_PUBLISHED),
+			},
+			Name: &testdatav1.ProductFilter_NameFilter{
+				Eq: lo.ToPtr("Test Product"),
+			},
+			CategoryId: &testdatav1.ProductFilter_CategoryIDFilter{
+				Eq: lo.ToPtr("cat-123"),
+			},
+		}
+
+		// Use AlignWith to align field names with Product model
+		result, err := protofilter.ToMap(
+			filter,
+			protofilter.WithTransformKeyHook(protofilter.AlignWith(Product{})),
+		)
+		require.NoError(t, err)
+
+		expected := `{
+  "CategoryID": {
+    "Eq": "cat-123"
+  },
+  "Name": {
+    "Eq": "Test Product",
+    "Fold": false
+  },
+  "Status": {
+    "Eq": "PUBLISHED"
+  }
+}`
+		assert.JSONEq(t, expected, toJSON(t, result))
+
+		// Verify CategoryID (not CategoryId)
+		_, hasCategoryID := result["CategoryID"]
+		assert.True(t, hasCategoryID, "should have CategoryID (with uppercase ID)")
+
+		_, hasCategoryId := result["CategoryId"]
+		assert.False(t, hasCategoryId, "should NOT have CategoryId (with lowercase Id)")
+	})
+
+	t.Run("without model type hook uses default capitalization", func(t *testing.T) {
+		filter := &testdatav1.ProductFilter{
+			CategoryId: &testdatav1.ProductFilter_CategoryIDFilter{
+				Eq: lo.ToPtr("cat-123"),
+			},
+		}
+
+		// Without ModelTypeTransformKeyHook
+		result, err := protofilter.ToMap(filter)
+		require.NoError(t, err)
+
+		expected := `{
+  "CategoryId": {
+    "Eq": "cat-123"
+  }
+}`
+		assert.JSONEq(t, expected, toJSON(t, result))
+
+		// Verify it's CategoryId (default capitalization), not CategoryID
+		_, hasCategoryId := result["CategoryId"]
+		assert.True(t, hasCategoryId, "should have CategoryId (default capitalization)")
+	})
+
+	t.Run("nested filters also use model type mapping", func(t *testing.T) {
+		filter := &testdatav1.ProductFilter{
+			Category: &testdatav1.CategoryFilter{
+				Name: &testdatav1.CategoryFilter_NameFilter{
+					Eq: lo.ToPtr("Electronics"),
+				},
+			},
+		}
+
+		result, err := protofilter.ToMap(
+			filter,
+			protofilter.WithTransformKeyHook(protofilter.AlignWith(Product{})),
+		)
+		require.NoError(t, err)
+
+		expected := `{
+  "Category": {
+    "Name": {
+      "Eq": "Electronics",
+      "Fold": false
+    }
+  }
+}`
+		assert.JSONEq(t, expected, toJSON(t, result))
+	})
+
+	t.Run("panics when model is nil", func(t *testing.T) {
+		assert.Panics(t, func() {
+			protofilter.AlignWith(nil)
+		}, "should panic when model is nil")
+	})
+}
