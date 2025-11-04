@@ -124,7 +124,7 @@ func TestProductSnapshotWithRelay(t *testing.T) {
 				db.WithContext(ctx).Scopes(gormfilter.Scope(
 					&ProductFilter{
 						Or: []*ProductFilter{
-							{Name: &filter.String{Contains: lo.ToPtr("Old"), Fold: true}},
+							{Name: &filter.String{Contains: lo.ToPtr("oLd"), Fold: true}},
 							{CategoryID: &filter.String{Eq: lo.ToPtr("cat-1")}},
 						},
 					},
