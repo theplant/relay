@@ -8,9 +8,7 @@ import (
 	"github.com/samber/lo"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/theplant/relay/filter"
 	"github.com/theplant/relay/internal/hook"
 	"github.com/theplant/relay/protorelay"
 )
@@ -37,6 +35,7 @@ type HandleOperatorFunc func(input *HandleOperatorInput) (*HandleOperatorOutput,
 // toMapOptions holds configuration options for ToMap
 type toMapOptions struct {
 	handleOperatorHook func(next HandleOperatorFunc) HandleOperatorFunc
+	transformKeyHook   func(next TransformKeyFunc) TransformKeyFunc
 }
 
 // ToMapOption is a function that configures toMapOptions
@@ -51,8 +50,19 @@ func WithHandleOperatorHook(hooks ...func(next HandleOperatorFunc) HandleOperato
 	}
 }
 
+// WithTransformKeyHook adds custom key transformation hooks.
+// Hooks are applied in the order they are added.
+// The default handler (capitalizeFirst) is always at the end of the chain.
+// You can use this to wrap or replace the default key transformation behavior.
+func WithTransformKeyHook(hooks ...func(next TransformKeyFunc) TransformKeyFunc) ToMapOption {
+	return func(o *toMapOptions) {
+		o.transformKeyHook = hook.Prepend(o.transformKeyHook, hooks...)
+	}
+}
+
 // ToMap parses a proto filter message to a map
-// It uses Go reflection to automatically handle type conversions:
+// It uses protojson to serialize the proto message, then converts keys from camelCase to PascalCase.
+// This approach ensures all proto special types (well-known types, oneof, etc.) are handled correctly.
 // - Proto enums -> strings (with validation)
 // - Timestamps -> time.Time
 // - Recursively processes nested filters (And/Or/Not)
@@ -67,11 +77,19 @@ func ToMap[T proto.Message](protoFilter T, opts ...ToMapOption) (map[string]any,
 		opt(options)
 	}
 
-	filterMap, err := filter.ToMap(protoFilter)
+	// Build transform key function with hooks
+	transformKey := capitalizeFirst
+	if options.transformKeyHook != nil {
+		transformKey = options.transformKeyHook(transformKey)
+	}
+
+	// 1. Convert proto message to map with transformed keys (includes pruning)
+	filterMap, err := toMap(protoFilter, transformKey)
 	if err != nil {
 		return nil, err
 	}
 
+	// 2. Apply operator transformations (timestamp, enum, etc.)
 	structValue := reflect.Indirect(reflect.ValueOf(protoFilter))
 	structType := structValue.Type()
 	if err := fixFilterMap(filterMap, structType, structValue, options); err != nil {
@@ -248,20 +266,9 @@ func fixNestedFilterMap(m map[string]any, key string, parentType reflect.Type, p
 
 // defaultHandleOperator is the default operator handler that handles standard type conversions.
 // It converts:
-// - Timestamps to time.Time
 // - Enums to strings
 // - Enum slices to string slices
 func defaultHandleOperator(input *HandleOperatorInput) (*HandleOperatorOutput, error) {
-	// Handle timestamp
-	if input.OperatorType == reflect.TypeOf((*timestamppb.Timestamp)(nil)) {
-		ts, ok := input.OperatorValue.Interface().(*timestamppb.Timestamp)
-		if !ok {
-			return nil, errors.Errorf("expected timestamp value, got %T", input.OperatorValue.Interface())
-		}
-		input.FilterMap[input.OperatorName] = ts.AsTime()
-		return &HandleOperatorOutput{}, nil
-	}
-
 	// Handle enum
 	if isEnumType(input.OperatorType) {
 		enumValue := reflect.Indirect(input.OperatorValue).Interface()

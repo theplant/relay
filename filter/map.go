@@ -35,24 +35,48 @@ func ToMap(v any) (map[string]any, error) {
 
 // PruneMap recursively removes nil values, empty slices, and empty nested maps.
 func PruneMap(m map[string]any) {
-	for k, v := range m {
-		if v == nil {
-			delete(m, k)
-			continue
-		}
+	prune(m)
+}
 
-		if nestedMap, ok := v.(map[string]any); ok {
-			PruneMap(nestedMap)
-			if len(nestedMap) == 0 {
-				delete(m, k)
-			}
-			continue
-		}
+// prune recursively processes a value and returns the pruned result.
+// Returns nil if the value should be removed (nil, empty map, or empty slice).
+func prune(v any) any {
+	if v == nil {
+		return nil
+	}
 
-		if slice, ok := v.([]any); ok {
-			if len(slice) == 0 {
-				delete(m, k)
+	switch val := v.(type) {
+	case map[string]any:
+		for k, item := range val {
+			pruned := prune(item)
+			if pruned == nil {
+				delete(val, k)
+			} else {
+				val[k] = pruned
 			}
 		}
+		if len(val) == 0 {
+			return nil
+		}
+		return val
+
+	case []any:
+		if len(val) == 0 {
+			return nil
+		}
+		pruned := make([]any, 0, len(val))
+		for _, item := range val {
+			prunedItem := prune(item)
+			if prunedItem != nil {
+				pruned = append(pruned, prunedItem)
+			}
+		}
+		if len(pruned) == 0 {
+			return nil
+		}
+		return pruned
+
+	default:
+		return v
 	}
 }
