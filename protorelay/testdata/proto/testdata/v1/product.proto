@@ -75,6 +75,12 @@ message CategoryFilter {
 }
 
 message ProductFilter {
+  message IDFilter {
+    optional string eq = 1;
+    repeated string in = 2;
+    repeated string not_in = 3;
+  }
+
   message StatusFilter {
     optional ProductStatus eq = 1;
     repeated ProductStatus in = 2;
@@ -118,13 +124,14 @@ message ProductFilter {
   repeated ProductFilter or = 2;
   optional ProductFilter not = 3;
 
-  optional StatusFilter status = 101;
-  optional NameFilter name = 102;
-  optional CodeFilter code = 103;
-  optional CreatedAtFilter created_at = 104;
-  optional UpdatedAtFilter updated_at = 105;
-  optional CategoryFilter category = 106;
-  optional CategoryIDFilter category_id = 107;
+  optional IDFilter id = 101;
+  optional StatusFilter status = 102;
+  optional NameFilter name = 103;
+  optional CodeFilter code = 104;
+  optional CreatedAtFilter created_at = 105;
+  optional UpdatedAtFilter updated_at = 106;
+  optional CategoryFilter category = 107;
+  optional CategoryIDFilter category_id = 108;
 }
 
 message ListProductsRequest {

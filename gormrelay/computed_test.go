@@ -247,3 +247,104 @@ func TestNewComputedScanner(t *testing.T) {
 	assert.Equal(t, 1, anyNodeWrapper.Unwrap().(*User).ID)
 	assert.Equal(t, "Alice", anyNodeWrapper.Unwrap().(*User).Name)
 }
+
+func TestNewComputedColumns(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    map[string]string
+		expected map[string]clause.Column
+	}{
+		{
+			name: "simple field without parentheses",
+			input: map[string]string{
+				"TotalCount": "COUNT(*)",
+			},
+			expected: map[string]clause.Column{
+				"TotalCount": {Name: "(COUNT(*))", Raw: true},
+			},
+		},
+		{
+			name: "field already wrapped with parentheses",
+			input: map[string]string{
+				"TotalCount": "(COUNT(*))",
+			},
+			expected: map[string]clause.Column{
+				"TotalCount": {Name: "(COUNT(*))", Raw: true},
+			},
+		},
+		{
+			name: "field with leading/trailing spaces",
+			input: map[string]string{
+				"TotalCount": "  COUNT(*)  ",
+			},
+			expected: map[string]clause.Column{
+				"TotalCount": {Name: "(COUNT(*))", Raw: true},
+			},
+		},
+		{
+			name: "field with spaces and already wrapped",
+			input: map[string]string{
+				"TotalCount": "  (COUNT(*))  ",
+			},
+			expected: map[string]clause.Column{
+				"TotalCount": {Name: "(COUNT(*))", Raw: true},
+			},
+		},
+		{
+			name: "complex nested expression already wrapped",
+			input: map[string]string{
+				"AverageScore": "((SUM(score) * 1.0) / NULLIF(COUNT(*), 0))",
+			},
+			expected: map[string]clause.Column{
+				"AverageScore": {Name: "((SUM(score) * 1.0) / NULLIF(COUNT(*), 0))", Raw: true},
+			},
+		},
+		{
+			name: "complex nested expression without outer wrapping",
+			input: map[string]string{
+				"AverageScore": "(SUM(score) * 1.0) / NULLIF(COUNT(*), 0)",
+			},
+			expected: map[string]clause.Column{
+				"AverageScore": {Name: "((SUM(score) * 1.0) / NULLIF(COUNT(*), 0))", Raw: true},
+			},
+		},
+		{
+			name: "expression starting with parenthesis but not ending with one",
+			input: map[string]string{
+				"Score": "(field_a + field_b",
+			},
+			expected: map[string]clause.Column{
+				"Score": {Name: "((field_a + field_b)", Raw: true},
+			},
+		},
+		{
+			name: "expression ending with parenthesis but not starting with one",
+			input: map[string]string{
+				"Score": "field_a + field_b)",
+			},
+			expected: map[string]clause.Column{
+				"Score": {Name: "(field_a + field_b))", Raw: true},
+			},
+		},
+		{
+			name: "multiple fields",
+			input: map[string]string{
+				"TotalCount":   "COUNT(*)",
+				"TotalAmount":  "(SUM(amount))",
+				"AverageScore": "  AVG(score)  ",
+			},
+			expected: map[string]clause.Column{
+				"TotalCount":   {Name: "(COUNT(*))", Raw: true},
+				"TotalAmount":  {Name: "(SUM(amount))", Raw: true},
+				"AverageScore": {Name: "(AVG(score))", Raw: true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := gormrelay.NewComputedColumns(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
