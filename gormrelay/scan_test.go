@@ -189,7 +189,7 @@ type Product struct {
 	ID         int       `gorm:"primarykey;not null;" json:"id"`
 	Name       string    `gorm:"not null;" json:"name"`
 	Price      float64   `gorm:"not null;" json:"price"`
-	CategoryID int       `gorm:"index;" json:"categoryId"`
+	CategoryID int       `gorm:"index;" json:"categoryID"`
 	Category   *Category `gorm:"-" json:"category"`
 }
 

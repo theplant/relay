@@ -44,7 +44,9 @@ func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListP
 		return nil, err
 	}
 
-	filterMap, err := protofilter.ToMap(req.Filter)
+	filterMap, err := protofilter.ToMap(req.Filter,
+		protofilter.WithTransformKeyHook(protofilter.AlignWith(&Product{})),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +106,7 @@ type Product struct {
 	Name       string    `gorm:"not null" json:"name"`
 	Code       string    `gorm:"not null" json:"code"`
 	Status     string    `gorm:"not null" json:"status"`
-	CategoryId string    `gorm:"column:category_id;not null" json:"categoryId"`
+	CategoryID string    `gorm:"column:category_id;not null" json:"categoryID"`
 	Category   *Category `json:"category"`
 }
 
@@ -151,7 +153,7 @@ func (p *Product) ToProto() *testdatav1.Product {
 		Name:       p.Name,
 		Code:       p.Code,
 		Status:     parseProductStatus(p.Status),
-		CategoryId: p.CategoryId,
+		CategoryId: p.CategoryID,
 		Category:   p.Category.ToProto(),
 	}
 	return proto
@@ -215,14 +217,14 @@ func resetDB(t *testing.T) {
 			status = "DRAFT"
 		}
 
-		var categoryId string
+		var categoryID string
 		switch i % 3 {
 		case 0:
-			categoryId = "cat-electronics"
+			categoryID = "cat-electronics"
 		case 1:
-			categoryId = "cat-books"
+			categoryID = "cat-books"
 		default:
-			categoryId = "cat-clothing"
+			categoryID = "cat-clothing"
 		}
 
 		products = append(products, &Product{
@@ -232,7 +234,7 @@ func resetDB(t *testing.T) {
 			Name:       fmt.Sprintf("Product %d", i),
 			Code:       fmt.Sprintf("CODE-%03d", i),
 			Status:     status,
-			CategoryId: categoryId,
+			CategoryID: categoryID,
 		})
 	}
 	err = db.Session(&gorm.Session{Logger: logger.Discard}).Create(products).Error
