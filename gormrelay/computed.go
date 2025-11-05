@@ -70,9 +70,40 @@ func (c *Computed[T]) Validate() error {
 // NewComputedColumns creates a map of Column objects from field-to-SQL expression mappings.
 func NewComputedColumns(columns map[string]string) map[string]clause.Column {
 	return lo.MapEntries(columns, func(field string, value string) (string, clause.Column) {
-		value = strings.Trim(value, " ()")
-		return field, clause.Column{Name: fmt.Sprintf("(%s)", value), Raw: true}
+		value = strings.TrimSpace(value)
+		// Only wrap in parentheses if not already fully wrapped
+		if !isWrappedInParentheses(value) {
+			value = fmt.Sprintf("(%s)", value)
+		}
+		return field, clause.Column{Name: value, Raw: true}
 	})
+}
+
+// isWrappedInParentheses checks if a string is wrapped in a matching pair of parentheses.
+// Returns true only if:
+// 1. The string starts with '(' and ends with ')'
+// 2. The opening '(' matches the closing ')' (they form a complete wrapper)
+func isWrappedInParentheses(s string) bool {
+	if len(s) < 2 || s[0] != '(' || s[len(s)-1] != ')' {
+		return false
+	}
+
+	// Check if the first '(' matches the last ')'
+	depth := 0
+	for i, ch := range s {
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		}
+		// If depth reaches 0 before the end, the first '(' doesn't match the last ')'
+		if depth == 0 && i < len(s)-1 {
+			return false
+		}
+	}
+
+	return depth == 0
 }
 
 // ComputedFieldToColumnAlias generates a standardized SQL alias for computed fields.
