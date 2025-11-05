@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+	"github.com/samber/lo/mutable"
 	"golang.org/x/exp/maps"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -224,7 +225,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 
 		nodes := scanner.Transform(computedResults)
 		if fromEnd {
-			lo.Reverse(nodes)
+			mutable.Reverse(nodes)
 		}
 		return nodes, nil
 	}
@@ -245,7 +246,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 		}
 
 		if fromEnd {
-			lo.Reverse(nodes)
+			mutable.Reverse(nodes)
 		}
 		return lo.Map(nodes, func(node T, _ int) cursor.Node[T] {
 			return &cursor.SelfNode[T]{Node: node}
@@ -258,7 +259,7 @@ func (a *KeysetFinder[T]) Find(ctx context.Context, after, before *map[string]an
 		return nil, errors.Wrap(err, "failed to find records with keyset pagination")
 	}
 	if fromEnd {
-		lo.Reverse(nodes)
+		mutable.Reverse(nodes)
 	}
 	return lo.Map(nodes, func(node T, _ int) cursor.Node[T] {
 		return &cursor.SelfNode[T]{Node: node}
