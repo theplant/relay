@@ -445,13 +445,14 @@ type ProductFilter struct {
 	And           []*ProductFilter                `protobuf:"bytes,1,rep,name=and,proto3" json:"and,omitempty"`
 	Or            []*ProductFilter                `protobuf:"bytes,2,rep,name=or,proto3" json:"or,omitempty"`
 	Not           *ProductFilter                  `protobuf:"bytes,3,opt,name=not,proto3,oneof" json:"not,omitempty"`
-	Status        *ProductFilter_StatusFilter     `protobuf:"bytes,101,opt,name=status,proto3,oneof" json:"status,omitempty"`
-	Name          *ProductFilter_NameFilter       `protobuf:"bytes,102,opt,name=name,proto3,oneof" json:"name,omitempty"`
-	Code          *ProductFilter_CodeFilter       `protobuf:"bytes,103,opt,name=code,proto3,oneof" json:"code,omitempty"`
-	CreatedAt     *ProductFilter_CreatedAtFilter  `protobuf:"bytes,104,opt,name=created_at,json=createdAt,proto3,oneof" json:"created_at,omitempty"`
-	UpdatedAt     *ProductFilter_UpdatedAtFilter  `protobuf:"bytes,105,opt,name=updated_at,json=updatedAt,proto3,oneof" json:"updated_at,omitempty"`
-	Category      *CategoryFilter                 `protobuf:"bytes,106,opt,name=category,proto3,oneof" json:"category,omitempty"`
-	CategoryId    *ProductFilter_CategoryIDFilter `protobuf:"bytes,107,opt,name=category_id,json=categoryId,proto3,oneof" json:"category_id,omitempty"`
+	Id            *ProductFilter_IDFilter         `protobuf:"bytes,101,opt,name=id,proto3,oneof" json:"id,omitempty"`
+	Status        *ProductFilter_StatusFilter     `protobuf:"bytes,102,opt,name=status,proto3,oneof" json:"status,omitempty"`
+	Name          *ProductFilter_NameFilter       `protobuf:"bytes,103,opt,name=name,proto3,oneof" json:"name,omitempty"`
+	Code          *ProductFilter_CodeFilter       `protobuf:"bytes,104,opt,name=code,proto3,oneof" json:"code,omitempty"`
+	CreatedAt     *ProductFilter_CreatedAtFilter  `protobuf:"bytes,105,opt,name=created_at,json=createdAt,proto3,oneof" json:"created_at,omitempty"`
+	UpdatedAt     *ProductFilter_UpdatedAtFilter  `protobuf:"bytes,106,opt,name=updated_at,json=updatedAt,proto3,oneof" json:"updated_at,omitempty"`
+	Category      *CategoryFilter                 `protobuf:"bytes,107,opt,name=category,proto3,oneof" json:"category,omitempty"`
+	CategoryId    *ProductFilter_CategoryIDFilter `protobuf:"bytes,108,opt,name=category_id,json=categoryId,proto3,oneof" json:"category_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -503,6 +504,13 @@ func (x *ProductFilter) GetOr() []*ProductFilter {
 func (x *ProductFilter) GetNot() *ProductFilter {
 	if x != nil {
 		return x.Not
+	}
+	return nil
+}
+
+func (x *ProductFilter) GetId() *ProductFilter_IDFilter {
+	if x != nil {
+		return x.Id
 	}
 	return nil
 }
@@ -856,6 +864,66 @@ func (x *CategoryFilter_CodeFilter) GetNotIn() []string {
 	return nil
 }
 
+type ProductFilter_IDFilter struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Eq            *string                `protobuf:"bytes,1,opt,name=eq,proto3,oneof" json:"eq,omitempty"`
+	In            []string               `protobuf:"bytes,2,rep,name=in,proto3" json:"in,omitempty"`
+	NotIn         []string               `protobuf:"bytes,3,rep,name=not_in,json=notIn,proto3" json:"not_in,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProductFilter_IDFilter) Reset() {
+	*x = ProductFilter_IDFilter{}
+	mi := &file_testdata_v1_product_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProductFilter_IDFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProductFilter_IDFilter) ProtoMessage() {}
+
+func (x *ProductFilter_IDFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_testdata_v1_product_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProductFilter_IDFilter.ProtoReflect.Descriptor instead.
+func (*ProductFilter_IDFilter) Descriptor() ([]byte, []int) {
+	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 0}
+}
+
+func (x *ProductFilter_IDFilter) GetEq() string {
+	if x != nil && x.Eq != nil {
+		return *x.Eq
+	}
+	return ""
+}
+
+func (x *ProductFilter_IDFilter) GetIn() []string {
+	if x != nil {
+		return x.In
+	}
+	return nil
+}
+
+func (x *ProductFilter_IDFilter) GetNotIn() []string {
+	if x != nil {
+		return x.NotIn
+	}
+	return nil
+}
+
 type ProductFilter_StatusFilter struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Eq            *ProductStatus         `protobuf:"varint,1,opt,name=eq,proto3,enum=testdata.v1.ProductStatus,oneof" json:"eq,omitempty"`
@@ -867,7 +935,7 @@ type ProductFilter_StatusFilter struct {
 
 func (x *ProductFilter_StatusFilter) Reset() {
 	*x = ProductFilter_StatusFilter{}
-	mi := &file_testdata_v1_product_proto_msgTypes[10]
+	mi := &file_testdata_v1_product_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -879,7 +947,7 @@ func (x *ProductFilter_StatusFilter) String() string {
 func (*ProductFilter_StatusFilter) ProtoMessage() {}
 
 func (x *ProductFilter_StatusFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_testdata_v1_product_proto_msgTypes[10]
+	mi := &file_testdata_v1_product_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -892,7 +960,7 @@ func (x *ProductFilter_StatusFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductFilter_StatusFilter.ProtoReflect.Descriptor instead.
 func (*ProductFilter_StatusFilter) Descriptor() ([]byte, []int) {
-	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 0}
+	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 1}
 }
 
 func (x *ProductFilter_StatusFilter) GetEq() ProductStatus {
@@ -928,7 +996,7 @@ type ProductFilter_NameFilter struct {
 
 func (x *ProductFilter_NameFilter) Reset() {
 	*x = ProductFilter_NameFilter{}
-	mi := &file_testdata_v1_product_proto_msgTypes[11]
+	mi := &file_testdata_v1_product_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -940,7 +1008,7 @@ func (x *ProductFilter_NameFilter) String() string {
 func (*ProductFilter_NameFilter) ProtoMessage() {}
 
 func (x *ProductFilter_NameFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_testdata_v1_product_proto_msgTypes[11]
+	mi := &file_testdata_v1_product_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -953,7 +1021,7 @@ func (x *ProductFilter_NameFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductFilter_NameFilter.ProtoReflect.Descriptor instead.
 func (*ProductFilter_NameFilter) Descriptor() ([]byte, []int) {
-	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 1}
+	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 2}
 }
 
 func (x *ProductFilter_NameFilter) GetEq() string {
@@ -995,7 +1063,7 @@ type ProductFilter_CodeFilter struct {
 
 func (x *ProductFilter_CodeFilter) Reset() {
 	*x = ProductFilter_CodeFilter{}
-	mi := &file_testdata_v1_product_proto_msgTypes[12]
+	mi := &file_testdata_v1_product_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1007,7 +1075,7 @@ func (x *ProductFilter_CodeFilter) String() string {
 func (*ProductFilter_CodeFilter) ProtoMessage() {}
 
 func (x *ProductFilter_CodeFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_testdata_v1_product_proto_msgTypes[12]
+	mi := &file_testdata_v1_product_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1020,7 +1088,7 @@ func (x *ProductFilter_CodeFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductFilter_CodeFilter.ProtoReflect.Descriptor instead.
 func (*ProductFilter_CodeFilter) Descriptor() ([]byte, []int) {
-	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 2}
+	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 3}
 }
 
 func (x *ProductFilter_CodeFilter) GetEq() string {
@@ -1056,7 +1124,7 @@ type ProductFilter_CreatedAtFilter struct {
 
 func (x *ProductFilter_CreatedAtFilter) Reset() {
 	*x = ProductFilter_CreatedAtFilter{}
-	mi := &file_testdata_v1_product_proto_msgTypes[13]
+	mi := &file_testdata_v1_product_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1068,7 +1136,7 @@ func (x *ProductFilter_CreatedAtFilter) String() string {
 func (*ProductFilter_CreatedAtFilter) ProtoMessage() {}
 
 func (x *ProductFilter_CreatedAtFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_testdata_v1_product_proto_msgTypes[13]
+	mi := &file_testdata_v1_product_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1081,7 +1149,7 @@ func (x *ProductFilter_CreatedAtFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductFilter_CreatedAtFilter.ProtoReflect.Descriptor instead.
 func (*ProductFilter_CreatedAtFilter) Descriptor() ([]byte, []int) {
-	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 3}
+	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 4}
 }
 
 func (x *ProductFilter_CreatedAtFilter) GetLt() *timestamppb.Timestamp {
@@ -1124,7 +1192,7 @@ type ProductFilter_UpdatedAtFilter struct {
 
 func (x *ProductFilter_UpdatedAtFilter) Reset() {
 	*x = ProductFilter_UpdatedAtFilter{}
-	mi := &file_testdata_v1_product_proto_msgTypes[14]
+	mi := &file_testdata_v1_product_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1136,7 +1204,7 @@ func (x *ProductFilter_UpdatedAtFilter) String() string {
 func (*ProductFilter_UpdatedAtFilter) ProtoMessage() {}
 
 func (x *ProductFilter_UpdatedAtFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_testdata_v1_product_proto_msgTypes[14]
+	mi := &file_testdata_v1_product_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1149,7 +1217,7 @@ func (x *ProductFilter_UpdatedAtFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductFilter_UpdatedAtFilter.ProtoReflect.Descriptor instead.
 func (*ProductFilter_UpdatedAtFilter) Descriptor() ([]byte, []int) {
-	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 4}
+	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 5}
 }
 
 func (x *ProductFilter_UpdatedAtFilter) GetLt() *timestamppb.Timestamp {
@@ -1191,7 +1259,7 @@ type ProductFilter_CategoryIDFilter struct {
 
 func (x *ProductFilter_CategoryIDFilter) Reset() {
 	*x = ProductFilter_CategoryIDFilter{}
-	mi := &file_testdata_v1_product_proto_msgTypes[15]
+	mi := &file_testdata_v1_product_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1203,7 +1271,7 @@ func (x *ProductFilter_CategoryIDFilter) String() string {
 func (*ProductFilter_CategoryIDFilter) ProtoMessage() {}
 
 func (x *ProductFilter_CategoryIDFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_testdata_v1_product_proto_msgTypes[15]
+	mi := &file_testdata_v1_product_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1216,7 +1284,7 @@ func (x *ProductFilter_CategoryIDFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductFilter_CategoryIDFilter.ProtoReflect.Descriptor instead.
 func (*ProductFilter_CategoryIDFilter) Descriptor() ([]byte, []int) {
-	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 5}
+	return file_testdata_v1_product_proto_rawDescGZIP(), []int{4, 6}
 }
 
 func (x *ProductFilter_CategoryIDFilter) GetEq() string {
@@ -1292,21 +1360,27 @@ const file_testdata_v1_product_proto_rawDesc = "" +
 	"\x03_eqB\x06\n" +
 	"\x04_notB\a\n" +
 	"\x05_nameB\a\n" +
-	"\x05_code\"\xda\r\n" +
+	"\x05_code\"\xea\x0e\n" +
 	"\rProductFilter\x12,\n" +
 	"\x03and\x18\x01 \x03(\v2\x1a.testdata.v1.ProductFilterR\x03and\x12*\n" +
 	"\x02or\x18\x02 \x03(\v2\x1a.testdata.v1.ProductFilterR\x02or\x121\n" +
-	"\x03not\x18\x03 \x01(\v2\x1a.testdata.v1.ProductFilterH\x00R\x03not\x88\x01\x01\x12D\n" +
-	"\x06status\x18e \x01(\v2'.testdata.v1.ProductFilter.StatusFilterH\x01R\x06status\x88\x01\x01\x12>\n" +
-	"\x04name\x18f \x01(\v2%.testdata.v1.ProductFilter.NameFilterH\x02R\x04name\x88\x01\x01\x12>\n" +
-	"\x04code\x18g \x01(\v2%.testdata.v1.ProductFilter.CodeFilterH\x03R\x04code\x88\x01\x01\x12N\n" +
+	"\x03not\x18\x03 \x01(\v2\x1a.testdata.v1.ProductFilterH\x00R\x03not\x88\x01\x01\x128\n" +
+	"\x02id\x18e \x01(\v2#.testdata.v1.ProductFilter.IDFilterH\x01R\x02id\x88\x01\x01\x12D\n" +
+	"\x06status\x18f \x01(\v2'.testdata.v1.ProductFilter.StatusFilterH\x02R\x06status\x88\x01\x01\x12>\n" +
+	"\x04name\x18g \x01(\v2%.testdata.v1.ProductFilter.NameFilterH\x03R\x04name\x88\x01\x01\x12>\n" +
+	"\x04code\x18h \x01(\v2%.testdata.v1.ProductFilter.CodeFilterH\x04R\x04code\x88\x01\x01\x12N\n" +
 	"\n" +
-	"created_at\x18h \x01(\v2*.testdata.v1.ProductFilter.CreatedAtFilterH\x04R\tcreatedAt\x88\x01\x01\x12N\n" +
+	"created_at\x18i \x01(\v2*.testdata.v1.ProductFilter.CreatedAtFilterH\x05R\tcreatedAt\x88\x01\x01\x12N\n" +
 	"\n" +
-	"updated_at\x18i \x01(\v2*.testdata.v1.ProductFilter.UpdatedAtFilterH\x05R\tupdatedAt\x88\x01\x01\x12<\n" +
-	"\bcategory\x18j \x01(\v2\x1b.testdata.v1.CategoryFilterH\x06R\bcategory\x88\x01\x01\x12Q\n" +
-	"\vcategory_id\x18k \x01(\v2+.testdata.v1.ProductFilter.CategoryIDFilterH\aR\n" +
-	"categoryId\x88\x01\x01\x1a\xa5\x01\n" +
+	"updated_at\x18j \x01(\v2*.testdata.v1.ProductFilter.UpdatedAtFilterH\x06R\tupdatedAt\x88\x01\x01\x12<\n" +
+	"\bcategory\x18k \x01(\v2\x1b.testdata.v1.CategoryFilterH\aR\bcategory\x88\x01\x01\x12Q\n" +
+	"\vcategory_id\x18l \x01(\v2+.testdata.v1.ProductFilter.CategoryIDFilterH\bR\n" +
+	"categoryId\x88\x01\x01\x1aM\n" +
+	"\bIDFilter\x12\x13\n" +
+	"\x02eq\x18\x01 \x01(\tH\x00R\x02eq\x88\x01\x01\x12\x0e\n" +
+	"\x02in\x18\x02 \x03(\tR\x02in\x12\x15\n" +
+	"\x06not_in\x18\x03 \x03(\tR\x05notInB\x05\n" +
+	"\x03_eq\x1a\xa5\x01\n" +
 	"\fStatusFilter\x12/\n" +
 	"\x02eq\x18\x01 \x01(\x0e2\x1a.testdata.v1.ProductStatusH\x00R\x02eq\x88\x01\x01\x12*\n" +
 	"\x02in\x18\x02 \x03(\x0e2\x1a.testdata.v1.ProductStatusR\x02in\x121\n" +
@@ -1351,7 +1425,8 @@ const file_testdata_v1_product_proto_rawDesc = "" +
 	"\x02in\x18\x02 \x03(\tR\x02in\x12\x15\n" +
 	"\x06not_in\x18\x03 \x03(\tR\x05notInB\x05\n" +
 	"\x03_eqB\x06\n" +
-	"\x04_notB\t\n" +
+	"\x04_notB\x05\n" +
+	"\x03_idB\t\n" +
 	"\a_statusB\a\n" +
 	"\x05_nameB\a\n" +
 	"\x05_codeB\r\n" +
@@ -1406,7 +1481,7 @@ func file_testdata_v1_product_proto_rawDescGZIP() []byte {
 }
 
 var file_testdata_v1_product_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_testdata_v1_product_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_testdata_v1_product_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_testdata_v1_product_proto_goTypes = []any{
 	(ProductStatus)(0),                     // 0: testdata.v1.ProductStatus
 	(ProductOrderField)(0),                 // 1: testdata.v1.ProductOrderField
@@ -1420,26 +1495,27 @@ var file_testdata_v1_product_proto_goTypes = []any{
 	(*ListProductsResponse)(nil),           // 9: testdata.v1.ListProductsResponse
 	(*CategoryFilter_NameFilter)(nil),      // 10: testdata.v1.CategoryFilter.NameFilter
 	(*CategoryFilter_CodeFilter)(nil),      // 11: testdata.v1.CategoryFilter.CodeFilter
-	(*ProductFilter_StatusFilter)(nil),     // 12: testdata.v1.ProductFilter.StatusFilter
-	(*ProductFilter_NameFilter)(nil),       // 13: testdata.v1.ProductFilter.NameFilter
-	(*ProductFilter_CodeFilter)(nil),       // 14: testdata.v1.ProductFilter.CodeFilter
-	(*ProductFilter_CreatedAtFilter)(nil),  // 15: testdata.v1.ProductFilter.CreatedAtFilter
-	(*ProductFilter_UpdatedAtFilter)(nil),  // 16: testdata.v1.ProductFilter.UpdatedAtFilter
-	(*ProductFilter_CategoryIDFilter)(nil), // 17: testdata.v1.ProductFilter.CategoryIDFilter
-	(*timestamppb.Timestamp)(nil),          // 18: google.protobuf.Timestamp
-	(v1.OrderDirection)(0),                 // 19: relay.v1.OrderDirection
-	(*v1.Pagination)(nil),                  // 20: relay.v1.Pagination
-	(*v1.PageInfo)(nil),                    // 21: relay.v1.PageInfo
+	(*ProductFilter_IDFilter)(nil),         // 12: testdata.v1.ProductFilter.IDFilter
+	(*ProductFilter_StatusFilter)(nil),     // 13: testdata.v1.ProductFilter.StatusFilter
+	(*ProductFilter_NameFilter)(nil),       // 14: testdata.v1.ProductFilter.NameFilter
+	(*ProductFilter_CodeFilter)(nil),       // 15: testdata.v1.ProductFilter.CodeFilter
+	(*ProductFilter_CreatedAtFilter)(nil),  // 16: testdata.v1.ProductFilter.CreatedAtFilter
+	(*ProductFilter_UpdatedAtFilter)(nil),  // 17: testdata.v1.ProductFilter.UpdatedAtFilter
+	(*ProductFilter_CategoryIDFilter)(nil), // 18: testdata.v1.ProductFilter.CategoryIDFilter
+	(*timestamppb.Timestamp)(nil),          // 19: google.protobuf.Timestamp
+	(v1.OrderDirection)(0),                 // 20: relay.v1.OrderDirection
+	(*v1.Pagination)(nil),                  // 21: relay.v1.Pagination
+	(*v1.PageInfo)(nil),                    // 22: relay.v1.PageInfo
 }
 var file_testdata_v1_product_proto_depIdxs = []int32{
-	18, // 0: testdata.v1.Category.created_at:type_name -> google.protobuf.Timestamp
-	18, // 1: testdata.v1.Category.updated_at:type_name -> google.protobuf.Timestamp
-	18, // 2: testdata.v1.Product.created_at:type_name -> google.protobuf.Timestamp
-	18, // 3: testdata.v1.Product.updated_at:type_name -> google.protobuf.Timestamp
+	19, // 0: testdata.v1.Category.created_at:type_name -> google.protobuf.Timestamp
+	19, // 1: testdata.v1.Category.updated_at:type_name -> google.protobuf.Timestamp
+	19, // 2: testdata.v1.Product.created_at:type_name -> google.protobuf.Timestamp
+	19, // 3: testdata.v1.Product.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: testdata.v1.Product.status:type_name -> testdata.v1.ProductStatus
 	2,  // 5: testdata.v1.Product.category:type_name -> testdata.v1.Category
 	1,  // 6: testdata.v1.ProductOrder.field:type_name -> testdata.v1.ProductOrderField
-	19, // 7: testdata.v1.ProductOrder.direction:type_name -> relay.v1.OrderDirection
+	20, // 7: testdata.v1.ProductOrder.direction:type_name -> relay.v1.OrderDirection
 	5,  // 8: testdata.v1.CategoryFilter.and:type_name -> testdata.v1.CategoryFilter
 	5,  // 9: testdata.v1.CategoryFilter.or:type_name -> testdata.v1.CategoryFilter
 	5,  // 10: testdata.v1.CategoryFilter.not:type_name -> testdata.v1.CategoryFilter
@@ -1448,37 +1524,38 @@ var file_testdata_v1_product_proto_depIdxs = []int32{
 	6,  // 13: testdata.v1.ProductFilter.and:type_name -> testdata.v1.ProductFilter
 	6,  // 14: testdata.v1.ProductFilter.or:type_name -> testdata.v1.ProductFilter
 	6,  // 15: testdata.v1.ProductFilter.not:type_name -> testdata.v1.ProductFilter
-	12, // 16: testdata.v1.ProductFilter.status:type_name -> testdata.v1.ProductFilter.StatusFilter
-	13, // 17: testdata.v1.ProductFilter.name:type_name -> testdata.v1.ProductFilter.NameFilter
-	14, // 18: testdata.v1.ProductFilter.code:type_name -> testdata.v1.ProductFilter.CodeFilter
-	15, // 19: testdata.v1.ProductFilter.created_at:type_name -> testdata.v1.ProductFilter.CreatedAtFilter
-	16, // 20: testdata.v1.ProductFilter.updated_at:type_name -> testdata.v1.ProductFilter.UpdatedAtFilter
-	5,  // 21: testdata.v1.ProductFilter.category:type_name -> testdata.v1.CategoryFilter
-	17, // 22: testdata.v1.ProductFilter.category_id:type_name -> testdata.v1.ProductFilter.CategoryIDFilter
-	6,  // 23: testdata.v1.ListProductsRequest.filter:type_name -> testdata.v1.ProductFilter
-	4,  // 24: testdata.v1.ListProductsRequest.order_by:type_name -> testdata.v1.ProductOrder
-	20, // 25: testdata.v1.ListProductsRequest.pagination:type_name -> relay.v1.Pagination
-	3,  // 26: testdata.v1.ProductEdge.node:type_name -> testdata.v1.Product
-	8,  // 27: testdata.v1.ListProductsResponse.edges:type_name -> testdata.v1.ProductEdge
-	21, // 28: testdata.v1.ListProductsResponse.page_info:type_name -> relay.v1.PageInfo
-	0,  // 29: testdata.v1.ProductFilter.StatusFilter.eq:type_name -> testdata.v1.ProductStatus
-	0,  // 30: testdata.v1.ProductFilter.StatusFilter.in:type_name -> testdata.v1.ProductStatus
-	0,  // 31: testdata.v1.ProductFilter.StatusFilter.not_in:type_name -> testdata.v1.ProductStatus
-	18, // 32: testdata.v1.ProductFilter.CreatedAtFilter.lt:type_name -> google.protobuf.Timestamp
-	18, // 33: testdata.v1.ProductFilter.CreatedAtFilter.lte:type_name -> google.protobuf.Timestamp
-	18, // 34: testdata.v1.ProductFilter.CreatedAtFilter.gt:type_name -> google.protobuf.Timestamp
-	18, // 35: testdata.v1.ProductFilter.CreatedAtFilter.gte:type_name -> google.protobuf.Timestamp
-	18, // 36: testdata.v1.ProductFilter.UpdatedAtFilter.lt:type_name -> google.protobuf.Timestamp
-	18, // 37: testdata.v1.ProductFilter.UpdatedAtFilter.lte:type_name -> google.protobuf.Timestamp
-	18, // 38: testdata.v1.ProductFilter.UpdatedAtFilter.gt:type_name -> google.protobuf.Timestamp
-	18, // 39: testdata.v1.ProductFilter.UpdatedAtFilter.gte:type_name -> google.protobuf.Timestamp
-	7,  // 40: testdata.v1.ProductService.ListProducts:input_type -> testdata.v1.ListProductsRequest
-	9,  // 41: testdata.v1.ProductService.ListProducts:output_type -> testdata.v1.ListProductsResponse
-	41, // [41:42] is the sub-list for method output_type
-	40, // [40:41] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	12, // 16: testdata.v1.ProductFilter.id:type_name -> testdata.v1.ProductFilter.IDFilter
+	13, // 17: testdata.v1.ProductFilter.status:type_name -> testdata.v1.ProductFilter.StatusFilter
+	14, // 18: testdata.v1.ProductFilter.name:type_name -> testdata.v1.ProductFilter.NameFilter
+	15, // 19: testdata.v1.ProductFilter.code:type_name -> testdata.v1.ProductFilter.CodeFilter
+	16, // 20: testdata.v1.ProductFilter.created_at:type_name -> testdata.v1.ProductFilter.CreatedAtFilter
+	17, // 21: testdata.v1.ProductFilter.updated_at:type_name -> testdata.v1.ProductFilter.UpdatedAtFilter
+	5,  // 22: testdata.v1.ProductFilter.category:type_name -> testdata.v1.CategoryFilter
+	18, // 23: testdata.v1.ProductFilter.category_id:type_name -> testdata.v1.ProductFilter.CategoryIDFilter
+	6,  // 24: testdata.v1.ListProductsRequest.filter:type_name -> testdata.v1.ProductFilter
+	4,  // 25: testdata.v1.ListProductsRequest.order_by:type_name -> testdata.v1.ProductOrder
+	21, // 26: testdata.v1.ListProductsRequest.pagination:type_name -> relay.v1.Pagination
+	3,  // 27: testdata.v1.ProductEdge.node:type_name -> testdata.v1.Product
+	8,  // 28: testdata.v1.ListProductsResponse.edges:type_name -> testdata.v1.ProductEdge
+	22, // 29: testdata.v1.ListProductsResponse.page_info:type_name -> relay.v1.PageInfo
+	0,  // 30: testdata.v1.ProductFilter.StatusFilter.eq:type_name -> testdata.v1.ProductStatus
+	0,  // 31: testdata.v1.ProductFilter.StatusFilter.in:type_name -> testdata.v1.ProductStatus
+	0,  // 32: testdata.v1.ProductFilter.StatusFilter.not_in:type_name -> testdata.v1.ProductStatus
+	19, // 33: testdata.v1.ProductFilter.CreatedAtFilter.lt:type_name -> google.protobuf.Timestamp
+	19, // 34: testdata.v1.ProductFilter.CreatedAtFilter.lte:type_name -> google.protobuf.Timestamp
+	19, // 35: testdata.v1.ProductFilter.CreatedAtFilter.gt:type_name -> google.protobuf.Timestamp
+	19, // 36: testdata.v1.ProductFilter.CreatedAtFilter.gte:type_name -> google.protobuf.Timestamp
+	19, // 37: testdata.v1.ProductFilter.UpdatedAtFilter.lt:type_name -> google.protobuf.Timestamp
+	19, // 38: testdata.v1.ProductFilter.UpdatedAtFilter.lte:type_name -> google.protobuf.Timestamp
+	19, // 39: testdata.v1.ProductFilter.UpdatedAtFilter.gt:type_name -> google.protobuf.Timestamp
+	19, // 40: testdata.v1.ProductFilter.UpdatedAtFilter.gte:type_name -> google.protobuf.Timestamp
+	7,  // 41: testdata.v1.ProductService.ListProducts:input_type -> testdata.v1.ListProductsRequest
+	9,  // 42: testdata.v1.ProductService.ListProducts:output_type -> testdata.v1.ListProductsResponse
+	42, // [42:43] is the sub-list for method output_type
+	41, // [41:42] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_testdata_v1_product_proto_init() }
@@ -1498,13 +1575,14 @@ func file_testdata_v1_product_proto_init() {
 	file_testdata_v1_product_proto_msgTypes[13].OneofWrappers = []any{}
 	file_testdata_v1_product_proto_msgTypes[14].OneofWrappers = []any{}
 	file_testdata_v1_product_proto_msgTypes[15].OneofWrappers = []any{}
+	file_testdata_v1_product_proto_msgTypes[16].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_testdata_v1_product_proto_rawDesc), len(file_testdata_v1_product_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

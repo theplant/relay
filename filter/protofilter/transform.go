@@ -115,9 +115,23 @@ func buildFieldMapping(modelType reflect.Type) *fieldMapping {
 		return mapping
 	}
 
+	collectFields(t, mapping)
+	return mapping
+}
+
+func collectFields(t reflect.Type, mapping *fieldMapping) {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		if !field.IsExported() {
+			continue
+		}
+
+		// Handle embedded structs by recursively collecting their fields
+		if field.Anonymous {
+			embeddedType := indirectType(field.Type)
+			if embeddedType.Kind() == reflect.Struct {
+				collectFields(embeddedType, mapping)
+			}
 			continue
 		}
 
@@ -137,6 +151,4 @@ func buildFieldMapping(modelType reflect.Type) *fieldMapping {
 		mapping.snakeMatch[snakeKey] = field.Name
 		// Example: CategoryID -> category_id -> CategoryID
 	}
-
-	return mapping
 }

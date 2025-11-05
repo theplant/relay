@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 
 	"github.com/theplant/relay/filter/protofilter"
 	testdatav1 "github.com/theplant/relay/protorelay/testdata/gen/testdata/v1"
@@ -171,13 +172,11 @@ func TestToMap_EmitUnpopulated(t *testing.T) {
 
 // Test model with Go naming conventions (ID, not Id)
 type Product struct {
-	ID         string    `json:"id"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
-	Name       string    `json:"name"`
-	Code       string    `json:"code"`
-	Status     string    `json:"status"`
-	CategoryID string    `json:"categoryID"`
+	gorm.Model
+	Name       string `json:"name"`
+	Code       string `json:"code"`
+	Status     string `json:"status"`
+	CategoryID string `json:"categoryID"`
 }
 
 type Category struct {
@@ -227,6 +226,58 @@ func TestAlignWith(t *testing.T) {
 
 		_, hasCategoryId := result["CategoryId"]
 		assert.False(t, hasCategoryId, "should NOT have CategoryId (with lowercase Id)")
+	})
+
+	t.Run("handles embedded gorm.Model ID field", func(t *testing.T) {
+		filter := &testdatav1.ProductFilter{
+			Id: &testdatav1.ProductFilter_IDFilter{
+				Eq: lo.ToPtr("prod-123"),
+			},
+		}
+
+		result, err := protofilter.ToMap(
+			filter,
+			protofilter.WithTransformKeyHook(protofilter.AlignWith(Product{})),
+		)
+		require.NoError(t, err)
+
+		expected := `{
+  "ID": {
+    "Eq": "prod-123"
+  }
+}`
+		assert.JSONEq(t, expected, toJSON(t, result))
+
+		_, hasID := result["ID"]
+		assert.True(t, hasID, "should have ID (with uppercase ID) from embedded gorm.Model")
+
+		_, hasId := result["Id"]
+		assert.False(t, hasId, "should NOT have Id (with lowercase Id)")
+	})
+
+	t.Run("handles embedded gorm.Model timestamp fields", func(t *testing.T) {
+		now := time.Now()
+		filter := &testdatav1.ProductFilter{
+			CreatedAt: &testdatav1.ProductFilter_CreatedAtFilter{
+				Gte: timestamppb.New(now),
+			},
+			UpdatedAt: &testdatav1.ProductFilter_UpdatedAtFilter{
+				Lte: timestamppb.New(now),
+			},
+		}
+
+		result, err := protofilter.ToMap(
+			filter,
+			protofilter.WithTransformKeyHook(protofilter.AlignWith(Product{})),
+		)
+		require.NoError(t, err)
+
+		// Verify that embedded gorm.Model fields are properly recognized
+		_, hasCreatedAt := result["CreatedAt"]
+		assert.True(t, hasCreatedAt, "should have CreatedAt from embedded gorm.Model")
+
+		_, hasUpdatedAt := result["UpdatedAt"]
+		assert.True(t, hasUpdatedAt, "should have UpdatedAt from embedded gorm.Model")
 	})
 
 	t.Run("without model type hook uses default capitalization", func(t *testing.T) {
