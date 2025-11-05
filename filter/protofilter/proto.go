@@ -64,7 +64,7 @@ func WithTransformKeyHook(hooks ...func(next TransformKeyFunc) TransformKeyFunc)
 // It uses protojson to serialize the proto message, then converts keys from camelCase to PascalCase.
 // This approach ensures all proto special types (well-known types, oneof, etc.) are handled correctly.
 // - Proto enums -> strings (with validation)
-// - Timestamps -> time.Time
+// - Timestamps are handled by protojson serialization
 // - Recursively processes nested filters (And/Or/Not)
 // Custom transformers can be provided via options to override default behavior.
 func ToMap[T proto.Message](protoFilter T, opts ...ToMapOption) (map[string]any, error) {
