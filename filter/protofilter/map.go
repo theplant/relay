@@ -33,20 +33,21 @@ func toMap[T proto.Message](protoFilter T, transformKey TransformKeyFunc) (map[s
 		return nil, errors.Wrap(err, "unmarshal json to map")
 	}
 
-	// 3. Transform keys (top level keys are field keys)
-	result, err := transformMapKeys(camelCaseMap, transformKey, true)
+	// 3. Clean up nil values, empty slices, and empty maps before transformation
+	filter.PruneMap(camelCaseMap)
+
+	// 4. Transform keys (top level is not in field filter)
+	result, err := transformMapKeys(camelCaseMap, transformKey, false)
 	if err != nil {
 		return nil, err
 	}
-
-	// 4. Clean up nil values, empty slices, and empty maps
-	filter.PruneMap(result)
 
 	return result, nil
 }
 
 // transformMapKeys recursively transforms all map keys using the provided function
-func transformMapKeys(m map[string]any, transform TransformKeyFunc, isFieldKey bool) (map[string]any, error) {
+// inFieldFilter indicates whether we are inside a field's filter object (Name, Code, etc.)
+func transformMapKeys(m map[string]any, transform TransformKeyFunc, inFieldFilter bool) (map[string]any, error) {
 	if m == nil {
 		return nil, nil
 	}
@@ -54,20 +55,34 @@ func transformMapKeys(m map[string]any, transform TransformKeyFunc, isFieldKey b
 	result := make(map[string]any, len(m))
 
 	for key, value := range m {
+		// Determine the type of current key based on context
+		var keyType filter.KeyType
+
+		if inFieldFilter {
+			// Inside a field filter: keys are operators or modifiers
+			if key == "fold" {
+				keyType = filter.KeyTypeModifier
+			} else {
+				keyType = filter.KeyTypeOperator
+			}
+		} else {
+			// Outside field filter: keys are fields or logical operators
+			if key == "and" || key == "or" || key == "not" {
+				keyType = filter.KeyTypeLogical
+			} else {
+				keyType = filter.KeyTypeField
+			}
+		}
+
 		output, err := transform(&TransformKeyInput{
-			Key:        key,
-			IsFieldKey: isFieldKey,
+			Key:     key,
+			KeyType: keyType,
 		})
 		if err != nil {
 			return nil, err
 		}
 
-		// Determine if nested keys are field keys
-		// - If current key is and/or/not (proto camelCase), nested keys are also field keys
-		// - Otherwise, nested keys are operator keys
-		nextIsFieldKey := (key == "and" || key == "or" || key == "not")
-
-		transformedValue, err := transformValue(value, transform, nextIsFieldKey)
+		transformedValue, err := transformValue(value, transform, keyType == filter.KeyTypeField)
 		if err != nil {
 			return nil, err
 		}
@@ -78,14 +93,14 @@ func transformMapKeys(m map[string]any, transform TransformKeyFunc, isFieldKey b
 }
 
 // transformValue recursively transforms map keys in any value
-func transformValue(v any, transform TransformKeyFunc, isFieldKey bool) (any, error) {
+func transformValue(v any, transform TransformKeyFunc, inFieldFilter bool) (any, error) {
 	switch val := v.(type) {
 	case map[string]any:
-		return transformMapKeys(val, transform, isFieldKey)
+		return transformMapKeys(val, transform, inFieldFilter)
 	case []any:
 		result := make([]any, 0, len(val))
 		for _, item := range val {
-			transformedItem, err := transformValue(item, transform, isFieldKey)
+			transformedItem, err := transformValue(item, transform, inFieldFilter)
 			if err != nil {
 				return nil, err
 			}

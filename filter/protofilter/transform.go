@@ -6,12 +6,14 @@ import (
 	"sync"
 
 	"github.com/samber/lo"
+
+	"github.com/theplant/relay/filter"
 )
 
 // TransformKeyInput provides input information for key transformation
 type TransformKeyInput struct {
-	Key        string // The original camelCase key from protojson
-	IsFieldKey bool   // Whether this key represents a model field (true) or an operator (false)
+	Key     string         // The original camelCase key from protojson
+	KeyType filter.KeyType // The type of this key
 }
 
 // TransformKeyOutput represents the result of key transformation
@@ -42,7 +44,7 @@ type fieldMapping struct {
 //  1. Exact match: CategoryId -> CategoryId (if exists in model)
 //  2. Snake_case match: CategoryId -> category_id -> CategoryID
 //
-// Only field keys are aligned; operator keys (Eq, In, etc.) use default capitalization.
+// Only field keys are aligned; logical operators, operators, and modifiers use default capitalization.
 //
 // Example:
 //
@@ -66,8 +68,8 @@ func AlignWith(model any) func(next TransformKeyFunc) TransformKeyFunc {
 				return nil, err
 			}
 
-			// Only map field keys; operator keys use default result
-			if !input.IsFieldKey {
+			// Only align field keys; other key types use default result
+			if input.KeyType != filter.KeyTypeField {
 				return output, nil
 			}
 
