@@ -283,4 +283,25 @@ func TestAlignWith(t *testing.T) {
 			protofilter.AlignWith(nil)
 		}, "should panic when model is nil")
 	})
+
+	t.Run("panics when model has conflicting snake_case fields", func(t *testing.T) {
+		type ConflictModel struct {
+			UserID string
+			UserId string // Both convert to "user_id"
+		}
+
+		assert.PanicsWithValue(t,
+			"AlignWith: model has conflicting snake_case field names: field 'UserID' and 'UserId' both convert to 'user_id'. This model is not suitable for AlignWith.",
+			func() {
+				filter := &testdatav1.ProductFilter{
+					Name: &testdatav1.ProductFilter_NameFilter{
+						Eq: lo.ToPtr("test"),
+					},
+				}
+				_, _ = protofilter.ToMap(filter, protofilter.WithTransformKeyHook(
+					protofilter.AlignWith(ConflictModel{}),
+				))
+			},
+		)
+	})
 }

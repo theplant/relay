@@ -124,8 +124,16 @@ func buildFieldMapping(modelType reflect.Type) *fieldMapping {
 		// Exact match: mark field name as existing
 		mapping.exactMatch[field.Name] = struct{}{}
 
-		// Snake_case match
+		// Snake_case match: detect conflicts
 		snakeKey := lo.SnakeCase(field.Name)
+		if existingField, exists := mapping.snakeMatch[snakeKey]; exists {
+			panic(strings.Join([]string{
+				"AlignWith: model has conflicting snake_case field names:",
+				"field '" + existingField + "' and '" + field.Name + "'",
+				"both convert to '" + snakeKey + "'.",
+				"This model is not suitable for AlignWith.",
+			}, " "))
+		}
 		mapping.snakeMatch[snakeKey] = field.Name
 		// Example: CategoryID -> category_id -> CategoryID
 	}
