@@ -408,6 +408,31 @@ db.Scopes(
 ).Find(&users)
 ```
 
+**Custom Field Column Mapping:**
+
+Use `WithFieldColumnHook` to customize how filter fields map to database columns. This is useful for filtering on computed expressions or JSON fields:
+
+```go
+// Filter on JSON field: WHERE "snapshot"->>'name' = 'Product A'
+snapshotHook := func(next gormfilter.FieldColumnFunc) gormfilter.FieldColumnFunc {
+    return func(input *gormfilter.FieldColumnInput) (*gormfilter.FieldColumnOutput, error) {
+        if input.FieldName == "SnapshotName" {
+            var column any = clause.Column{Name: `"snapshot"->>'name'`, Raw: true}
+            if input.Fold {
+                column = clause.Expr{SQL: "LOWER(?)", Vars: []any{column}}
+            }
+            return &gormfilter.FieldColumnOutput{Column: column}, nil
+        }
+        return next(input)
+    }
+}
+
+db.Scopes(gormfilter.Scope(
+    productFilter,
+    gormfilter.WithFieldColumnHook(snapshotHook),
+)).Find(&products)
+```
+
 ### Performance Considerations
 
 Relationship filters use `IN` subqueries, which are generally efficient for most use cases. Performance depends on:
@@ -431,6 +456,30 @@ For a complete example of proto definitions with pagination, ordering, and filte
 - Proto definitions: [`protorelay/testdata/proto/testdata/v1/product.proto`](protorelay/testdata/proto/testdata/v1/product.proto)
 - Relay pagination types: [`protorelay/proto/relay/v1/relay.proto`](protorelay/proto/relay/v1/relay.proto)
 
+### Proto Filter Field Alignment
+
+Proto-generated Go code capitalizes acronyms differently than Go conventions. For example, proto generates `CategoryId` but Go style requires `CategoryID`. Use `AlignWith` to automatically align filter field names with your model's acronym conventions:
+
+```go
+import (
+    "github.com/theplant/relay/filter/protofilter"
+)
+
+type Product struct {
+    Name       string
+    CategoryID string  // Go convention: ID in uppercase
+}
+
+// Align proto filter fields with model conventions
+filterMap, err := protofilter.ToMap(
+    protoFilter,
+    protofilter.WithTransformKeyHook(
+        protofilter.AlignWith(Product{}),
+    ),
+)
+// Proto generates "CategoryId" → Aligns to model's "CategoryID"
+```
+
 ### Implementation Example
 
 For a complete implementation of a gRPC service using `relay`, refer to the `ProductService.ListProducts` method:
@@ -440,7 +489,7 @@ For a complete implementation of a gRPC service using `relay`, refer to the `Pro
 This example demonstrates:
 
 - Parsing proto order fields with `protorelay.ParseOrderBy`
-- Parsing proto filters with `protofilter.ToMap`
+- Parsing proto filters with `protofilter.ToMap` and `AlignWith`
 - Creating a paginator with Base64-encoded cursors
 - Converting between proto and internal types with `protorelay.ParsePagination`
 - Building gRPC responses from pagination results

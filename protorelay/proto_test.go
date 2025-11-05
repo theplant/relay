@@ -44,7 +44,9 @@ func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListP
 		return nil, err
 	}
 
-	filterMap, err := protofilter.ToMap(req.Filter)
+	filterMap, err := protofilter.ToMap(req.Filter,
+		protofilter.WithTransformKeyHook(protofilter.AlignWith(&Product{})),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +106,7 @@ type Product struct {
 	Name       string    `gorm:"not null" json:"name"`
 	Code       string    `gorm:"not null" json:"code"`
 	Status     string    `gorm:"not null" json:"status"`
-	CategoryId string    `gorm:"column:category_id;not null" json:"categoryId"`
+	CategoryID string    `gorm:"column:category_id;not null" json:"categoryID"`
 	Category   *Category `json:"category"`
 }
 
@@ -151,7 +153,7 @@ func (p *Product) ToProto() *testdatav1.Product {
 		Name:       p.Name,
 		Code:       p.Code,
 		Status:     parseProductStatus(p.Status),
-		CategoryId: p.CategoryId,
+		CategoryId: p.CategoryID,
 		Category:   p.Category.ToProto(),
 	}
 	return proto
@@ -215,14 +217,14 @@ func resetDB(t *testing.T) {
 			status = "DRAFT"
 		}
 
-		var categoryId string
+		var categoryID string
 		switch i % 3 {
 		case 0:
-			categoryId = "cat-electronics"
+			categoryID = "cat-electronics"
 		case 1:
-			categoryId = "cat-books"
+			categoryID = "cat-books"
 		default:
-			categoryId = "cat-clothing"
+			categoryID = "cat-clothing"
 		}
 
 		products = append(products, &Product{
@@ -232,7 +234,7 @@ func resetDB(t *testing.T) {
 			Name:       fmt.Sprintf("Product %d", i),
 			Code:       fmt.Sprintf("CODE-%03d", i),
 			Status:     status,
-			CategoryId: categoryId,
+			CategoryID: categoryID,
 		})
 	}
 	err = db.Session(&gorm.Session{Logger: logger.Discard}).Create(products).Error
@@ -762,6 +764,10 @@ func TestProductService_ListProducts(t *testing.T) {
 		// Custom hook that converts timestamps to Unix milliseconds
 		customHook := func(next protofilter.HandleOperatorFunc) protofilter.HandleOperatorFunc {
 			return func(input *protofilter.HandleOperatorInput) (*protofilter.HandleOperatorOutput, error) {
+				// Verify ParentFilterMap is provided
+				assert.NotNil(t, input.ParentFilterMap, "ParentFilterMap should be provided")
+				assert.Contains(t, input.ParentFilterMap, input.FilterName, "ParentFilterMap should contain the filter name")
+
 				if input.OperatorType == reflect.TypeOf((*timestamppb.Timestamp)(nil)) {
 					ts, ok := input.OperatorValue.Interface().(*timestamppb.Timestamp)
 					if !ok {
@@ -801,5 +807,70 @@ func TestProductService_ListProducts(t *testing.T) {
 		eq, ok := statusFilter["Eq"].(string)
 		require.True(t, ok, "expected enum to be converted to string")
 		assert.Equal(t, "custom_PUBLISHED", eq)
+	})
+
+	t.Run("custom handle operator with parent filter map context", func(t *testing.T) {
+		protoFilter := &testdatav1.ProductFilter{
+			Name: &testdatav1.ProductFilter_NameFilter{
+				Contains: lo.ToPtr("test"),
+			},
+			Status: &testdatav1.ProductFilter_StatusFilter{
+				Eq: lo.ToPtr(testdatav1.ProductStatus_PRODUCT_STATUS_PUBLISHED),
+			},
+		}
+
+		// Custom hook that uses ParentFilterMap to make contextual decisions
+		// Example: add a prefix to status values only when Name filter is also present
+		customHook := func(next protofilter.HandleOperatorFunc) protofilter.HandleOperatorFunc {
+			return func(input *protofilter.HandleOperatorInput) (*protofilter.HandleOperatorOutput, error) {
+				// First call the default handler
+				output, err := next(input)
+				if err != nil {
+					return nil, err
+				}
+
+				// If this is a Status filter operator and Name filter exists in parent
+				if input.FilterName == "Status" {
+					_, hasNameFilter := input.ParentFilterMap["Name"]
+					if hasNameFilter {
+						// Add a special prefix when both filters are present
+						if strVal, ok := input.FilterMap[input.OperatorName].(string); ok {
+							input.FilterMap[input.OperatorName] = "strict_" + strVal
+						}
+					}
+				}
+
+				return output, nil
+			}
+		}
+
+		filterMap, err := protofilter.ToMap(protoFilter, protofilter.WithHandleOperatorHook(customHook))
+		require.NoError(t, err)
+
+		// Verify the filter map structure
+		nameFilter := filterMap["Name"].(map[string]any)
+		assert.Equal(t, "test", nameFilter["Contains"])
+
+		// Verify that Status was modified because Name filter exists
+		statusFilter := filterMap["Status"].(map[string]any)
+		eq, ok := statusFilter["Eq"].(string)
+		require.True(t, ok, "expected status to be a string")
+		assert.Equal(t, "strict_PUBLISHED", eq, "Status should have 'strict_' prefix when Name filter is present")
+
+		{
+			// Without Name filter
+			filterMap, err := protofilter.ToMap(&testdatav1.ProductFilter{
+				Status: &testdatav1.ProductFilter_StatusFilter{
+					Eq: lo.ToPtr(testdatav1.ProductStatus_PRODUCT_STATUS_PUBLISHED),
+				},
+			}, protofilter.WithHandleOperatorHook(customHook))
+			require.NoError(t, err)
+
+			// Verify that Status was NOT modified because Name filter doesn't exist
+			statusFilter := filterMap["Status"].(map[string]any)
+			eq, ok := statusFilter["Eq"].(string)
+			require.True(t, ok, "expected status to be a string")
+			assert.Equal(t, "PUBLISHED", eq, "Status should NOT have 'strict_' prefix when Name filter is absent")
+		}
 	})
 }
