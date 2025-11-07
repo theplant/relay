@@ -414,6 +414,10 @@ func buildFilterFieldExpr(stmt *gorm.Statement, fieldName string, filter map[str
 		}
 	}
 
+	if len(exprs) == 0 {
+		return nil, errors.Errorf("field %q filter has no operators specified", fieldName)
+	}
+
 	return clause.And(exprs...), nil
 }
 
