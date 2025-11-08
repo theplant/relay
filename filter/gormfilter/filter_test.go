@@ -632,6 +632,22 @@ func TestScope(t *testing.T) {
 				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" NOT IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%manager%"},
 			},
+			{
+				name: "fold without operators should error",
+				filter: &UserFilter{
+					Name: &filter.String{
+						Fold: true,
+					},
+				},
+				wantErrMsg: `field "Name" filter has no operators specified`,
+			},
+			{
+				name: "empty field filter should error",
+				filter: &UserFilter{
+					Name: &filter.String{},
+				},
+				wantErrMsg: `field "Name" filter has no operators specified`,
+			},
 		}
 
 		for _, tt := range tests {
