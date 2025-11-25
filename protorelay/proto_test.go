@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/sunfmin/reflectutils"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -20,6 +23,7 @@ import (
 
 	"github.com/theplant/relay"
 	"github.com/theplant/relay/cursor"
+	"github.com/theplant/relay/filter"
 	"github.com/theplant/relay/filter/gormfilter"
 	"github.com/theplant/relay/filter/protofilter"
 	"github.com/theplant/relay/gormrelay"
@@ -45,7 +49,7 @@ func (s *ProductService) ListProducts(ctx context.Context, req *testdatav1.ListP
 	}
 
 	filterMap, err := protofilter.ToMap(req.Filter,
-		protofilter.WithTransformKeyHook(protofilter.AlignWith(&Product{})),
+		protofilter.WithTransformHook(filter.WithSmartPascalCase()),
 	)
 	if err != nil {
 		return nil, err
@@ -751,7 +755,7 @@ func TestProductService_ListProducts(t *testing.T) {
 		}
 	})
 
-	t.Run("custom handle operator", func(t *testing.T) {
+	t.Run("custom transform with enum and timestamp conversion", func(t *testing.T) {
 		protoFilter := &testdatav1.ProductFilter{
 			Status: &testdatav1.ProductFilter_StatusFilter{
 				Eq: lo.ToPtr(testdatav1.ProductStatus_PRODUCT_STATUS_PUBLISHED),
@@ -761,116 +765,65 @@ func TestProductService_ListProducts(t *testing.T) {
 			},
 		}
 
-		// Custom hook that converts timestamps to Unix milliseconds
-		customHook := func(next protofilter.HandleOperatorFunc) protofilter.HandleOperatorFunc {
-			return func(input *protofilter.HandleOperatorInput) (*protofilter.HandleOperatorOutput, error) {
-				// Verify ParentFilterMap is provided
-				assert.NotNil(t, input.ParentFilterMap, "ParentFilterMap should be provided")
-				assert.Contains(t, input.ParentFilterMap, input.FilterName, "ParentFilterMap should contain the filter name")
+		// Custom transform that converts timestamps to Unix milliseconds and adds prefix to enums
+		// Capture the model via closure
+		customTransform := func(next filter.TransformFunc) filter.TransformFunc {
+			return func(input *filter.TransformInput) (*filter.TransformOutput, error) {
+				keyPath := strings.Join(input.KeyPath, ".")
+				fieldType := reflectutils.GetType(protoFilter, keyPath)
+				if fieldType == nil {
+					return next(input)
+				}
 
-				if input.OperatorType == reflect.TypeOf((*timestamppb.Timestamp)(nil)) {
-					ts, ok := input.OperatorValue.Interface().(*timestamppb.Timestamp)
-					if !ok {
-						return nil, fmt.Errorf("expected timestamp value, got %T", input.OperatorValue.Interface())
+				tsType := reflect.TypeOf((*timestamppb.Timestamp)(nil))
+				if fieldType == tsType {
+					fieldValue, err := reflectutils.Get(protoFilter, keyPath)
+					if err != nil {
+						return nil, errors.Wrapf(err, "get field value for %s", keyPath)
 					}
-					// Convert to Unix milliseconds instead of time.Time
-					input.FilterMap[input.OperatorName] = ts.AsTime().UnixMilli()
-					return &protofilter.HandleOperatorOutput{}, nil
+					if fieldValue != nil {
+						return &filter.TransformOutput{
+							Key:   filter.Capitalize(lo.LastOrEmpty(input.KeyPath)),
+							Value: fieldValue.(*timestamppb.Timestamp).AsTime().UnixMilli(),
+						}, nil
+					}
 				}
 
 				// Handle enums with custom format
 				enumType := reflect.TypeOf((*protoreflect.Enum)(nil)).Elem()
-				if input.OperatorType.Implements(enumType) {
-					if _, err := next(input); err != nil {
+				if fieldType.Implements(enumType) {
+					output, err := next(input)
+					if err != nil {
 						return nil, err
 					}
-					input.FilterMap[input.OperatorName] = "custom_" + input.FilterMap[input.OperatorName].(string)
-					return &protofilter.HandleOperatorOutput{}, nil
+					output.Value = "custom_" + output.Value.(string)
+					return output, nil
 				}
 
-				// Pass to next hook (or default handler)
+				// Pass to next handler
 				return next(input)
 			}
 		}
 
-		filterMap, err := protofilter.ToMap(protoFilter, protofilter.WithHandleOperatorHook(customHook))
+		filterMap, err := protofilter.ToMap(protoFilter, protofilter.WithTransformHook(customTransform))
 		require.NoError(t, err)
 
 		// Verify that timestamp was converted to Unix milliseconds
 		createdAtFilter := filterMap["CreatedAt"].(map[string]any)
 		gte, ok := createdAtFilter["Gte"].(int64)
+		if !ok {
+			t.Logf("Actual Gte value: %v (type: %T)", createdAtFilter["Gte"], createdAtFilter["Gte"])
+		}
 		require.True(t, ok, "expected timestamp to be converted to int64")
 		assert.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC).UnixMilli(), gte)
 
-		// Verify that enum was still converted normally
+		// Verify that enum was converted with custom prefix
 		statusFilter := filterMap["Status"].(map[string]any)
 		eq, ok := statusFilter["Eq"].(string)
 		require.True(t, ok, "expected enum to be converted to string")
 		assert.Equal(t, "custom_PUBLISHED", eq)
 	})
 
-	t.Run("custom handle operator with parent filter map context", func(t *testing.T) {
-		protoFilter := &testdatav1.ProductFilter{
-			Name: &testdatav1.ProductFilter_NameFilter{
-				Contains: lo.ToPtr("test"),
-			},
-			Status: &testdatav1.ProductFilter_StatusFilter{
-				Eq: lo.ToPtr(testdatav1.ProductStatus_PRODUCT_STATUS_PUBLISHED),
-			},
-		}
-
-		// Custom hook that uses ParentFilterMap to make contextual decisions
-		// Example: add a prefix to status values only when Name filter is also present
-		customHook := func(next protofilter.HandleOperatorFunc) protofilter.HandleOperatorFunc {
-			return func(input *protofilter.HandleOperatorInput) (*protofilter.HandleOperatorOutput, error) {
-				// First call the default handler
-				output, err := next(input)
-				if err != nil {
-					return nil, err
-				}
-
-				// If this is a Status filter operator and Name filter exists in parent
-				if input.FilterName == "Status" {
-					_, hasNameFilter := input.ParentFilterMap["Name"]
-					if hasNameFilter {
-						// Add a special prefix when both filters are present
-						if strVal, ok := input.FilterMap[input.OperatorName].(string); ok {
-							input.FilterMap[input.OperatorName] = "strict_" + strVal
-						}
-					}
-				}
-
-				return output, nil
-			}
-		}
-
-		filterMap, err := protofilter.ToMap(protoFilter, protofilter.WithHandleOperatorHook(customHook))
-		require.NoError(t, err)
-
-		// Verify the filter map structure
-		nameFilter := filterMap["Name"].(map[string]any)
-		assert.Equal(t, "test", nameFilter["Contains"])
-
-		// Verify that Status was modified because Name filter exists
-		statusFilter := filterMap["Status"].(map[string]any)
-		eq, ok := statusFilter["Eq"].(string)
-		require.True(t, ok, "expected status to be a string")
-		assert.Equal(t, "strict_PUBLISHED", eq, "Status should have 'strict_' prefix when Name filter is present")
-
-		{
-			// Without Name filter
-			filterMap, err := protofilter.ToMap(&testdatav1.ProductFilter{
-				Status: &testdatav1.ProductFilter_StatusFilter{
-					Eq: lo.ToPtr(testdatav1.ProductStatus_PRODUCT_STATUS_PUBLISHED),
-				},
-			}, protofilter.WithHandleOperatorHook(customHook))
-			require.NoError(t, err)
-
-			// Verify that Status was NOT modified because Name filter doesn't exist
-			statusFilter := filterMap["Status"].(map[string]any)
-			eq, ok := statusFilter["Eq"].(string)
-			require.True(t, ok, "expected status to be a string")
-			assert.Equal(t, "PUBLISHED", eq, "Status should NOT have 'strict_' prefix when Name filter is absent")
-		}
-	})
+	// Note: PostTransformHook was removed. For multi-stage processing or cross-field logic,
+	// users can manually call Transform multiple times or post-process the result map.
 }

@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 
+	F "github.com/theplant/relay/filter"
 	"github.com/theplant/relay/filter/protofilter"
 	testdatav1 "github.com/theplant/relay/protorelay/testdata/gen/testdata/v1"
 )
@@ -185,8 +186,8 @@ type Category struct {
 	Code string `json:"code"`
 }
 
-func TestAlignWith(t *testing.T) {
-	t.Run("maps proto camelCase to model PascalCase with ID acronym", func(t *testing.T) {
+func TestSmartPascalCase(t *testing.T) {
+	t.Run("maps proto camelCase to PascalCase with ID acronym", func(t *testing.T) {
 		filter := &testdatav1.ProductFilter{
 			Status: &testdatav1.ProductFilter_StatusFilter{
 				Eq: lo.ToPtr(testdatav1.ProductStatus_PRODUCT_STATUS_PUBLISHED),
@@ -199,10 +200,10 @@ func TestAlignWith(t *testing.T) {
 			},
 		}
 
-		// Use AlignWith to align field names with Product model
+		// Use SmartPascalCase to handle acronyms properly
 		result, err := protofilter.ToMap(
 			filter,
-			protofilter.WithTransformKeyHook(protofilter.AlignWith(Product{})),
+			protofilter.WithTransformHook(F.WithSmartPascalCase()),
 		)
 		require.NoError(t, err)
 
@@ -228,7 +229,7 @@ func TestAlignWith(t *testing.T) {
 		assert.False(t, hasCategoryId, "should NOT have CategoryId (with lowercase Id)")
 	})
 
-	t.Run("handles embedded gorm.Model ID field", func(t *testing.T) {
+	t.Run("handles ID field with smart acronym handling", func(t *testing.T) {
 		filter := &testdatav1.ProductFilter{
 			Id: &testdatav1.ProductFilter_IDFilter{
 				Eq: lo.ToPtr("prod-123"),
@@ -237,7 +238,7 @@ func TestAlignWith(t *testing.T) {
 
 		result, err := protofilter.ToMap(
 			filter,
-			protofilter.WithTransformKeyHook(protofilter.AlignWith(Product{})),
+			protofilter.WithTransformHook(F.WithSmartPascalCase()),
 		)
 		require.NoError(t, err)
 
@@ -249,38 +250,13 @@ func TestAlignWith(t *testing.T) {
 		assert.JSONEq(t, expected, toJSON(t, result))
 
 		_, hasID := result["ID"]
-		assert.True(t, hasID, "should have ID (with uppercase ID) from embedded gorm.Model")
+		assert.True(t, hasID, "should have ID (with uppercase ID)")
 
 		_, hasId := result["Id"]
 		assert.False(t, hasId, "should NOT have Id (with lowercase Id)")
 	})
 
-	t.Run("handles embedded gorm.Model timestamp fields", func(t *testing.T) {
-		now := time.Now()
-		filter := &testdatav1.ProductFilter{
-			CreatedAt: &testdatav1.ProductFilter_CreatedAtFilter{
-				Gte: timestamppb.New(now),
-			},
-			UpdatedAt: &testdatav1.ProductFilter_UpdatedAtFilter{
-				Lte: timestamppb.New(now),
-			},
-		}
-
-		result, err := protofilter.ToMap(
-			filter,
-			protofilter.WithTransformKeyHook(protofilter.AlignWith(Product{})),
-		)
-		require.NoError(t, err)
-
-		// Verify that embedded gorm.Model fields are properly recognized
-		_, hasCreatedAt := result["CreatedAt"]
-		assert.True(t, hasCreatedAt, "should have CreatedAt from embedded gorm.Model")
-
-		_, hasUpdatedAt := result["UpdatedAt"]
-		assert.True(t, hasUpdatedAt, "should have UpdatedAt from embedded gorm.Model")
-	})
-
-	t.Run("without model type hook uses default capitalization", func(t *testing.T) {
+	t.Run("without smart pascal case uses default capitalization", func(t *testing.T) {
 		filter := &testdatav1.ProductFilter{
 			CategoryId: &testdatav1.ProductFilter_CategoryIDFilter{
 				Eq: lo.ToPtr("cat-123"),
@@ -303,7 +279,7 @@ func TestAlignWith(t *testing.T) {
 		assert.True(t, hasCategoryId, "should have CategoryId (default capitalization)")
 	})
 
-	t.Run("nested filters also use model type mapping", func(t *testing.T) {
+	t.Run("nested filters also use smart pascal case", func(t *testing.T) {
 		filter := &testdatav1.ProductFilter{
 			Category: &testdatav1.CategoryFilter{
 				Name: &testdatav1.CategoryFilter_NameFilter{
@@ -314,7 +290,7 @@ func TestAlignWith(t *testing.T) {
 
 		result, err := protofilter.ToMap(
 			filter,
-			protofilter.WithTransformKeyHook(protofilter.AlignWith(Product{})),
+			protofilter.WithTransformHook(F.WithSmartPascalCase()),
 		)
 		require.NoError(t, err)
 
@@ -327,32 +303,5 @@ func TestAlignWith(t *testing.T) {
   }
 }`
 		assert.JSONEq(t, expected, toJSON(t, result))
-	})
-
-	t.Run("panics when model is nil", func(t *testing.T) {
-		assert.Panics(t, func() {
-			protofilter.AlignWith(nil)
-		}, "should panic when model is nil")
-	})
-
-	t.Run("panics when model has conflicting snake_case fields", func(t *testing.T) {
-		type ConflictModel struct {
-			UserID string
-			UserId string // Both convert to "user_id"
-		}
-
-		assert.PanicsWithValue(t,
-			"AlignWith: model has conflicting snake_case field names: field 'UserID' and 'UserId' both convert to 'user_id'. This model is not suitable for AlignWith.",
-			func() {
-				filter := &testdatav1.ProductFilter{
-					Name: &testdatav1.ProductFilter_NameFilter{
-						Eq: lo.ToPtr("test"),
-					},
-				}
-				_, _ = protofilter.ToMap(filter, protofilter.WithTransformKeyHook(
-					protofilter.AlignWith(ConflictModel{}),
-				))
-			},
-		)
 	})
 }

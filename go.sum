@@ -154,6 +154,8 @@ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
+github.com/sunfmin/reflectutils v1.0.6 h1:tX1ecTgYLsv2F8iBO2JL3BY2AdMtyFz/ir3ip+njFNs=
+github.com/sunfmin/reflectutils v1.0.6/go.mod h1:ao2bbF4RZrTe2PboJKdZoC3BA71gdU6rFkCuUjoeqMw=
 github.com/testcontainers/testcontainers-go v0.35.0 h1:uADsZpTKFAtp8SLK+hMwSaa+X+JiERHtd4sQAFmXeMo=
 github.com/testcontainers/testcontainers-go v0.35.0/go.mod h1:oEVBj5zrfJTrgjwONs1SsRbnBtH9OKl+IGl3UMcr2B4=
 github.com/testcontainers/testcontainers-go/modules/redis v0.35.0 h1:RBgVefU5j5IWapp3TNKqMTYX+M22OSjtuORjPd4+g08=
