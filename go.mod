@@ -7,6 +7,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
+	github.com/sunfmin/reflectutils v1.0.6
 	github.com/theplant/testenv v0.1.0
 	github.com/tidwall/sjson v1.2.5
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
