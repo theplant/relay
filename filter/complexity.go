@@ -63,7 +63,10 @@ func CheckComplexity(filterMap map[string]any, limits *ComplexityLimits) error {
 		return nil
 	}
 
-	result := CalculateComplexity(filterMap)
+	result, err := CalculateComplexity(filterMap)
+	if err != nil {
+		return err
+	}
 
 	if limits.MaxDepth > 0 && result.Depth > limits.MaxDepth {
 		return errors.Errorf("filter depth %d exceeds limit %d", result.Depth, limits.MaxDepth)
@@ -85,13 +88,15 @@ func CheckComplexity(filterMap map[string]any, limits *ComplexityLimits) error {
 }
 
 // CalculateComplexity analyzes a filter map and returns its complexity metrics.
-func CalculateComplexity(filterMap map[string]any) *ComplexityResult {
+func CalculateComplexity(filterMap map[string]any) (*ComplexityResult, error) {
 	result := &ComplexityResult{}
-	calculateComplexityRecursive(filterMap, 1, 0, result)
-	return result
+	if err := calculateComplexityRecursive(filterMap, 1, 0, result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
-func calculateComplexityRecursive(m map[string]any, depth int, logicalDepth int, result *ComplexityResult) {
+func calculateComplexityRecursive(m map[string]any, depth int, logicalDepth int, result *ComplexityResult) error {
 	if depth > result.Depth {
 		result.Depth = depth
 	}
@@ -109,53 +114,65 @@ func calculateComplexityRecursive(m map[string]any, depth int, logicalDepth int,
 		switch lowerKey {
 		case "and", "or", "not":
 			result.LogicalOperators++
-			handleLogicalComplexity(lowerKey, value, depth, logicalDepth+1, result)
+			if err := handleLogicalComplexity(key, lowerKey, value, depth, logicalDepth+1, result); err != nil {
+				return err
+			}
 		default:
 			valueMap, ok := value.(map[string]any)
 			if !ok {
-				continue
+				return errors.Errorf("invalid filter: expected map for key %q, got %T", key, value)
 			}
 
 			if isRelationshipFilterMap(valueMap) {
 				// Relationship filter - recurse with increased depth
-				calculateComplexityRecursive(valueMap, depth+1, logicalDepth, result)
+				if err := calculateComplexityRecursive(valueMap, depth+1, logicalDepth, result); err != nil {
+					return err
+				}
 			} else {
 				// Field filter - count it
 				result.TotalFields++
 			}
 		}
 	}
+
+	return nil
 }
 
-func handleLogicalComplexity(op string, value any, depth int, logicalDepth int, result *ComplexityResult) {
+func handleLogicalComplexity(key, lowerKey string, value any, depth int, logicalDepth int, result *ComplexityResult) error {
 	if logicalDepth > result.LogicalDepth {
 		result.LogicalDepth = logicalDepth
 	}
 
-	switch op {
+	switch lowerKey {
 	case "and", "or":
 		list, ok := value.([]any)
 		if !ok {
-			return
+			return errors.Errorf("invalid filter: expected array for key %q, got %T", key, value)
 		}
 
-		if op == "or" && len(list) > result.OrBranches {
+		if lowerKey == "or" && len(list) > result.OrBranches {
 			result.OrBranches = len(list)
 		}
 
-		for _, item := range list {
+		for i, item := range list {
 			subMap, ok := item.(map[string]any)
 			if !ok {
-				continue
+				return errors.Errorf("invalid filter: expected map for %s[%d], got %T", key, i, item)
 			}
-			calculateComplexityRecursive(subMap, depth, logicalDepth, result)
+			if err := calculateComplexityRecursive(subMap, depth, logicalDepth, result); err != nil {
+				return err
+			}
 		}
 
 	case "not":
 		subMap, ok := value.(map[string]any)
 		if !ok {
-			return
+			return errors.Errorf("invalid filter: expected map for key %q, got %T", key, value)
 		}
-		calculateComplexityRecursive(subMap, depth, logicalDepth, result)
+		if err := calculateComplexityRecursive(subMap, depth, logicalDepth, result); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }

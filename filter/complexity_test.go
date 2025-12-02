@@ -149,8 +149,61 @@ func TestCalculateComplexity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CalculateComplexity(tt.filter)
+			result, err := CalculateComplexity(tt.filter)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCalculateComplexity_Errors(t *testing.T) {
+	tests := []struct {
+		name        string
+		filter      map[string]any
+		errContains string
+	}{
+		{
+			name: "And value is not array",
+			filter: map[string]any{
+				"And": "invalid",
+			},
+			errContains: `expected array for key "And"`,
+		},
+		{
+			name: "Or value is not array",
+			filter: map[string]any{
+				"Or": map[string]any{},
+			},
+			errContains: `expected array for key "Or"`,
+		},
+		{
+			name: "Not value is not map",
+			filter: map[string]any{
+				"Not": []any{},
+			},
+			errContains: `expected map for key "Not"`,
+		},
+		{
+			name: "And array element is not map",
+			filter: map[string]any{
+				"And": []any{"invalid"},
+			},
+			errContains: `expected map for And[0]`,
+		},
+		{
+			name: "field value is not map",
+			filter: map[string]any{
+				"Name": "invalid",
+			},
+			errContains: `expected map for key "Name"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := CalculateComplexity(tt.filter)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.errContains)
 		})
 	}
 }
@@ -269,6 +322,15 @@ func TestCheckComplexity(t *testing.T) {
 		}
 		err := CheckComplexity(filter, &ComplexityLimits{MaxDepth: 0}) // 0 means no limit for depth
 		require.NoError(t, err)
+	})
+
+	t.Run("returns error for invalid filter structure", func(t *testing.T) {
+		filter := map[string]any{
+			"And": "invalid",
+		}
+		err := CheckComplexity(filter, DefaultLimits)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected array")
 	})
 }
 
