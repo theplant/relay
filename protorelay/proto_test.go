@@ -825,5 +825,8 @@ func TestProductService_ListProducts(t *testing.T) {
 	})
 
 	// Note: PostTransformHook was removed. For multi-stage processing or cross-field logic,
-	// users can manually call Transform multiple times or post-process the result map.
+	// apply filter.Transform() multiple times with different transform functions, or
+	// post-process the resulting map. Example:
+	// step1, _ := protofilter.ToMap(filter, protofilter.WithTransformHook(hook1))
+	// step2, _ := filter.Transform(step1, transformer)
 }

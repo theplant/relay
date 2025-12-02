@@ -77,6 +77,10 @@ func toMap[T proto.Message](protoFilter T) (map[string]any, error) {
 
 // buildDefaultTransform creates a default transform function that handles enums and capitalizes keys.
 // It captures the proto model via closure for type information queries.
+//
+// NOTE: The KeyPath argument uses camelCase keys from the JSON representation of the proto message,
+// not the PascalCase Go struct field names. The reflectutils library handles conversion
+// from camelCase to the corresponding struct field names when accessing fields via GetType/Get.
 func buildDefaultTransform(model proto.Message) filter.TransformFunc {
 	return func(input *filter.TransformInput) (*filter.TransformOutput, error) {
 		var lastKey string
@@ -85,6 +89,7 @@ func buildDefaultTransform(model proto.Message) filter.TransformFunc {
 		}
 
 		outputKey := filter.Capitalize(lastKey)
+		outputValue := input.Value
 
 		if model != nil {
 			keyPath := strings.Join(input.KeyPath, ".")
@@ -101,7 +106,7 @@ func buildDefaultTransform(model proto.Message) filter.TransformFunc {
 							if err != nil {
 								return nil, err
 							}
-							input.Value = converted
+							outputValue = converted
 						}
 					}
 				}
@@ -120,7 +125,7 @@ func buildDefaultTransform(model proto.Message) filter.TransformFunc {
 								if err != nil {
 									return nil, err
 								}
-								input.Value = converted
+								outputValue = converted
 							}
 						}
 					}
@@ -128,7 +133,7 @@ func buildDefaultTransform(model proto.Message) filter.TransformFunc {
 			}
 		}
 
-		return &filter.TransformOutput{Key: outputKey, Value: input.Value}, nil
+		return &filter.TransformOutput{Key: outputKey, Value: outputValue}, nil
 	}
 }
 

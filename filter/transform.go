@@ -211,25 +211,25 @@ func appendPath(parent []string, key string) []string {
 	return append(result, key)
 }
 
+var knownKeys = map[string]bool{
+	"eq":          true,
+	"in":          true,
+	"not_in":      true,
+	"contains":    true,
+	"starts_with": true,
+	"ends_with":   true,
+	"gt":          true,
+	"gte":         true,
+	"lt":          true,
+	"lte":         true,
+	"between":     true,
+	"is_null":     true,
+	"fold":        true,
+}
+
 func isRelationshipFilterMap(m map[string]any) bool {
 	if len(m) == 0 {
 		return false
-	}
-
-	knownKeys := map[string]bool{
-		"eq":          true,
-		"in":          true,
-		"not_in":      true,
-		"contains":    true,
-		"starts_with": true,
-		"ends_with":   true,
-		"gt":          true,
-		"gte":         true,
-		"lt":          true,
-		"lte":         true,
-		"between":     true,
-		"is_null":     true,
-		"fold":        true,
 	}
 
 	for key := range m {
@@ -250,91 +250,68 @@ func Capitalize(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-// SmartPascalCase converts camelCase to PascalCase with proper handling of common acronyms
+// CommonInitialisms is a set of common initialisms for identifier naming.
+// Based on https://github.com/golang/lint/blob/master/lint.go#L770
+// This is the canonical list from Go's official style guide.
+var CommonInitialisms = map[string]bool{
+	"acl":   true,
+	"api":   true,
+	"ascii": true,
+	"cpu":   true,
+	"css":   true,
+	"dns":   true,
+	"eof":   true,
+	"guid":  true,
+	"html":  true,
+	"http":  true,
+	"https": true,
+	"id":    true,
+	"ip":    true,
+	"json":  true,
+	"lhs":   true,
+	"qps":   true,
+	"ram":   true,
+	"rhs":   true,
+	"rpc":   true,
+	"sla":   true,
+	"smtp":  true,
+	"sql":   true,
+	"ssh":   true,
+	"tcp":   true,
+	"tls":   true,
+	"ttl":   true,
+	"udp":   true,
+	"ui":    true,
+	"uid":   true,
+	"uuid":  true,
+	"uri":   true,
+	"url":   true,
+	"utf8":  true,
+	"vm":    true,
+	"xml":   true,
+	"xmpp":  true,
+	"xsrf":  true,
+	"xss":   true,
+}
+
+// SmartPascalCase converts camelCase to PascalCase with proper handling of common acronyms.
+// It handles consecutive uppercase letters specially: a sequence like "HTMLParser" is split
+// into "HTML" + "Parser" rather than individual letters.
+// Uses commonInitialisms from Go's official style guide.
 func SmartPascalCase(s string) string {
 	if s == "" {
 		return s
 	}
 
-	acronyms := map[string]bool{
-		"id":    true,
-		"url":   true,
-		"uri":   true,
-		"api":   true,
-		"http":  true,
-		"https": true,
-		"html":  true,
-		"xml":   true,
-		"json":  true,
-		"sql":   true,
-		"uuid":  true,
-		"uid":   true,
-		"ip":    true,
-		"tcp":   true,
-		"udp":   true,
-		"rpc":   true,
-		"grpc":  true,
-		"oauth": true,
-		"jwt":   true,
-		"ssh":   true,
-		"tls":   true,
-		"ssl":   true,
-		"ui":    true,
-		"ux":    true,
-		"seo":   true,
-		"cms":   true,
-		"db":    true,
-		"os":    true,
-		"io":    true,
-		"pdf":   true,
-		"csv":   true,
-		"svg":   true,
-		"png":   true,
-		"jpg":   true,
-		"gif":   true,
-		"ftp":   true,
-		"smtp":  true,
-		"pop":   true,
-		"imap":  true,
-		"dns":   true,
-		"cdn":   true,
-		"cpu":   true,
-		"gpu":   true,
-		"ram":   true,
-		"rom":   true,
-		"ssd":   true,
-		"hdd":   true,
-		"usb":   true,
-		"lan":   true,
-		"wan":   true,
-		"vpn":   true,
-		"nat":   true,
-	}
-
-	var words []string
-	var currentWord strings.Builder
-
-	for i, r := range s {
-		if i > 0 && r >= 'A' && r <= 'Z' {
-			if currentWord.Len() > 0 {
-				words = append(words, strings.ToLower(currentWord.String()))
-				currentWord.Reset()
-			}
-		}
-		currentWord.WriteRune(r)
-	}
-	if currentWord.Len() > 0 {
-		words = append(words, strings.ToLower(currentWord.String()))
-	}
+	words := lo.Words(s)
 
 	var result strings.Builder
 	for _, word := range words {
-		if acronyms[word] {
+		lower := strings.ToLower(word)
+		if CommonInitialisms[lower] {
 			result.WriteString(strings.ToUpper(word))
 		} else {
-			if word != "" {
-				result.WriteString(strings.ToUpper(word[:1]) + word[1:])
-			}
+			result.WriteString(strings.ToUpper(word[:1]) + strings.ToLower(word[1:]))
 		}
 	}
 
