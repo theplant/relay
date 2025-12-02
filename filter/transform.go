@@ -257,17 +257,20 @@ func Capitalize(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-// CommonInitialisms is a set of common initialisms for identifier naming.
-// Based on https://github.com/golang/lint/blob/master/lint.go#L770
-// This is the canonical list from Go's official style guide.
-var CommonInitialisms = map[string]bool{
+// Initialisms is a set of common initialisms for identifier naming.
+// Based on https://github.com/dominikh/go-tools/blob/master/config/example.conf
+// This is the canonical list from staticcheck.
+var Initialisms = map[string]bool{
 	"acl":   true,
+	"amqp":  true,
 	"api":   true,
 	"ascii": true,
 	"cpu":   true,
 	"css":   true,
+	"db":    true,
 	"dns":   true,
 	"eof":   true,
+	"gid":   true,
 	"guid":  true,
 	"html":  true,
 	"http":  true,
@@ -275,25 +278,26 @@ var CommonInitialisms = map[string]bool{
 	"id":    true,
 	"ip":    true,
 	"json":  true,
-	"lhs":   true,
 	"qps":   true,
 	"ram":   true,
-	"rhs":   true,
 	"rpc":   true,
+	"rtp":   true,
+	"sip":   true,
 	"sla":   true,
 	"smtp":  true,
 	"sql":   true,
 	"ssh":   true,
 	"tcp":   true,
 	"tls":   true,
+	"ts":    true,
 	"ttl":   true,
 	"udp":   true,
 	"ui":    true,
 	"uid":   true,
-	"uuid":  true,
 	"uri":   true,
 	"url":   true,
 	"utf8":  true,
+	"uuid":  true,
 	"vm":    true,
 	"xml":   true,
 	"xmpp":  true,
@@ -304,7 +308,7 @@ var CommonInitialisms = map[string]bool{
 // SmartPascalCase converts a string to PascalCase with proper handling of common acronyms.
 // It handles consecutive uppercase letters specially: a sequence like "HTMLParser" is split
 // into "HTML" + "Parser" rather than individual letters.
-// Uses commonInitialisms from Go's official style guide.
+// Uses Initialisms from staticcheck.
 func SmartPascalCase(s string) string {
 	if s == "" {
 		return s
@@ -314,8 +318,11 @@ func SmartPascalCase(s string) string {
 
 	var result strings.Builder
 	for _, word := range words {
+		if len(word) == 0 {
+			continue
+		}
 		lower := strings.ToLower(word)
-		if CommonInitialisms[lower] {
+		if Initialisms[lower] {
 			result.WriteString(strings.ToUpper(word))
 		} else {
 			result.WriteString(strings.ToUpper(word[:1]) + strings.ToLower(word[1:]))

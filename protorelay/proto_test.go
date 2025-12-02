@@ -766,7 +766,7 @@ func TestProductService_ListProducts(t *testing.T) {
 		}
 
 		// Custom transform that converts timestamps to Unix milliseconds and adds prefix to enums
-		// Capture the model via closure
+		// Captures the model via closure
 		customTransform := func(next filter.TransformFunc) filter.TransformFunc {
 			return func(input *filter.TransformInput) (*filter.TransformOutput, error) {
 				keyPath := strings.Join(input.KeyPath, ".")
