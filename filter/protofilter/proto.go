@@ -19,7 +19,8 @@ import (
 type ToMapOption func(*toMapOptions)
 
 type toMapOptions struct {
-	transformHook func(filter.TransformFunc) filter.TransformFunc
+	transformHook    func(filter.TransformFunc) filter.TransformFunc
+	complexityLimits *filter.ComplexityLimits
 }
 
 // WithTransformHook allows customizing the transform function
@@ -29,14 +30,26 @@ func WithTransformHook(hook func(filter.TransformFunc) filter.TransformFunc) ToM
 	}
 }
 
+// WithComplexityLimits sets custom complexity limits for the filter.
+// By default, filter.DefaultLimits is used.
+// Pass nil to disable complexity checking.
+func WithComplexityLimits(limits *filter.ComplexityLimits) ToMapOption {
+	return func(opts *toMapOptions) {
+		opts.complexityLimits = limits
+	}
+}
+
 // ToMap converts a proto filter message to a map with proper transformations.
 // It applies default transformations (enum conversion, capitalization) and any custom transforms.
+// By default, complexity is checked against filter.DefaultLimits.
 func ToMap[T proto.Message](protoFilter T, opts ...ToMapOption) (map[string]any, error) {
 	if lo.IsNil(protoFilter) {
 		return nil, nil
 	}
 
-	options := &toMapOptions{}
+	options := &toMapOptions{
+		complexityLimits: filter.DefaultLimits,
+	}
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -47,13 +60,18 @@ func ToMap[T proto.Message](protoFilter T, opts ...ToMapOption) (map[string]any,
 		return nil, err
 	}
 
-	// Stage 2: Capitalize keys (camelCase -> PascalCase)
+	// Stage 2: Check complexity (early rejection of overly complex filters)
+	if err := filter.CheckComplexity(camelCaseMap, options.complexityLimits); err != nil {
+		return nil, err
+	}
+
+	// Stage 3: Capitalize keys (camelCase -> PascalCase)
 	pascalCaseMap, err := filter.Transform(camelCaseMap, capitalizeTransform)
 	if err != nil {
 		return nil, err
 	}
 
-	// Stage 3: Apply transformations (enum conversion, custom hooks)
+	// Stage 4: Apply transformations (enum conversion, custom hooks)
 	transform := buildDefaultTransform(protoFilter)
 	if options.transformHook != nil {
 		transform = options.transformHook(transform)
