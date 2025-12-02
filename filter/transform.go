@@ -25,9 +25,18 @@ const (
 	KeyTypeModifier KeyType = "MODIFIER"
 )
 
+type KeyPath []string
+
+func (k KeyPath) Last() string {
+	if len(k) == 0 {
+		return ""
+	}
+	return k[len(k)-1]
+}
+
 // TransformInput provides input information for transformation
 type TransformInput struct {
-	KeyPath   []string
+	KeyPath   KeyPath
 	KeyType   KeyType
 	Value     any
 	RootMap   map[string]any
@@ -206,9 +215,7 @@ func handleLogical(
 }
 
 func appendPath(parent []string, key string) []string {
-	result := make([]string, len(parent), len(parent)+1)
-	copy(result, parent)
-	return append(result, key)
+	return append(append([]string(nil), parent...), key)
 }
 
 var knownKeys = map[string]bool{
@@ -294,7 +301,7 @@ var CommonInitialisms = map[string]bool{
 	"xss":   true,
 }
 
-// SmartPascalCase converts camelCase to PascalCase with proper handling of common acronyms.
+// SmartPascalCase converts a string to PascalCase with proper handling of common acronyms.
 // It handles consecutive uppercase letters specially: a sequence like "HTMLParser" is split
 // into "HTML" + "Parser" rather than individual letters.
 // Uses commonInitialisms from Go's official style guide.
@@ -326,10 +333,7 @@ func WithSmartPascalCase() func(next TransformFunc) TransformFunc {
 			if err != nil {
 				return nil, err
 			}
-			if len(input.KeyPath) > 0 {
-				lastKey := input.KeyPath[len(input.KeyPath)-1]
-				output.Key = SmartPascalCase(lastKey)
-			}
+			output.Key = SmartPascalCase(input.KeyPath.Last())
 			return output, nil
 		}
 	}

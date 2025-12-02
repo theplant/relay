@@ -77,7 +77,7 @@ func TestKeyTypeParameter(t *testing.T) {
 			},
 		}
 
-		camelCaseMap, err := toMap(protoFilter)
+		camelCaseMap, err := toRawMap(protoFilter)
 		require.NoError(t, err)
 		_, err = filter.Transform(camelCaseMap, recordingTransform)
 		require.NoError(t, err)
@@ -109,7 +109,7 @@ func TestKeyTypeParameter(t *testing.T) {
 			},
 		}
 
-		camelCaseMap, err := toMap(protoFilter)
+		camelCaseMap, err := toRawMap(protoFilter)
 		require.NoError(t, err)
 		_, err = filter.Transform(camelCaseMap, recordingTransform)
 		require.NoError(t, err)
@@ -143,7 +143,7 @@ func TestKeyTypeParameter(t *testing.T) {
 			},
 		}
 
-		camelCaseMap, err := toMap(protoFilter)
+		camelCaseMap, err := toRawMap(protoFilter)
 		require.NoError(t, err)
 		_, err = filter.Transform(camelCaseMap, recordingTransform)
 		require.NoError(t, err)
@@ -170,7 +170,7 @@ func TestKeyTypeParameter(t *testing.T) {
 			},
 		}
 
-		camelCaseMap, err := toMap(protoFilter)
+		camelCaseMap, err := toRawMap(protoFilter)
 		require.NoError(t, err)
 		_, err = filter.Transform(camelCaseMap, recordingTransform)
 		require.NoError(t, err)
@@ -212,7 +212,7 @@ func TestKeyTypeParameter(t *testing.T) {
 			},
 		}
 
-		camelCaseMap, err := toMap(protoFilter)
+		camelCaseMap, err := toRawMap(protoFilter)
 		require.NoError(t, err)
 		_, err = filter.Transform(camelCaseMap, recordingTransform)
 		require.NoError(t, err)
@@ -243,7 +243,7 @@ func TestKeyTypeParameter(t *testing.T) {
 			},
 		}
 
-		camelCaseMap, err := toMap(protoFilter)
+		camelCaseMap, err := toRawMap(protoFilter)
 		require.NoError(t, err)
 		_, err = filter.Transform(camelCaseMap, recordingTransform)
 		require.NoError(t, err)

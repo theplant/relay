@@ -42,22 +42,28 @@ func ToMap[T proto.Message](protoFilter T, opts ...ToMapOption) (map[string]any,
 	}
 
 	// Stage 1: Convert proto message to camelCase map (no transformations)
-	camelCaseMap, err := toMap(protoFilter)
+	camelCaseMap, err := toRawMap(protoFilter)
 	if err != nil {
 		return nil, err
 	}
 
-	// Stage 2: Apply transformations
+	// Stage 2: Capitalize keys (camelCase -> PascalCase)
+	pascalCaseMap, err := filter.Transform(camelCaseMap, capitalizeTransform)
+	if err != nil {
+		return nil, err
+	}
+
+	// Stage 3: Apply transformations (enum conversion, custom hooks)
 	transform := buildDefaultTransform(protoFilter)
 	if options.transformHook != nil {
 		transform = options.transformHook(transform)
 	}
 
-	return filter.Transform(camelCaseMap, transform)
+	return filter.Transform(pascalCaseMap, transform)
 }
 
-// toMap converts a proto message to a camelCase map without any transformations
-func toMap[T proto.Message](protoFilter T) (map[string]any, error) {
+// toRawMap converts a proto message to a camelCase map without any transformations
+func toRawMap[T proto.Message](protoFilter T) (map[string]any, error) {
 	data, err := protojson.MarshalOptions{
 		EmitUnpopulated: true,
 	}.Marshal(protoFilter)
@@ -75,20 +81,17 @@ func toMap[T proto.Message](protoFilter T) (map[string]any, error) {
 	return camelCaseMap, nil
 }
 
-// buildDefaultTransform creates a default transform function that handles enums and capitalizes keys.
+// capitalizeTransform converts camelCase keys to PascalCase keys.
+func capitalizeTransform(input *filter.TransformInput) (*filter.TransformOutput, error) {
+	return &filter.TransformOutput{Key: filter.Capitalize(input.KeyPath.Last()), Value: input.Value}, nil
+}
+
+// buildDefaultTransform creates a default transform function that handles enum conversion.
 // It captures the proto model via closure for type information queries.
-//
-// NOTE: The KeyPath argument uses camelCase keys from the JSON representation of the proto message,
-// not the PascalCase Go struct field names. The reflectutils library handles conversion
-// from camelCase to the corresponding struct field names when accessing fields via GetType/Get.
+// NOTE: The KeyPath uses PascalCase keys (after capitalizeTransform stage).
 func buildDefaultTransform(model proto.Message) filter.TransformFunc {
 	return func(input *filter.TransformInput) (*filter.TransformOutput, error) {
-		var lastKey string
-		if len(input.KeyPath) > 0 {
-			lastKey = input.KeyPath[len(input.KeyPath)-1]
-		}
-
-		outputKey := filter.Capitalize(lastKey)
+		outputKey := input.KeyPath.Last()
 		outputValue := input.Value
 
 		if model != nil {

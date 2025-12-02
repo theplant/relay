@@ -824,7 +824,7 @@ func TestProductService_ListProducts(t *testing.T) {
 		assert.Equal(t, "custom_PUBLISHED", eq)
 	})
 
-	// Note: PostTransformHook was removed. For multi-stage processing or cross-field logic,
+	// For multi-stage processing or cross-field logic,
 	// apply filter.Transform() multiple times with different transform functions, or
 	// post-process the resulting map. Example:
 	// step1, _ := protofilter.ToMap(filter, protofilter.WithTransformHook(hook1))
