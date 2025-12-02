@@ -15,8 +15,11 @@ const (
 	// KeyTypeLogical represents a logical operator key (And, Or, Not)
 	KeyTypeLogical KeyType = "LOGICAL"
 
-	// KeyTypeField represents a model field key (Name, Code, CategoryID, etc.)
+	// KeyTypeField represents a scalar field filter key (Name, Code, CategoryID, etc.)
 	KeyTypeField KeyType = "FIELD"
+
+	// KeyTypeRelationship represents a relationship filter key (Category, Author, etc.)
+	KeyTypeRelationship KeyType = "RELATIONSHIP"
 
 	// KeyTypeOperator represents a filter operator key (Eq, Contains, In, Gt, etc.)
 	KeyTypeOperator KeyType = "OPERATOR"
@@ -95,9 +98,15 @@ func transformMap(
 			return errors.Errorf("field %s value should be map[string]any, got %T", key, value)
 		}
 
+		isRelationship := isRelationshipFilterMap(valueMap)
+		keyType := KeyTypeField
+		if isRelationship {
+			keyType = KeyTypeRelationship
+		}
+
 		input := &TransformInput{
 			KeyPath:   currentPath,
-			KeyType:   KeyTypeField,
+			KeyType:   keyType,
 			Value:     value,
 			RootMap:   rootMap,
 			ParentMap: parentMap,
@@ -112,7 +121,7 @@ func transformMap(
 			continue
 		}
 
-		if isRelationshipFilterMap(valueMap) {
+		if isRelationship {
 			nestedResult := make(map[string]any)
 			if err := transformMap(valueMap, nestedResult, currentPath, targetMap, rootMap, transform); err != nil {
 				return errors.Wrapf(err, "field %s", key)
