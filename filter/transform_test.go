@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSmartPascalCase(t *testing.T) {
@@ -243,4 +244,154 @@ func TestKeyPath_Last(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestTransformOutput_skip(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   *TransformOutput
+		expected bool
+	}{
+		{
+			name:     "nil output",
+			output:   nil,
+			expected: true,
+		},
+		{
+			name:     "empty key",
+			output:   &TransformOutput{Key: ""},
+			expected: true,
+		},
+		{
+			name:     "non-empty key",
+			output:   &TransformOutput{Key: "Name"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.output.skip())
+		})
+	}
+}
+
+func TestTransform(t *testing.T) {
+	t.Run("skip by returning nil", func(t *testing.T) {
+		source := map[string]any{
+			"Name": map[string]any{"Eq": "test"},
+			"Code": map[string]any{"Eq": "P001"},
+		}
+
+		result, err := Transform(source, func(input *TransformInput) (*TransformOutput, error) {
+			if input.KeyPath.Last() == "Code" {
+				return nil, nil
+			}
+			return &TransformOutput{Key: input.KeyPath.Last(), Value: input.Value}, nil
+		})
+
+		require.NoError(t, err)
+		assert.Contains(t, result, "Name")
+		assert.NotContains(t, result, "Code")
+	})
+
+	t.Run("skip by returning empty key", func(t *testing.T) {
+		source := map[string]any{
+			"Name": map[string]any{"Eq": "test"},
+			"Code": map[string]any{"Eq": "P001"},
+		}
+
+		result, err := Transform(source, func(input *TransformInput) (*TransformOutput, error) {
+			if input.KeyPath.Last() == "Code" {
+				return &TransformOutput{Key: ""}, nil
+			}
+			return &TransformOutput{Key: input.KeyPath.Last(), Value: input.Value}, nil
+		})
+
+		require.NoError(t, err)
+		assert.Contains(t, result, "Name")
+		assert.NotContains(t, result, "Code")
+	})
+
+	t.Run("skip operator by returning nil", func(t *testing.T) {
+		source := map[string]any{
+			"Name": map[string]any{
+				"Eq":       "test",
+				"Contains": "es",
+			},
+		}
+
+		result, err := Transform(source, func(input *TransformInput) (*TransformOutput, error) {
+			if input.KeyType == KeyTypeOperator && input.KeyPath.Last() == "Contains" {
+				return nil, nil
+			}
+			return &TransformOutput{Key: input.KeyPath.Last(), Value: input.Value}, nil
+		})
+
+		require.NoError(t, err)
+		nameFilter := result["Name"].(map[string]any)
+		assert.Contains(t, nameFilter, "Eq")
+		assert.NotContains(t, nameFilter, "Contains")
+	})
+
+	t.Run("skip logical by returning nil", func(t *testing.T) {
+		source := map[string]any{
+			"And": []any{
+				map[string]any{"Name": map[string]any{"Eq": "test"}},
+			},
+			"Name": map[string]any{"Eq": "direct"},
+		}
+
+		result, err := Transform(source, func(input *TransformInput) (*TransformOutput, error) {
+			if input.KeyType == KeyTypeLogical {
+				return nil, nil
+			}
+			return &TransformOutput{Key: input.KeyPath.Last(), Value: input.Value}, nil
+		})
+
+		require.NoError(t, err)
+		assert.NotContains(t, result, "And")
+		assert.Contains(t, result, "Name")
+	})
+
+	t.Run("containers correspond to key path", func(t *testing.T) {
+		source := map[string]any{
+			"And": []any{
+				map[string]any{
+					"Name": map[string]any{"Eq": "test"},
+				},
+			},
+		}
+
+		var captured *TransformInput
+		_, err := Transform(source, func(input *TransformInput) (*TransformOutput, error) {
+			if input.KeyType == KeyTypeOperator && input.KeyPath.Last() == "Eq" {
+				captured = input
+			}
+			return &TransformOutput{Key: input.KeyPath.Last(), Value: input.Value}, nil
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, captured)
+
+		// KeyPath: ["And", "[0]", "Name", "Eq"]
+		assert.Equal(t, KeyPath{"And", "[0]", "Name", "Eq"}, captured.KeyPath)
+		assert.Len(t, captured.Containers, 4)
+
+		// Containers[0] is root map
+		_, ok := captured.Containers[0].(map[string]any)
+		assert.True(t, ok, "Containers[0] should be root map")
+
+		// Containers[1] is []any (And's list)
+		_, ok = captured.Containers[1].([]any)
+		assert.True(t, ok, "Containers[1] should be []any")
+
+		// Containers[2] is map[string]any ([0]'s map)
+		_, ok = captured.Containers[2].(map[string]any)
+		assert.True(t, ok, "Containers[2] should be map")
+
+		// Containers[3] is map[string]any (Name's field result)
+		_, ok = captured.Containers[3].(map[string]any)
+		assert.True(t, ok, "Containers[3] should be map")
+	})
 }

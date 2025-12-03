@@ -110,10 +110,15 @@ func (t *TransformInput) ContainerAt(index int) any {
 	return t.Containers[index]
 }
 
-// TransformOutput represents the result of transformation
+// TransformOutput represents the result of transformation.
+// Return nil or empty Key to skip this key.
 type TransformOutput struct {
 	Key   string
 	Value any
+}
+
+func (o *TransformOutput) skip() bool {
+	return o == nil || o.Key == ""
 }
 
 // TransformFunc is a function that transforms keys and values.
@@ -179,7 +184,7 @@ func transformMap(
 			return errors.Wrapf(err, "transform key %s", strings.Join(currentPath, "."))
 		}
 
-		if output.Key == "" {
+		if output.skip() {
 			continue
 		}
 
@@ -208,7 +213,7 @@ func transformMap(
 				if err != nil {
 					return errors.Wrapf(err, "transform key %s", strings.Join(opPath, "."))
 				}
-				if opOutput.Key != "" {
+				if !opOutput.skip() {
 					fieldResult[opOutput.Key] = opOutput.Value
 				}
 			}
@@ -236,7 +241,7 @@ func handleLogical(
 		return err
 	}
 
-	if output.Key == "" {
+	if output.skip() {
 		return nil
 	}
 
