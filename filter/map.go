@@ -5,27 +5,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// KeyType represents the type of a filter key
-type KeyType string
-
-const (
-	// KeyTypeField represents a model field key (Name, Code, CategoryID, etc.)
-	// These keys should be aligned with model fields
-	KeyTypeField KeyType = "FIELD"
-
-	// KeyTypeLogical represents a logical operator key (And, Or, Not)
-	// These keys are not model fields but contain nested field keys
-	KeyTypeLogical KeyType = "LOGICAL"
-
-	// KeyTypeOperator represents a filter operator key (Eq, Contains, In, Gt, etc.)
-	// These keys define how to filter a field
-	KeyTypeOperator KeyType = "OPERATOR"
-
-	// KeyTypeModifier represents a modifier key that changes operator behavior (Fold, etc.)
-	// These keys modify how operators work (e.g., case-insensitive comparison)
-	KeyTypeModifier KeyType = "MODIFIER"
-)
-
 // TagKey is the tag key used to marshal and unmarshal filter to and from map[string]any.
 const TagKey = "~~~filter~~~"
 
@@ -50,12 +29,12 @@ func ToMap(v any) (map[string]any, error) {
 	if err := jsoniterForFilter.Unmarshal(data, &filterMap); err != nil {
 		return nil, errors.Wrap(err, "unmarshal filter to map")
 	}
-	PruneMap(filterMap)
+	prune(filterMap)
 	return filterMap, nil
 }
 
-// PruneMap recursively removes nil values, empty slices, and empty nested maps.
-func PruneMap(m map[string]any) {
+// Prune recursively removes nil values, empty slices, and empty nested maps.
+func Prune(m map[string]any) {
 	prune(m)
 }
 
