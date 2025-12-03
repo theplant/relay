@@ -37,6 +37,28 @@ func (k KeyPath) Last() string {
 	return k[len(k)-1]
 }
 
+// String returns a human-readable representation of the key path.
+// Array indices like "[0]" are appended directly without a dot separator.
+// Example: ["And", "[0]", "Name", "Eq"] -> "And[0].Name.Eq"
+func (k KeyPath) String() string {
+	if len(k) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	for i, part := range k {
+		if strings.HasPrefix(part, "[") {
+			sb.WriteString(part)
+		} else {
+			if i > 0 {
+				sb.WriteString(".")
+			}
+			sb.WriteString(part)
+		}
+	}
+	return sb.String()
+}
+
 // TransformInput provides input information for transformation
 type TransformInput struct {
 	KeyPath   KeyPath

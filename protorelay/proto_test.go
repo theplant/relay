@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -769,7 +768,7 @@ func TestProductService_ListProducts(t *testing.T) {
 		// Captures the model via closure
 		customTransform := func(next filter.TransformFunc) filter.TransformFunc {
 			return func(input *filter.TransformInput) (*filter.TransformOutput, error) {
-				keyPath := strings.Join(input.KeyPath, ".")
+				keyPath := input.KeyPath.String()
 				fieldType := reflectutils.GetType(protoFilter, keyPath)
 				if fieldType == nil {
 					return next(input)

@@ -3,7 +3,6 @@ package protofilter
 import (
 	"encoding/json"
 	"reflect"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
@@ -113,7 +112,7 @@ func buildDefaultTransform(model proto.Message) filter.TransformFunc {
 		outputValue := input.Value
 
 		if model != nil {
-			keyPath := strings.Join(input.KeyPath, ".")
+			keyPath := input.KeyPath.String()
 			fieldType := reflectutils.GetType(model, keyPath)
 			if fieldType != nil {
 				if isEnumType(fieldType) {

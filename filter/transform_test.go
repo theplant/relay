@@ -147,3 +147,100 @@ func TestCapitalize(t *testing.T) {
 		})
 	}
 }
+
+func TestKeyPath_String(t *testing.T) {
+	tests := []struct {
+		name     string
+		keyPath  KeyPath
+		expected string
+	}{
+		{
+			name:     "empty path",
+			keyPath:  KeyPath{},
+			expected: "",
+		},
+		{
+			name:     "single key",
+			keyPath:  KeyPath{"Name"},
+			expected: "Name",
+		},
+		{
+			name:     "simple nested path",
+			keyPath:  KeyPath{"Name", "Eq"},
+			expected: "Name.Eq",
+		},
+		{
+			name:     "path with array index",
+			keyPath:  KeyPath{"And", "[0]", "Name"},
+			expected: "And[0].Name",
+		},
+		{
+			name:     "path with multiple array indices",
+			keyPath:  KeyPath{"And", "[0]", "Or", "[1]", "Name", "Eq"},
+			expected: "And[0].Or[1].Name.Eq",
+		},
+		{
+			name:     "array index at end",
+			keyPath:  KeyPath{"And", "[0]"},
+			expected: "And[0]",
+		},
+		{
+			name:     "consecutive array indices",
+			keyPath:  KeyPath{"Data", "[0]", "[1]", "Value"},
+			expected: "Data[0][1].Value",
+		},
+		{
+			name:     "relationship path",
+			keyPath:  KeyPath{"Category", "Name", "Contains"},
+			expected: "Category.Name.Contains",
+		},
+		{
+			name:     "complex nested with relationship",
+			keyPath:  KeyPath{"And", "[1]", "Category", "Name", "Eq"},
+			expected: "And[1].Category.Name.Eq",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.keyPath.String()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestKeyPath_Last(t *testing.T) {
+	tests := []struct {
+		name     string
+		keyPath  KeyPath
+		expected string
+	}{
+		{
+			name:     "empty path",
+			keyPath:  KeyPath{},
+			expected: "",
+		},
+		{
+			name:     "single key",
+			keyPath:  KeyPath{"Name"},
+			expected: "Name",
+		},
+		{
+			name:     "nested path",
+			keyPath:  KeyPath{"Name", "Eq"},
+			expected: "Eq",
+		},
+		{
+			name:     "path with array index",
+			keyPath:  KeyPath{"And", "[0]", "Name"},
+			expected: "Name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.keyPath.Last()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
