@@ -3,7 +3,9 @@ package protofilter
 import (
 	"encoding/json"
 	"reflect"
+	"sync"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/sunfmin/reflectutils"
@@ -103,52 +105,117 @@ func capitalizeTransform(input *filter.TransformInput) (*filter.TransformOutput,
 	return &filter.TransformOutput{Key: filter.Capitalize(input.KeyPath.Last()), Value: input.Value}, nil
 }
 
-// buildDefaultTransform creates a default transform function that handles enum conversion.
-// It captures the proto model via closure for type information queries.
-// NOTE: The KeyPath uses PascalCase keys (after capitalizeTransform stage).
+var (
+	typeInfoCache     *lru.Cache[typeCacheKey, *typeInfo]
+	typeInfoCacheOnce sync.Once
+)
+
+type typeCacheKey struct {
+	modelType reflect.Type
+	keyPath   string
+}
+
+type typeInfo struct {
+	fieldType  reflect.Type
+	isEnum     bool
+	isSlice    bool
+	elemType   reflect.Type
+	elemIsEnum bool
+}
+
+func getTypeInfoCache() *lru.Cache[typeCacheKey, *typeInfo] {
+	typeInfoCacheOnce.Do(func() {
+		cache, err := lru.New[typeCacheKey, *typeInfo](4096)
+		if err != nil {
+			panic(err)
+		}
+		typeInfoCache = cache
+	})
+	return typeInfoCache
+}
+
+func getTypeInfo(modelType reflect.Type, model proto.Message, keyPath string) *typeInfo {
+	if model == nil || keyPath == "" {
+		return nil
+	}
+
+	key := typeCacheKey{
+		modelType: modelType,
+		keyPath:   keyPath,
+	}
+
+	cache := getTypeInfoCache()
+	if cached, ok := cache.Get(key); ok {
+		return cached
+	}
+
+	info := &typeInfo{}
+	info.fieldType = reflectutils.GetType(model, keyPath)
+
+	if info.fieldType != nil {
+		info.isSlice = info.fieldType.Kind() == reflect.Slice
+
+		if info.isSlice {
+			info.elemType = info.fieldType.Elem()
+			info.elemIsEnum = isEnumType(info.elemType)
+		} else {
+			info.isEnum = isEnumType(info.fieldType)
+		}
+	}
+
+	cache.Add(key, info)
+	return info
+}
+
 func buildDefaultTransform(model proto.Message) filter.TransformFunc {
+	var modelType reflect.Type
+	if model != nil {
+		modelType = reflect.TypeOf(model)
+	}
+
 	return func(input *filter.TransformInput) (*filter.TransformOutput, error) {
 		outputKey := input.KeyPath.Last()
 		outputValue := input.Value
 
-		if model != nil {
-			keyPath := input.KeyPath.String()
-			fieldType := reflectutils.GetType(model, keyPath)
-			if fieldType != nil {
-				if isEnumType(fieldType) {
-					fieldValue, err := reflectutils.Get(model, keyPath)
-					if err != nil {
-						return nil, errors.Wrapf(err, "get field value for %s", keyPath)
-					}
-					if !lo.IsNil(fieldValue) {
-						if protoEnum, ok := fieldValue.(protoreflect.Enum); ok {
-							converted, err := protorelay.ParseEnum(protoEnum)
-							if err != nil {
-								return nil, err
-							}
-							outputValue = converted
-						}
-					}
-				}
+		if model == nil || input.KeyType != filter.KeyTypeOperator {
+			return &filter.TransformOutput{Key: outputKey, Value: outputValue}, nil
+		}
 
-				if fieldType.Kind() == reflect.Slice {
-					elemType := fieldType.Elem()
-					if isEnumType(elemType) {
-						fieldValue, err := reflectutils.Get(model, keyPath)
-						if err != nil {
-							return nil, errors.Wrapf(err, "get field value for %s", keyPath)
-						}
-						if !lo.IsNil(fieldValue) {
-							sliceVal := reflect.ValueOf(fieldValue)
-							if sliceVal.IsValid() && sliceVal.Len() > 0 {
-								converted, err := convertProtoEnumSlice(sliceVal)
-								if err != nil {
-									return nil, err
-								}
-								outputValue = converted
-							}
-						}
+		keyPath := input.KeyPath.String()
+		info := getTypeInfo(modelType, model, keyPath)
+		if info == nil || info.fieldType == nil {
+			return &filter.TransformOutput{Key: outputKey, Value: outputValue}, nil
+		}
+
+		if info.isEnum {
+			fieldValue, err := reflectutils.Get(model, keyPath)
+			if err != nil {
+				return nil, errors.Wrapf(err, "get field value for %s", keyPath)
+			}
+			if !lo.IsNil(fieldValue) {
+				if protoEnum, ok := fieldValue.(protoreflect.Enum); ok {
+					converted, err := protorelay.ParseEnum(protoEnum)
+					if err != nil {
+						return nil, err
 					}
+					outputValue = converted
+				}
+			}
+		}
+
+		if info.isSlice && info.elemIsEnum {
+			fieldValue, err := reflectutils.Get(model, keyPath)
+			if err != nil {
+				return nil, errors.Wrapf(err, "get field value for %s", keyPath)
+			}
+			if !lo.IsNil(fieldValue) {
+				sliceVal := reflect.ValueOf(fieldValue)
+				if sliceVal.IsValid() && sliceVal.Len() > 0 {
+					converted, err := convertProtoEnumSlice(sliceVal)
+					if err != nil {
+						return nil, err
+					}
+					outputValue = converted
 				}
 			}
 		}
