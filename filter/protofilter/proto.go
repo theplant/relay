@@ -95,7 +95,7 @@ func toRawMap[T proto.Message](protoFilter T) (map[string]any, error) {
 		return nil, errors.Wrap(err, "unmarshal json to map")
 	}
 
-	filter.PruneMap(camelCaseMap)
+	filter.Prune(camelCaseMap)
 
 	return camelCaseMap, nil
 }

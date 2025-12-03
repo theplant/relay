@@ -29,12 +29,12 @@ func ToMap(v any) (map[string]any, error) {
 	if err := jsoniterForFilter.Unmarshal(data, &filterMap); err != nil {
 		return nil, errors.Wrap(err, "unmarshal filter to map")
 	}
-	PruneMap(filterMap)
+	prune(filterMap)
 	return filterMap, nil
 }
 
-// PruneMap recursively removes nil values, empty slices, and empty nested maps.
-func PruneMap(m map[string]any) {
+// Prune recursively removes nil values, empty slices, and empty nested maps.
+func Prune(m map[string]any) {
 	prune(m)
 }
 

@@ -61,12 +61,53 @@ func (k KeyPath) String() string {
 
 // TransformInput provides input information for transformation
 type TransformInput struct {
-	KeyPath   KeyPath
-	KeyType   KeyType
-	Value     any
-	RootMap   map[string]any
-	ParentMap map[string]any
-	TargetMap map[string]any
+	KeyPath    KeyPath
+	KeyType    KeyType
+	Value      any
+	Containers []any // Containers[i] is the container that holds KeyPath[i]
+}
+
+func (t *TransformInput) Root() any {
+	if len(t.Containers) == 0 {
+		return nil
+	}
+	return t.Containers[0]
+}
+
+func (t *TransformInput) RootMap() map[string]any {
+	m, _ := t.Root().(map[string]any)
+	return m
+}
+
+func (t *TransformInput) Current() any {
+	if len(t.Containers) == 0 {
+		return nil
+	}
+	return t.Containers[len(t.Containers)-1]
+}
+
+func (t *TransformInput) CurrentMap() map[string]any {
+	m, _ := t.Current().(map[string]any)
+	return m
+}
+
+func (t *TransformInput) Parent() any {
+	if len(t.Containers) < 2 {
+		return nil
+	}
+	return t.Containers[len(t.Containers)-2]
+}
+
+func (t *TransformInput) ParentMap() map[string]any {
+	m, _ := t.Parent().(map[string]any)
+	return m
+}
+
+func (t *TransformInput) ContainerAt(index int) any {
+	if index < 0 || index >= len(t.Containers) {
+		return nil
+	}
+	return t.Containers[index]
 }
 
 // TransformOutput represents the result of transformation
@@ -84,9 +125,10 @@ func Transform(sourceMap map[string]any, transform TransformFunc) (map[string]an
 		return nil, nil
 	}
 	rootMap := make(map[string]any)
-	if err := transformMap(sourceMap, rootMap, nil, nil, rootMap, transform); err != nil {
+	if err := transformMap(sourceMap, rootMap, nil, nil, transform); err != nil {
 		return nil, err
 	}
+	Prune(rootMap)
 	return rootMap, nil
 }
 
@@ -94,8 +136,7 @@ func transformMap(
 	sourceMap map[string]any,
 	targetMap map[string]any,
 	parentPath []string,
-	parentMap map[string]any,
-	rootMap map[string]any,
+	parentContainers []any,
 	transform TransformFunc,
 ) error {
 	for key, value := range sourceMap {
@@ -104,12 +145,13 @@ func transformMap(
 		}
 
 		currentPath := appendPath(parentPath, key)
+		currentContainers := appendContainer(parentContainers, targetMap)
 
 		lowerKey := strings.ToLower(key)
 		isLogical := lowerKey == "and" || lowerKey == "or" || lowerKey == "not"
 
 		if isLogical {
-			if err := handleLogical(lowerKey, value, currentPath, targetMap, parentMap, rootMap, transform); err != nil {
+			if err := handleLogical(lowerKey, value, currentPath, currentContainers, transform); err != nil {
 				return err
 			}
 			continue
@@ -127,12 +169,10 @@ func transformMap(
 		}
 
 		input := &TransformInput{
-			KeyPath:   currentPath,
-			KeyType:   keyType,
-			Value:     value,
-			RootMap:   rootMap,
-			ParentMap: parentMap,
-			TargetMap: targetMap,
+			KeyPath:    currentPath,
+			KeyType:    keyType,
+			Value:      value,
+			Containers: currentContainers,
 		}
 		output, err := transform(input)
 		if err != nil {
@@ -145,7 +185,7 @@ func transformMap(
 
 		if isRelationship {
 			nestedResult := make(map[string]any)
-			if err := transformMap(valueMap, nestedResult, currentPath, targetMap, rootMap, transform); err != nil {
+			if err := transformMap(valueMap, nestedResult, currentPath, currentContainers, transform); err != nil {
 				return errors.Wrapf(err, "field %s", key)
 			}
 			targetMap[output.Key] = nestedResult
@@ -153,17 +193,16 @@ func transformMap(
 			fieldResult := make(map[string]any)
 			for opKey, opValue := range valueMap {
 				opPath := appendPath(currentPath, opKey)
+				opContainers := appendContainer(currentContainers, fieldResult)
 				keyType := KeyTypeOperator
 				if strings.ToLower(opKey) == "fold" {
 					keyType = KeyTypeModifier
 				}
 				opInput := &TransformInput{
-					KeyPath:   opPath,
-					KeyType:   keyType,
-					Value:     opValue,
-					RootMap:   rootMap,
-					ParentMap: targetMap,
-					TargetMap: fieldResult,
+					KeyPath:    opPath,
+					KeyType:    keyType,
+					Value:      opValue,
+					Containers: opContainers,
 				}
 				opOutput, err := transform(opInput)
 				if err != nil {
@@ -183,18 +222,14 @@ func handleLogical(
 	lowerKey string,
 	value any,
 	currentPath []string,
-	targetMap map[string]any,
-	parentMap map[string]any,
-	rootMap map[string]any,
+	currentContainers []any,
 	transform TransformFunc,
 ) error {
 	input := &TransformInput{
-		KeyPath:   currentPath,
-		KeyType:   KeyTypeLogical,
-		Value:     value,
-		RootMap:   rootMap,
-		ParentMap: parentMap,
-		TargetMap: targetMap,
+		KeyPath:    currentPath,
+		KeyType:    KeyTypeLogical,
+		Value:      value,
+		Containers: currentContainers,
 	}
 	output, err := transform(input)
 	if err != nil {
@@ -205,6 +240,7 @@ func handleLogical(
 		return nil
 	}
 
+	targetMap := input.CurrentMap()
 	pathStr := strings.Join(currentPath, ".")
 	switch lowerKey {
 	case "and", "or":
@@ -222,7 +258,8 @@ func handleLogical(
 
 			result := make(map[string]any)
 			itemPath := appendPath(currentPath, fmt.Sprintf("[%d]", i))
-			if err := transformMap(subMap, result, itemPath, targetMap, rootMap, transform); err != nil {
+			itemContainers := appendContainer(currentContainers, transformedList)
+			if err := transformMap(subMap, result, itemPath, itemContainers, transform); err != nil {
 				return errors.Wrapf(err, "index %d", i)
 			}
 			transformedList = append(transformedList, result)
@@ -236,7 +273,7 @@ func handleLogical(
 		}
 
 		result := make(map[string]any)
-		if err := transformMap(subMap, result, currentPath, targetMap, rootMap, transform); err != nil {
+		if err := transformMap(subMap, result, currentPath, currentContainers, transform); err != nil {
 			return err
 		}
 		targetMap[output.Key] = result
@@ -247,6 +284,10 @@ func handleLogical(
 
 func appendPath(parent []string, key string) []string {
 	return append(append([]string(nil), parent...), key)
+}
+
+func appendContainer(parent []any, container any) []any {
+	return append(append([]any(nil), parent...), container)
 }
 
 var knownKeys = map[string]bool{
