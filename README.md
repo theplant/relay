@@ -458,10 +458,11 @@ For a complete example of proto definitions with pagination, ordering, and filte
 
 ### Proto Filter Field Alignment
 
-Proto-generated Go code capitalizes acronyms differently than Go conventions. For example, proto generates `CategoryId` but Go style requires `CategoryID`. Use `AlignWith` to automatically align filter field names with your model's acronym conventions:
+Proto-generated Go code capitalizes acronyms differently than Go conventions. For example, proto generates `CategoryId` but Go style requires `CategoryID`. Use `WithSmartPascalCase` to automatically handle common acronyms (ID, URL, HTTP, etc.) according to Go conventions:
 
 ```go
 import (
+    "github.com/theplant/relay/filter"
     "github.com/theplant/relay/filter/protofilter"
 )
 
@@ -470,14 +471,14 @@ type Product struct {
     CategoryID string  // Go convention: ID in uppercase
 }
 
-// Align proto filter fields with model conventions
+// Use smart PascalCase conversion for proper acronym handling
 filterMap, err := protofilter.ToMap(
     protoFilter,
-    protofilter.WithTransformKeyHook(
-        protofilter.AlignWith(Product{}),
+    protofilter.WithTransformHook(
+        filter.WithSmartPascalCase(),
     ),
 )
-// Proto generates "CategoryId" → Aligns to model's "CategoryID"
+// Proto generates "CategoryId" → Converts to "CategoryID"
 ```
 
 ### Implementation Example
@@ -489,7 +490,7 @@ For a complete implementation of a gRPC service using `relay`, refer to the `Pro
 This example demonstrates:
 
 - Parsing proto order fields with `protorelay.ParseOrderBy`
-- Parsing proto filters with `protofilter.ToMap` and `AlignWith`
+- Parsing proto filters with `protofilter.ToMap` and `filter.WithSmartPascalCase`
 - Creating a paginator with Base64-encoded cursors
 - Converting between proto and internal types with `protorelay.ParsePagination`
 - Building gRPC responses from pagination results

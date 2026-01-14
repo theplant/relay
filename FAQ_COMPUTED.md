@@ -64,11 +64,11 @@ For keyset pagination to work, the cursor must contain both `Priority` and `ID` 
 **Implementation:**
 
 ```go
-gormrelay.WithComputed(&Computed[*Shop]{
-    Columns: NewComputedColumns(map[string]string{
+gormrelay.WithComputed(&gormrelay.Computed[*Shop]{
+    Columns: gormrelay.NewComputedColumns(map[string]string{
         "Priority": "(CASE WHEN name = 'premium' THEN 1 ELSE 3 END)",
     }),
-    Scanner: NewComputedScanner[*Shop],
+    Scanner: gormrelay.NewComputedScanner[*Shop],
 })
 ```
 
@@ -274,25 +274,25 @@ type ShopWithExtra struct {
 
 gormrelay.NewKeysetAdapter[*Shop](
     db.Scopes(
-        AppendSelect(clause.Column{
+        gormrelay.AppendSelect(clause.Column{
             Name:  "'additional data'",
             Alias: "extra_info",
             Raw:   true,
         }),
     ),
-    gormrelay.WithComputed(&Computed[*Shop]{
-        Columns: NewComputedColumns(map[string]string{
+    gormrelay.WithComputed(&gormrelay.Computed[*Shop]{
+        Columns: gormrelay.NewComputedColumns(map[string]string{
             "Priority": "(CASE...)",
         }),
-        Scanner: func(_ *gorm.DB) (*ComputedScanner[*Shop], error) {
+        Scanner: func(_ *gorm.DB) (*gormrelay.ComputedScanner[*Shop], error) {
             nodes := []*ShopWithExtra{}
-            return &ComputedScanner[*Shop]{
+            return &gormrelay.ComputedScanner[*Shop]{
                 Destination: &nodes,
                 Transform: func(computedResults []map[string]any) []cursor.Node[*Shop] {
                     return lo.Map(nodes, func(s *ShopWithExtra, i int) cursor.Node[*Shop] {
                         // ExtraInfo is populated by GORM directly
                         // Priority is in computedResults
-                        return NewComputedNode(s.Shop, computedResults[i])
+                        return gormrelay.NewComputedNode(s.Shop, computedResults[i])
                     })
                 },
             }, nil
@@ -343,14 +343,14 @@ type Product struct {
     DiscountedPrice float64 `gorm:"-" json:"discountedPrice"`  // Will be populated from computedResults
 }
 
-gormrelay.WithComputed(&Computed[*Product]{
-    Columns: NewComputedColumns(map[string]string{
+gormrelay.WithComputed(&gormrelay.Computed[*Product]{
+    Columns: gormrelay.NewComputedColumns(map[string]string{
         "DiscountedPrice": "(price * (1 - discount_rate))",
         "Priority":        "(CASE...)",  // Used for ordering
     }),
-    Scanner: func(_ *gorm.DB) (*ComputedScanner[*Product], error) {
+    Scanner: func(_ *gorm.DB) (*gormrelay.ComputedScanner[*Product], error) {
         nodes := []*Product{}
-        return &ComputedScanner[*Product]{
+        return &gormrelay.ComputedScanner[*Product]{
             Destination: &nodes,
             Transform: func(computedResults []map[string]any) []cursor.Node[*Product] {
                 return lo.Map(nodes, func(p *Product, i int) cursor.Node[*Product] {
@@ -359,7 +359,7 @@ gormrelay.WithComputed(&Computed[*Product]{
                         p.DiscountedPrice = discounted
                     }
 
-                    return NewComputedNode(p, computedResults[i])
+                    return gormrelay.NewComputedNode(p, computedResults[i])
                 })
             },
         }, nil
