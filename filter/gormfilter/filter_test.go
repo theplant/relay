@@ -121,7 +121,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	defer env.TearDown()
+	defer func() { _ = env.TearDown() }()
 
 	db = env.DB
 	db.Logger = db.Logger.LogMode(logger.Info)

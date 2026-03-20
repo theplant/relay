@@ -199,7 +199,7 @@ func Scan(db *gorm.DB, dest any, opts ...ScanOption) (tx *gorm.DB) {
 	if err == nil {
 		rows, err := NewRowsSplitter(sqlRows, splitColumns)
 		if err != nil {
-			rows.Close()
+			_ = rows.Close()
 			_ = tx.AddError(err)
 		} else {
 			if rows.Next() {

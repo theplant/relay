@@ -473,8 +473,8 @@ func buildRelationshipFilterExpr(stmt *gorm.Statement, rel *schema.Relationship,
 	}
 
 	// Wrap the dialector to use ? placeholders for database-agnostic SQL generation
-	originalDialector := subQuery.Statement.DB.Dialector
-	subQuery.Statement.DB.Dialector = &questionMarkDialector{Dialector: originalDialector}
+	originalDialector := subQuery.Statement.Dialector
+	subQuery.Statement.Dialector = &questionMarkDialector{Dialector: originalDialector}
 
 	var localColumn, subQueryColumn clause.Column
 
