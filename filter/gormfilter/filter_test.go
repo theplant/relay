@@ -654,7 +654,7 @@ func TestScope(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				q := db.Model(&User{})
+				q := db.Session(&gorm.Session{QueryFields: false}).Model(&User{})
 				if tt.before != nil {
 					q = tt.before(q)
 				}
