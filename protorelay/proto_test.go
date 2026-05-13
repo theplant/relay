@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/theplant/testenv"
+	"github.com/qor5/x/v3/gormx"
 
 	"github.com/theplant/relay"
 	"github.com/theplant/relay/cursor"
@@ -165,13 +165,14 @@ func (p *Product) ToProto() *testdatav1.Product {
 var db *gorm.DB
 
 func TestMain(m *testing.M) {
-	env, err := testenv.New().DBEnable(true).SetUp()
-	if err != nil {
-		panic(err)
-	}
-	defer func() { _ = env.TearDown() }()
-
-	db = env.DB
+	ctx := context.Background()
+	testSuite := gormx.MustStartTestSuite(ctx)
+	defer func() {
+		if err := testSuite.Stop(context.Background()); err != nil {
+			fmt.Printf("Error during teardown: %v\n", err)
+		}
+	}()
+	db = testSuite.DB()
 	db.Logger = db.Logger.LogMode(logger.Info)
 
 	m.Run()

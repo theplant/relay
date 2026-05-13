@@ -2,12 +2,13 @@ package gormfilter_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/qor5/x/v3/gormx"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/theplant/testenv"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -117,13 +118,14 @@ type ProfileFilter struct {
 var db *gorm.DB
 
 func TestMain(m *testing.M) {
-	env, err := testenv.New().DBEnable(true).SetUp()
-	if err != nil {
-		panic(err)
-	}
-	defer func() { _ = env.TearDown() }()
-
-	db = env.DB
+	ctx := context.Background()
+	testSuite := gormx.MustStartTestSuite(ctx)
+	defer func() {
+		if err := testSuite.Stop(context.Background()); err != nil {
+			fmt.Printf("Error during teardown: %v\n", err)
+		}
+	}()
+	db = testSuite.DB()
 	db.Logger = db.Logger.LogMode(logger.Info)
 
 	m.Run()
