@@ -181,7 +181,7 @@ func TestScope(t *testing.T) {
 			{
 				name:     "empty filter",
 				filter:   &UserFilter{},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."deleted_at" IS NULL`,
 				wantVars: nil,
 			},
 			{
@@ -191,7 +191,7 @@ func TestScope(t *testing.T) {
 						Eq: lo.ToPtr("John"),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."name" = $1 AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."name" = $1 AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"John"},
 			},
 			{
@@ -202,7 +202,7 @@ func TestScope(t *testing.T) {
 						Fold:     true,
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") LIKE $1 AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE LOWER("users"."name") LIKE $1 AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%john%"},
 			},
 			{
@@ -216,7 +216,7 @@ func TestScope(t *testing.T) {
 						Gte: lo.ToPtr(18),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND LOWER("users"."name") LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 AND LOWER("users"."name") LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(18), "%john%"},
 			},
 			{
@@ -236,7 +236,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE (LOWER("users"."name") LIKE $1 OR "users"."age" >= $2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE (LOWER("users"."name") LIKE $1 OR "users"."age" >= $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%john%", float64(18)},
 			},
 			{
@@ -247,7 +247,7 @@ func TestScope(t *testing.T) {
 						IsNull: lo.ToPtr(false),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."description" IN ($1,$2) AND "users"."description" IS NOT NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."description" IN ($1,$2) AND "users"."description" IS NOT NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"desc1", "desc2"},
 			},
 			{
@@ -270,7 +270,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE (LOWER("users"."name") LIKE $1 OR ("users"."age" > $2 AND "users"."created_at" > $3)) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE (LOWER("users"."name") LIKE $1 OR ("users"."age" > $2 AND "users"."created_at" > $3)) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"j%", float64(30), "2024-01-01T00:00:00Z"},
 			},
 			{
@@ -293,7 +293,7 @@ func TestScope(t *testing.T) {
 						Gt: lo.ToPtr(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ((LOWER("users"."name") LIKE $1 AND "users"."age" > $2) AND "users"."created_at" > $3) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ((LOWER("users"."name") LIKE $1 AND "users"."age" > $2) AND "users"."created_at" > $3) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"j%", float64(30), "2024-01-01T00:00:00Z"},
 			},
 			{
@@ -309,7 +309,7 @@ func TestScope(t *testing.T) {
 				before: func(db *gorm.DB) *gorm.DB {
 					return db.Where("age > ? OR age < ?", 100, 200)
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE (age > $1 OR age < $2) AND ("users"."description" IS NULL AND "users"."name" = $3) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE (age > $1 OR age < $2) AND ("users"."description" IS NULL AND "users"."name" = $3) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{100, 200, "john"},
 			},
 			{
@@ -322,7 +322,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") <> $1 AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE LOWER("users"."name") <> $1 AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"john"},
 			},
 			{
@@ -332,7 +332,7 @@ func TestScope(t *testing.T) {
 						Neq: lo.ToPtr(20),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."age" <> $1 AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."age" <> $1 AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(20)},
 			},
 			{
@@ -343,7 +343,7 @@ func TestScope(t *testing.T) {
 						Fold: true,
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") IN ($1,$2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE LOWER("users"."name") IN ($1,$2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"john", "jane"},
 			},
 			{
@@ -353,7 +353,7 @@ func TestScope(t *testing.T) {
 						NotIn: []int{18, 20, 25},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."age" NOT IN ($1,$2,$3) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."age" NOT IN ($1,$2,$3) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(18), float64(20), float64(25)},
 			},
 			{
@@ -363,7 +363,7 @@ func TestScope(t *testing.T) {
 						Lt: lo.ToPtr(30),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."age" < $1 AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."age" < $1 AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(30)},
 			},
 			{
@@ -373,7 +373,7 @@ func TestScope(t *testing.T) {
 						Lte: lo.ToPtr(25),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."age" <= $1 AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."age" <= $1 AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(25)},
 			},
 			{
@@ -386,7 +386,7 @@ func TestScope(t *testing.T) {
 						Lt: lo.ToPtr(30),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" < $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" < $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(30), "%son"},
 			},
 			{
@@ -401,7 +401,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 OR "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 OR "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(30), "%son"},
 			},
 			{
@@ -414,7 +414,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."created_at" IN ($1,$2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."created_at" IN ($1,$2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"},
 			},
 			{
@@ -426,7 +426,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"company1"},
 			},
 			{
@@ -439,7 +439,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE LOWER("companies"."name") LIKE $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE LOWER("companies"."name") LIKE $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%tech%"},
 			},
 			{
@@ -454,7 +454,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."description" IS NOT NULL AND "companies"."name" LIKE $1) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."description" IS NOT NULL AND "companies"."name" LIKE $1) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"Tech%"},
 			},
 			{
@@ -464,7 +464,7 @@ func TestScope(t *testing.T) {
 						Eq: lo.ToPtr("company1"),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" = $1 AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."company_id" = $1 AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"company1"},
 			},
 			{
@@ -474,7 +474,7 @@ func TestScope(t *testing.T) {
 						In: []string{"company1", "company2"},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN ($1,$2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."company_id" IN ($1,$2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"company1", "company2"},
 			},
 			{
@@ -489,7 +489,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $2 AND "companies"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 AND "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $2 AND "companies"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(25), "company1"},
 			},
 			{
@@ -503,7 +503,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE "countries"."code" = $1 AND "countries"."deleted_at" IS NULL) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE "countries"."code" = $1 AND "countries"."deleted_at" IS NULL) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"US"},
 			},
 			{
@@ -526,7 +526,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE ("countries"."code" = $2 AND "countries"."name" = $3) AND "countries"."deleted_at" IS NULL) AND "companies"."name" LIKE $4) AND "companies"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 AND "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE ("countries"."code" = $2 AND "countries"."name" = $3) AND "countries"."deleted_at" IS NULL) AND "companies"."name" LIKE $4) AND "companies"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(21), "US", "United States", "%Tech%"},
 			},
 			{
@@ -545,7 +545,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE LOWER("countries"."name") LIKE $1 AND "countries"."deleted_at" IS NULL) AND LOWER("companies"."name") LIKE $2) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE ("companies"."country_id" IN (SELECT "countries"."id" FROM "countries" WHERE LOWER("countries"."name") LIKE $1 AND "countries"."deleted_at" IS NULL) AND LOWER("companies"."name") LIKE $2) AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%america%", "tech%"},
 			},
 			{
@@ -557,7 +557,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" = $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" = $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"Software Engineer"},
 			},
 			{
@@ -570,7 +570,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE LOWER("profiles"."bio") LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE LOWER("profiles"."bio") LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%engineer%"},
 			},
 			{
@@ -585,7 +585,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE ("profiles"."avatar" IS NOT NULL AND "profiles"."bio" LIKE $1) AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE ("profiles"."avatar" IS NOT NULL AND "profiles"."bio" LIKE $1) AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"Software%"},
 			},
 			{
@@ -600,7 +600,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $2 AND "profiles"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 AND "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $2 AND "profiles"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(25), "%engineer%"},
 			},
 			{
@@ -617,7 +617,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $2 AND "profiles"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $2 AND "profiles"."deleted_at" IS NULL)) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"Tech Corp", "%developer%"},
 			},
 			{
@@ -631,7 +631,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" NOT IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."id" NOT IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%manager%"},
 			},
 			{
@@ -654,7 +654,7 @@ func TestScope(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				q := db.Session(&gorm.Session{QueryFields: false}).Model(&User{})
+				q := db.Model(&User{})
 				if tt.before != nil {
 					q = tt.before(q)
 				}
@@ -736,7 +736,7 @@ func TestScope(t *testing.T) {
 						Contains: lo.ToPtr("user"),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(18), "%user%"},
 			},
 			{
@@ -748,7 +748,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."id" IN (SELECT "profiles"."user_id" FROM "profiles" WHERE "profiles"."bio" LIKE $1 AND "profiles"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"%engineer%"},
 			},
 			{
@@ -824,7 +824,7 @@ func TestScope(t *testing.T) {
 						Contains: lo.ToPtr("user"),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(18), "%user%"},
 			},
 			{
@@ -836,7 +836,7 @@ func TestScope(t *testing.T) {
 						},
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."company_id" IN (SELECT "companies"."id" FROM "companies" WHERE "companies"."name" = $1 AND "companies"."deleted_at" IS NULL) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{"company1"},
 			},
 			{
@@ -899,7 +899,7 @@ func TestScope(t *testing.T) {
 						Contains: lo.ToPtr("user"),
 					},
 				},
-				wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
+				wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 AND "users"."name" LIKE $2) AND "users"."deleted_at" IS NULL`,
 				wantVars: []any{float64(18), "%user%"},
 			},
 			{
@@ -964,7 +964,7 @@ func TestErrorHandling(t *testing.T) {
 			Find(&[]User{})
 
 		require.NoError(t, stmt.Error)
-		require.Equal(t, `SELECT * FROM "users" WHERE "users"."deleted_at" IS NULL`, stmt.Statement.SQL.String())
+		require.Equal(t, `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."deleted_at" IS NULL`, stmt.Statement.SQL.String())
 	})
 
 	t.Run("missing field in schema", func(t *testing.T) {
@@ -1141,7 +1141,7 @@ func TestAdditionalOperators(t *testing.T) {
 					Gt: lo.ToPtr(30),
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE "users"."age" > $1 AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."age" > $1 AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{float64(30)},
 		},
 		{
@@ -1152,7 +1152,7 @@ func TestAdditionalOperators(t *testing.T) {
 					Lt: lo.ToPtr(65),
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" > $1 AND "users"."age" < $2) AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" > $1 AND "users"."age" < $2) AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{float64(18), float64(65)},
 		},
 		{
@@ -1170,7 +1170,7 @@ func TestAdditionalOperators(t *testing.T) {
 			filter: &UserFilter{
 				And: []*UserFilter{},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."deleted_at" IS NULL`,
 			wantVars: nil,
 		},
 		{
@@ -1178,7 +1178,7 @@ func TestAdditionalOperators(t *testing.T) {
 			filter: &UserFilter{
 				Or: []*UserFilter{},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."deleted_at" IS NULL`,
 			wantVars: nil,
 		},
 		{
@@ -1192,7 +1192,7 @@ func TestAdditionalOperators(t *testing.T) {
 					},
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE NOT "users"."name" <> $1 AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE NOT "users"."name" <> $1 AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{"John"},
 		},
 		{
@@ -1207,7 +1207,7 @@ func TestAdditionalOperators(t *testing.T) {
 					},
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" <= $1 OR "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" <= $1 OR "users"."name" NOT LIKE $2) AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{float64(30), "%john%"},
 		},
 		{
@@ -1217,7 +1217,7 @@ func TestAdditionalOperators(t *testing.T) {
 					StartsWith: lo.ToPtr("J"),
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE "users"."name" LIKE $1 AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE "users"."name" LIKE $1 AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{"J%"},
 		},
 		{
@@ -1228,7 +1228,7 @@ func TestAdditionalOperators(t *testing.T) {
 					Fold:     true,
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") LIKE $1 AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE LOWER("users"."name") LIKE $1 AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{"%son"},
 		},
 		{
@@ -1239,7 +1239,7 @@ func TestAdditionalOperators(t *testing.T) {
 					Fold: true,
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") = $1 AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE LOWER("users"."name") = $1 AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{"john"},
 		},
 		{
@@ -1250,7 +1250,7 @@ func TestAdditionalOperators(t *testing.T) {
 					Fold: true,
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE LOWER("users"."name") <> $1 AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE LOWER("users"."name") <> $1 AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{"john"},
 		},
 		{
@@ -1262,7 +1262,7 @@ func TestAdditionalOperators(t *testing.T) {
 					Fold: true,
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE (LOWER("users"."name") < $1 AND LOWER("users"."name") <= $2) AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE (LOWER("users"."name") < $1 AND LOWER("users"."name") <= $2) AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{"m", "z"},
 		},
 		{
@@ -1274,7 +1274,7 @@ func TestAdditionalOperators(t *testing.T) {
 					Fold: true,
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE (LOWER("users"."name") > $1 AND LOWER("users"."name") >= $2) AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE (LOWER("users"."name") > $1 AND LOWER("users"."name") >= $2) AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{"a", "b"},
 		},
 		{
@@ -1292,7 +1292,7 @@ func TestAdditionalOperators(t *testing.T) {
 					},
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE ("users"."age" >= $1 AND ("users"."name" LIKE $2 AND "users"."name" LIKE $3)) AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE ("users"."age" >= $1 AND ("users"."name" LIKE $2 AND "users"."name" LIKE $3)) AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{float64(20), "%n", "J%"},
 		},
 		{
@@ -1313,7 +1313,7 @@ func TestAdditionalOperators(t *testing.T) {
 					},
 				},
 			},
-			wantSQL:  `SELECT * FROM "users" WHERE NOT ("users"."age" < $1 OR "users"."age" > $2) AND "users"."deleted_at" IS NULL`,
+			wantSQL:  `SELECT "users"."id","users"."created_at","users"."updated_at","users"."deleted_at","users"."name","users"."description","users"."age","users"."company_id" FROM "users" WHERE NOT ("users"."age" < $1 OR "users"."age" > $2) AND "users"."deleted_at" IS NULL`,
 			wantVars: []any{float64(20), float64(60)},
 		},
 	}
