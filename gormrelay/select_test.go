@@ -34,7 +34,7 @@ func TestAppendSelect(t *testing.T) {
 			)).Find(&testModel{})
 		})
 
-		expectedSQL := `SELECT *,"id" AS "user_id","name" AS "user_name" FROM "test_models"`
+		expectedSQL := `SELECT "test_models"."id","test_models"."name","test_models"."email","test_models"."profile_id","id" AS "user_id","name" AS "user_name" FROM "test_models"`
 		require.Equal(t, expectedSQL, sql)
 	})
 
@@ -68,7 +68,7 @@ func TestAppendSelect(t *testing.T) {
 				Scopes(AppendSelect(clause.Column{Name: "email", Alias: "user_email"})).
 				Find(&testModel{})
 		})
-		require.Equal(t, sql, `SELECT *,"email" AS "user_email","name" AS "user_name","id" AS "user_id" FROM "test_models"`)
+		require.Equal(t, sql, `SELECT "test_models"."id","test_models"."name","test_models"."email","test_models"."profile_id","email" AS "user_email","name" AS "user_name","id" AS "user_id" FROM "test_models"`)
 	})
 
 	t.Run("multiple Find", func(t *testing.T) {
@@ -77,10 +77,10 @@ func TestAppendSelect(t *testing.T) {
 			clause.Column{Name: "name", Alias: "user_name"},
 		))
 
-		require.Equal(t, `SELECT *,"id" AS "user_id","name" AS "user_name" FROM "test_models"`, queryDB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		require.Equal(t, `SELECT "test_models"."id","test_models"."name","test_models"."email","test_models"."profile_id","id" AS "user_id","name" AS "user_name" FROM "test_models"`, queryDB.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			return tx.Find(&testModel{})
 		}))
-		require.Equal(t, `SELECT *,"id" AS "user_id","name" AS "user_name" FROM "test_models"`, queryDB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		require.Equal(t, `SELECT "test_models"."id","test_models"."name","test_models"."email","test_models"."profile_id","id" AS "user_id","name" AS "user_name" FROM "test_models"`, queryDB.ToSQL(func(tx *gorm.DB) *gorm.DB {
 			return tx.Find(&testModel{})
 		}))
 	})
@@ -100,10 +100,10 @@ func TestAppendSelect(t *testing.T) {
 			return tx.Find(&testModel{})
 		})
 
-		expectedSessionSQL := `SELECT *,"name" AS "session_name" FROM "test_models"`
+		expectedSessionSQL := `SELECT "test_models"."id","test_models"."name","test_models"."email","test_models"."profile_id","name" AS "session_name" FROM "test_models"`
 		require.Equal(t, expectedSessionSQL, sessionSQL)
 
-		expectedOriginalSQL := `SELECT * FROM "test_models"`
+		expectedOriginalSQL := `SELECT "test_models"."id","test_models"."name","test_models"."email","test_models"."profile_id" FROM "test_models"`
 		require.Equal(t, expectedOriginalSQL, originalSQL)
 	})
 
@@ -118,7 +118,7 @@ func TestAppendSelect(t *testing.T) {
 			return tx.Find(&testModel{})
 		})
 
-		expectedSQL := `SELECT *,"id" AS "preserve_id" FROM "test_models"`
+		expectedSQL := `SELECT "test_models"."id","test_models"."name","test_models"."email","test_models"."profile_id","id" AS "preserve_id" FROM "test_models"`
 		require.Equal(t, expectedSQL, sql)
 	})
 }

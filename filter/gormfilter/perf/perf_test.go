@@ -1,6 +1,7 @@
 package perf
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/qor5/x/v3/gormx"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/theplant/testenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -94,13 +95,15 @@ func TestMain(m *testing.M) {
 			}
 		}()
 	} else {
-		env, err := testenv.New().DBEnable(true).SetUp()
-		if err != nil {
-			panic(err)
-		}
-		defer func() { _ = env.TearDown() }()
+		ctx := context.Background()
+		testSuite := gormx.MustStartTestSuite(ctx)
+		defer func() {
+			if err := testSuite.Stop(context.Background()); err != nil {
+				fmt.Printf("Error during teardown: %v\n", err)
+			}
+		}()
 
-		db = env.DB
+		db = testSuite.DB()
 		db.Logger = db.Logger.LogMode(logger.Info)
 	}
 
