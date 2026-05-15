@@ -6,7 +6,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/json-iterator/go v1.1.12
 	github.com/pkg/errors v0.9.1
-	github.com/qor5/x/v3 v3.2.1-0.20260513111456-ce22ad0a7920
+	github.com/qor5/x/v3 v3.2.1-0.20260515090943-65b6f4f15c42
 	github.com/samber/lo v1.52.0
 	github.com/stretchr/testify v1.11.1
 	github.com/sunfmin/reflectutils v1.0.6
